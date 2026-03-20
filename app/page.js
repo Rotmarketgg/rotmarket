@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Navbar from '@/components/Navbar'
 import ListingCard, { ListingCardSkeleton } from '@/components/ListingCard'
-import { getListings, supabase } from '@/lib/supabase'
+import { getListings } from '@/lib/supabase'
 import { GAMES } from '@/lib/constants'
 import Link from 'next/link'
 
@@ -27,17 +27,9 @@ export default function HomePage() {
   const [debouncedSearch, setDebSearch] = useState('')
   const [page, setPage]                 = useState(0)
   const [hasMore, setHasMore]           = useState(true)
-  const [user, setUser]                 = useState(null)
-
   const debounceTimer  = useRef(null)
   const sentinelRef    = useRef(null)   // invisible div at bottom of grid
   const observerRef    = useRef(null)   // IntersectionObserver instance
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user || null)
-    })
-  }, [])
 
   // Debounce search
   useEffect(() => {

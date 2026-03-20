@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import Navbar from '@/components/Navbar'
 import Link from 'next/link'
 import { getUser } from '@/lib/supabase'
+import { useEffect } from 'react'
 
 const TOPICS = [
   { id: 'scam', label: 'Report a Scam', emoji: '🚨', description: 'Report a user who scammed or attempted to scam you' },
@@ -16,7 +16,6 @@ const TOPICS = [
 ]
 
 export default function ContactPage() {
-  const router = useRouter()
   const [form, setForm] = useState({ topic: '', username: '', email: '', message: '' })
   const [submitted, setSubmitted] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -25,7 +24,6 @@ export default function ContactPage() {
 
   useEffect(() => {
     getUser().then(u => {
-      if (!u) { router.push('/auth/login'); return }
       setAuthChecked(true)
     })
   }, [])

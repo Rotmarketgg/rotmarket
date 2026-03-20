@@ -508,12 +508,12 @@ export default function ProfilePage() {
                 : <div>
                     <div style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 10, padding: '10px 16px', marginBottom: 16, fontSize: 13, color: '#fbbf24' }}>
                       ⏰ These listings have expired. Renew them to make them active again for another{' '}
-                      {profile?.badge === 'VIP' || profile?.badge === 'Owner' ? '30' : profile?.badge === 'Verified Trader' ? '14' : '7'} days.
+                      {primaryBadgeName === 'VIP' || primaryBadgeName === 'Owner' ? '30' : primaryBadgeName === 'Verified Trader' ? '14' : '7'} days.
                     </div>
                     <div className="listing-grid">
                       {expiredListings.map(l => (
                         <div key={l.id}>
-                          <div style={{ opacity: 0.55, pointerEvents: 'none' }}>
+                          <div style={{ opacity: 0.65 }}>
                             <ListingCard listing={l} />
                           </div>
                           <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>

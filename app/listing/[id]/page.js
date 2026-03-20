@@ -8,8 +8,7 @@ import StarRating from '@/components/StarRating'
 import ReportButton from '@/components/ReportButton'
 import { getListing, getReviews, getUser, getProfile, createReview, supabase } from '@/lib/supabase'
 import { getRarityStyle, timeAgo, formatPrice, getInitial, checkRateLimit } from '@/lib/utils'
-import { BADGE_HIERARCHY, BADGE_META, getPrimaryBadge } from '@/lib/constants'
-import { PAYMENT_METHODS } from '@/lib/constants'
+import { BADGE_HIERARCHY, BADGE_META, getPrimaryBadge, PAYMENT_METHODS } from '@/lib/constants'
 import { isClean } from '@/lib/profanity'
 
 // ─── TRADE HELPERS ────────────────────────────────────────────────

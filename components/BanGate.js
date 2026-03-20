@@ -1,12 +1,14 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
 // Pages that banned users can still access (so they can log out)
 const ALLOWED_PATHS = ['/auth/login', '/auth/signup', '/auth/reset', '/auth/update-password']
 
 export default function BanGate({ children }) {
+  const pathname = usePathname()
   const [banned, setBanned] = useState(false)
   const [banReason, setBanReason] = useState(null)
   const [checked, setChecked] = useState(false)
@@ -58,7 +60,8 @@ export default function BanGate({ children }) {
   // Don't flash anything while checking
   if (!checked) return children
 
-  if (banned) {
+  // Let banned users access auth pages so they can sign out / appeal
+  if (banned && !ALLOWED_PATHS.some(p => pathname?.startsWith(p))) {
     return (
       <div style={{
         minHeight: '100vh', background: '#0a0a0f',

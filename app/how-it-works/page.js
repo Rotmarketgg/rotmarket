@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Navbar from '@/components/Navbar'
 import Link from 'next/link'
-import { supabase } from '@/lib/supabase'
+import { getUser } from '@/lib/supabase'
 
 const STEPS = [
   {
@@ -79,9 +79,7 @@ export default function HowItWorksPage() {
   const [openFaq, setOpenFaq] = useState(null)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user || null)
-    })
+    getUser().then(u => setUser(u || null))
   }, [])
 
   return (

@@ -6,13 +6,9 @@ import { useRouter } from 'next/navigation'
 import Navbar from '@/components/Navbar'
 import { supabase, getUser } from '@/lib/supabase'
 import { getInitial } from '@/lib/utils'
+import { BADGE_META, BADGE_HIERARCHY, getPrimaryBadge } from '@/lib/constants'
 
-const BADGE_STYLES = {
-  'Verified Trader': { color: '#4ade80', bg: 'rgba(74,222,128,0.1)', border: 'rgba(74,222,128,0.3)', icon: '✓' },
-  'VIP': { color: '#f59e0b', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.3)', icon: '⭐' },
-  'Moderator': { color: '#60a5fa', bg: 'rgba(96,165,250,0.1)', border: 'rgba(96,165,250,0.3)', icon: '🛡️' },
-  'Owner': { color: '#ef4444', bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.3)', icon: '👑' },
-}
+const BADGE_STYLES = BADGE_META
 
 const MEDALS = ['🥇', '🥈', '🥉']
 const MEDAL_COLORS = ['#f59e0b', '#9ca3af', '#cd7c2f']
@@ -38,7 +34,7 @@ export default function LeaderboardPage() {
       if (tab === 'trades') {
         const { data, error } = await supabase
           .from('profiles')
-          .select('id, username, trade_count, rating, review_count, badge, avatar_url')
+          .select('id, username, trade_count, rating, review_count, badge, badges, avatar_url')
           .not('username', 'is', null)
           .gt('trade_count', 0)
           .order('trade_count', { ascending: false })
@@ -49,7 +45,7 @@ export default function LeaderboardPage() {
         // Query profiles directly — rating/review_count are kept in sync by DB trigger
         const { data, error } = await supabase
           .from('profiles')
-          .select('id, username, trade_count, rating, review_count, badge, avatar_url')
+          .select('id, username, trade_count, rating, review_count, badge, badges, avatar_url')
           .not('username', 'is', null)
           .gt('review_count', 0)
           .order('rating', { ascending: false })
@@ -165,11 +161,16 @@ export default function LeaderboardPage() {
                         <div style={{ fontSize: 13, fontWeight: 800, color: '#f9fafb', marginBottom: 2 }}>
                           {trader.username}
                         </div>
-                        {trader.badge && BADGE_STYLES[trader.badge] && (
-                          <div style={{ fontSize: 9, color: BADGE_STYLES[trader.badge].color, marginBottom: 6, fontWeight: 700 }}>
-                            {BADGE_STYLES[trader.badge].icon} {trader.badge}
-                          </div>
-                        )}
+                        {(() => {
+                          const badges = trader.badges?.length ? trader.badges : trader.badge ? [trader.badge] : []
+                          const primary = getPrimaryBadge(badges)
+                          const meta = primary ? BADGE_STYLES[primary] : null
+                          return meta ? (
+                            <div style={{ fontSize: 9, color: meta.color, marginBottom: 6, fontWeight: 700 }}>
+                              {meta.icon} {primary}
+                            </div>
+                          ) : null
+                        })()}
                         <div style={{ fontSize: 20, fontWeight: 900, color: MEDAL_COLORS[rank] }}>
                           {getValue(trader)}
                         </div>
@@ -184,7 +185,9 @@ export default function LeaderboardPage() {
             {/* Full list */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {traders.map((trader, i) => {
-                const badge = trader.badge ? BADGE_STYLES[trader.badge] : null
+                const traderBadges = trader.badges?.length ? trader.badges : trader.badge ? [trader.badge] : []
+                const primaryBadge = getPrimaryBadge(traderBadges)
+                const badge = primaryBadge ? BADGE_STYLES[primaryBadge] : null
                 return (
                   <Link key={trader.id} href={`/profile/${trader.username}`} style={{ textDecoration: 'none' }}>
                     <div style={{
@@ -224,7 +227,7 @@ export default function LeaderboardPage() {
                               fontSize: 9, fontWeight: 800, color: badge.color,
                               background: badge.bg, border: `1px solid ${badge.border}`,
                               borderRadius: 3, padding: '1px 5px',
-                            }}>{badge.icon} {trader.badge}</span>
+                            }}>{badge.icon} {primaryBadge}</span>
                           )}
                         </div>
                         <div style={{ display: 'flex', gap: 12, marginTop: 2, flexWrap: 'wrap' }}>

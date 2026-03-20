@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Navbar from '@/components/Navbar'
 import { getUser, getProfile } from '@/lib/supabase'
+import { getPrimaryBadge } from '@/lib/constants'
 
 const CASHAPP = '$tdowdy94'
 const VENMO   = '@davari'
@@ -20,10 +21,10 @@ const VIP_PERKS = [
 
 const COMPARISON = [
   { feature: 'Listings per day',  free: '3',        verified: '5',         vip: '10' },
-  { feature: 'Posting cooldown',  free: '15 min',   verified: '15 min',    vip: 'None' },
+  { feature: 'Posting cooldown',  free: '15 min',   verified: '15 min',    vip: 'None ⚡' },
   { feature: 'Listing lifetime',  free: '7 days',   verified: '14 days',   vip: '30 days' },
   { feature: 'Profile badge',     free: '—',        verified: '✓ Green',   vip: '⭐ Gold' },
-  { feature: 'Card border',       free: '—',        verified: 'Rarity',    vip: 'Gold' },
+  { feature: 'Card border',       free: 'Rarity',   verified: 'Rarity',    vip: 'Gold glow' },
   { feature: 'Monthly price',     free: 'Free',     verified: 'Free',       vip: '$10/mo' },
 ]
 
@@ -43,7 +44,9 @@ export default function VIPPage() {
     })
   }, [])
 
-  const isVip = profile?.badge === 'VIP' || profile?.badge === 'Owner'
+  const profileBadges = profile?.badges?.length ? profile.badges : profile?.badge ? [profile.badge] : []
+  const primaryBadge = getPrimaryBadge(profileBadges)
+  const isVip = primaryBadge === 'VIP' || primaryBadge === 'Owner'
 
   if (!authChecked) return <div style={{ minHeight: '100vh' }}><Navbar /></div>
 
