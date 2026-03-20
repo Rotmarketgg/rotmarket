@@ -46,7 +46,7 @@ export default function AdminPage() {
 
   const profileBadges = profile?.badges?.length ? profile.badges : profile?.badge ? [profile.badge] : []
   const isOwner = profileBadges.includes('Owner')
-  const isMod = profileBadges.includes('Moderator'
+  const isMod = profileBadges.includes('Moderator')
 
   // Reports state
   const [reports, setReports] = useState([])
