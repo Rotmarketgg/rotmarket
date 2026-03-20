@@ -1,0 +1,5 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" rx="112" fill="#0a0a0f"/>
+  <text x="256" y="240" font-family="Arial Black, Impact, sans-serif" font-weight="900" font-size="144" fill="#4ade80" text-anchor="middle">ROT</text>
+  <text x="256" y="390" font-family="Arial Black, Impact, sans-serif" font-weight="900" font-size="112" fill="#ffffff" text-anchor="middle">MKT</text>
+</svg>

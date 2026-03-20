@@ -18,11 +18,18 @@ export const metadata = {
   title: 'RotMarket — Brainrot Trading Marketplace',
   description: 'The trusted marketplace to buy, sell, and trade Brainrots in Fortnite Brainrot and Roblox Brainrot. Verified traders, reputation system, safe trades.',
   keywords: 'Fortnite Brainrot, Roblox Brainrot, Brainrot marketplace, Brainrot trade, RotMarket',
+  icons: {
+    icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+    ],
+    apple: '/apple-touch-icon.svg',
+  },
   openGraph: {
     title: 'RotMarket — Brainrot Trading Marketplace',
-    description: 'The trusted marketplace to buy, sell, and trade Brainrots.',
+    description: 'The trusted marketplace to buy, sell, and trade Brainrots in Fortnite Brainrot and Roblox Brainrot.',
     type: 'website',
-  }
+    siteName: 'RotMarket',
+  },
 }
 
 export default function RootLayout({ children }) {
