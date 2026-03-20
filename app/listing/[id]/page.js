@@ -454,6 +454,13 @@ export default function ListingPage() {
           </div>
         )}
 
+        {listing.promoted && (
+          <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.35)', borderRadius: 10, padding: '10px 16px', marginBottom: 14, color: '#f59e0b', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+            ⚡ PROMOTED LISTING
+            <span style={{ fontSize: 11, fontWeight: 500, color: '#d97706' }}>— Featured by the seller</span>
+          </div>
+        )}
+
         <div style={{ background: '#0f0f18', border: `1px solid ${rarity.border}44`, borderRadius: 16, overflow: 'hidden', boxShadow: `0 0 40px ${rarity.glow}66, 0 20px 60px rgba(0,0,0,0.5)` }}>
 
           {/* Rarity accent bar — matches card design */}

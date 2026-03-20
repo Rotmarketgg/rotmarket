@@ -122,7 +122,6 @@ export default function Navbar() {
           <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 0, textDecoration: 'none', marginRight: 28, flexShrink: 0 }}>
             <span style={{ fontSize: 26, fontWeight: 900, color: '#4ade80', fontFamily: 'var(--font-display)', letterSpacing: '-0.5px' }}>ROT</span>
             <span style={{ fontSize: 26, fontWeight: 900, color: '#fff', fontFamily: 'var(--font-display)', letterSpacing: '-0.5px' }}>MARKET</span>
-            <span style={{ fontSize: 10, fontWeight: 700, color: '#4ade80', background: 'rgba(74,222,128,0.12)', border: '1px solid rgba(74,222,128,0.25)', borderRadius: 4, padding: '1px 5px', marginLeft: 6, letterSpacing: '0.05em', alignSelf: 'flex-start', marginTop: 4 }}>gg</span>
           </Link>
 
           {/* Nav links */}

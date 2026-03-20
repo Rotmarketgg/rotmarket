@@ -63,18 +63,22 @@ export default function ListingCard({ listing }) {
           height: '100%',
           opacity: listing.status === 'sold' ? 0.5 : 1,
           outline: listing.promoted
-            ? '2px solid rgba(245,158,11,0.7)'
+            ? '2px solid rgba(139,92,246,0.7)'
             : isVip
-            ? '1px solid rgba(245,158,11,0.2)'
+            ? '1px solid rgba(245,158,11,0.4)'
             : `1px solid ${rarity.border}44`,
           boxShadow: listing.promoted
-            ? `0 0 20px rgba(245,158,11,0.25), inset 0 0 0 1px rgba(245,158,11,0.15)`
+            ? `0 0 20px rgba(139,92,246,0.25), inset 0 0 0 1px rgba(139,92,246,0.15)`
+            : isVip
+            ? `0 0 16px rgba(245,158,11,0.2), 0 2px 8px rgba(0,0,0,0.4)`
             : `0 2px 8px rgba(0,0,0,0.4)`,
         }}
         onMouseEnter={e => {
           e.currentTarget.style.transform = 'translateY(-4px) scale(1.01)'
           e.currentTarget.style.boxShadow = listing.promoted
-            ? `0 12px 32px rgba(245,158,11,0.4), inset 0 0 0 1px rgba(245,158,11,0.2)`
+            ? `0 12px 32px rgba(139,92,246,0.4), inset 0 0 0 1px rgba(139,92,246,0.2)`
+            : isVip
+            ? `0 12px 28px rgba(0,0,0,0.5), 0 0 0 1px rgba(245,158,11,0.5)`
             : `0 12px 28px rgba(0,0,0,0.5), 0 0 0 1px ${rarity.border}66`
         }}
         onMouseLeave={e => {
@@ -103,7 +107,12 @@ export default function ListingCard({ listing }) {
 
           {/* Promoted badge */}
           {listing.promoted && (
-            <div style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)', border: '1px solid rgba(245,158,11,0.6)', color: '#f59e0b', fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', borderRadius: 4, padding: '3px 7px' }}>⚡ PROMOTED</div>
+            <div style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)', border: '1px solid rgba(139,92,246,0.6)', color: '#a78bfa', fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', borderRadius: 4, padding: '3px 7px' }}>⚡ PROMOTED</div>
+          )}
+
+          {/* VIP seller badge — only when not promoted (avoid overlap) */}
+          {!listing.promoted && isVip && (
+            <div style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)', border: '1px solid rgba(245,158,11,0.6)', color: '#f59e0b', fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', borderRadius: 4, padding: '3px 7px' }}>⭐ VIP</div>
           )}
 
           {/* Type badge */}
