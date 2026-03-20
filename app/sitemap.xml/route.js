@@ -5,7 +5,7 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 )
 
-const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://rotmarket.gg'
+const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://rotmarket.net'
 
 export async function GET() {
   const staticPages = [

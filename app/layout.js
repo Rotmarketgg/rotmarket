@@ -28,6 +28,7 @@ export const metadata = {
     title: 'RotMarket — Brainrot Trading Marketplace',
     description: 'The trusted marketplace to buy, sell, and trade Brainrots in Fortnite Brainrot and Roblox Brainrot.',
     type: 'website',
+    url: 'https://rotmarket.net',
     siteName: 'RotMarket',
   },
 }

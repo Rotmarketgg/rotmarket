@@ -5,4 +5,4 @@ Disallow: /settings
 Disallow: /messages
 Disallow: /auth/
 
-Sitemap: https://rotmarket.gg/sitemap.xml
+Sitemap: https://rotmarket.net/sitemap.xml
