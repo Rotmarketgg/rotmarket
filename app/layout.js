@@ -1,4 +1,18 @@
+import { Barlow_Condensed, DM_Sans } from 'next/font/google'
 import './globals.css'
+import BanGate from '@/components/BanGate'
+
+const displayFont = Barlow_Condensed({
+  subsets: ['latin'],
+  weight: ['700', '800', '900'],
+  variable: '--font-display',
+})
+
+const bodyFont = DM_Sans({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-body',
+})
 
 export const metadata = {
   title: 'RotMarket — Brainrot Trading Marketplace',
@@ -13,9 +27,9 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${displayFont.variable} ${bodyFont.variable}`}>
       <body className="bg-rot-dark text-white font-body antialiased min-h-screen">
-        {children}
+        <BanGate>{children}</BanGate>
       </body>
     </html>
   )
