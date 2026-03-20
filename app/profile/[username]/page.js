@@ -559,21 +559,21 @@ export default function ProfilePage() {
                           {/* Reviewer avatar */}
                           <div style={{
                             width: 36, height: 36, borderRadius: '50%', overflow: 'hidden', flexShrink: 0,
-                            background: r.profiles?.avatar_url ? 'transparent' : 'linear-gradient(135deg, #4ade80, #22c55e)',
+                            background: r.reviewer?.avatar_url ? 'transparent' : 'linear-gradient(135deg, #4ade80, #22c55e)',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             fontSize: 13, fontWeight: 900, color: '#0a0a0f',
                           }}>
-                            {r.profiles?.avatar_url
-                              ? <img src={r.profiles.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                              : getInitial(r.profiles?.username || '?')
+                            {r.reviewer?.avatar_url
+                              ? <img src={r.reviewer?.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              : getInitial(r.reviewer?.username || '?')
                             }
                           </div>
 
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                              {r.profiles?.username
-                                ? <Link href={`/profile/${r.profiles.username}`} style={{ fontSize: 13, fontWeight: 700, color: '#d1d5db', textDecoration: 'none' }}>
-                                    {r.profiles.username}
+                              {r.reviewer?.username
+                                ? <Link href={`/profile/${r.reviewer?.username}`} style={{ fontSize: 13, fontWeight: 700, color: '#d1d5db', textDecoration: 'none' }}>
+                                    {r.reviewer?.username}
                                   </Link>
                                 : <span style={{ fontSize: 13, fontWeight: 700, color: '#6b7280' }}>Unknown</span>
                               }
