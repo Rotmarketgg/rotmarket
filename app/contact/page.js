@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import Navbar from '@/components/Navbar'
 import Link from 'next/link'
 import { getUser } from '@/lib/supabase'
-import { useEffect } from 'react'
 
 const TOPICS = [
   { id: 'scam', label: 'Report a Scam', emoji: '🚨', description: 'Report a user who scammed or attempted to scam you' },
