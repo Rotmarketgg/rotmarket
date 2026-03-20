@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /settings
+Disallow: /messages
+Disallow: /auth/
+
+Sitemap: https://rotmarket.gg/sitemap.xml
