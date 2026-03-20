@@ -10,10 +10,7 @@ const nextConfig = {
       },
     ],
   },
-  // Suppress the ESM/CJS warning — Next.js 14 handles this internally
-  experimental: {
-    serverComponentsExternalPackages: [],
-  },
+  serverExternalPackages: [],
 }
 
 module.exports = nextConfig
