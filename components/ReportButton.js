@@ -25,6 +25,7 @@ export default function ReportButton({ reportedUserId, listingId, label = 'Repor
 
   const handleSubmit = async () => {
     if (!reason) { setError('Please select a reason.'); return }
+    if (!reportedUserId) { setError('Invalid report target.'); return }
     const user = await getUser()
     if (!user) { router.push('/auth/login'); return }
     // Prevent self-reporting

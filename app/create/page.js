@@ -121,7 +121,7 @@ export default function CreateListingPage() {
 
       // Update with image URLs
       if (imageUrls.length > 0) {
-        await updateListing(listing.id, { images: imageUrls })
+        await updateListing(listing.id, { images: imageUrls }, user.id)
       }
 
       setSuccess(true)

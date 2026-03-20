@@ -4,7 +4,6 @@ import { useState, useEffect, useRef, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 import Navbar from '@/components/Navbar'
 import { getUser, getProfile, updateProfile, supabase } from '@/lib/supabase'
-import { getInitial } from '@/lib/utils'
 import { validateClean } from '@/lib/profanity'
 
 export default function SettingsPageWrapper() {
@@ -137,12 +136,13 @@ function SettingsPage() {
 
   const handlePasswordChange = async () => {
     const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
-      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/update-password`,
+      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || window.location.origin}/auth/update-password`,
     })
     if (!error) alert('Password reset email sent!')
     else alert('Failed to send reset email.')
   }
 
+  const getInitial = (username) => (username || '?')[0].toUpperCase()
 
   if (loading) return (
     <div style={{ minHeight: '100vh' }}>

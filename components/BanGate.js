@@ -30,8 +30,27 @@ export default function BanGate({ children }) {
     }
     check()
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session) { setBanned(false); setBanReason(null) }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!session) {
+        setBanned(false)
+        setBanReason(null)
+        setChecked(true)
+        return
+      }
+      // Re-check ban status on every auth state change (e.g. tab focus, token refresh)
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('banned, ban_reason')
+        .eq('id', session.user.id)
+        .single()
+      if (profile?.banned) {
+        setBanned(true)
+        setBanReason(profile.ban_reason || null)
+      } else {
+        setBanned(false)
+        setBanReason(null)
+      }
+      setChecked(true)
     })
     return () => subscription.unsubscribe()
   }, [])

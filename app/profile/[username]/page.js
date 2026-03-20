@@ -9,19 +9,14 @@ import StarRating from '@/components/StarRating'
 import ReportButton from '@/components/ReportButton'
 import { getProfileByUsername, getUser, getUserListings, getReviews, deleteListing, supabase } from '@/lib/supabase'
 import { timeAgo, getInitial } from '@/lib/utils'
+import { BADGE_HIERARCHY, BADGE_META, getPrimaryBadge } from '@/lib/constants'
 
+// Extend shared BADGE_META with profile-specific desc field
 const BADGE_CONFIG = {
-  'Verified Trader': { color: '#4ade80', bg: 'rgba(74,222,128,0.12)', border: 'rgba(74,222,128,0.3)', icon: '✓', desc: 'Trusted trader — 25 five-star reviews' },
-  'VIP': { color: '#f59e0b', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.3)', icon: '⭐', desc: 'VIP supporter of RotMarket' },
-  'Moderator': { color: '#60a5fa', bg: 'rgba(96,165,250,0.12)', border: 'rgba(96,165,250,0.3)', icon: '🛡️', desc: 'Community moderator' },
-  'Owner': { color: '#ef4444', bg: 'rgba(239,68,68,0.12)', border: 'rgba(239,68,68,0.3)', icon: '👑', desc: 'RotMarket owner' },
-}
-
-const BADGE_HIERARCHY = ['Owner', 'Moderator', 'VIP', 'Verified Trader']
-
-function getPrimaryBadge(badges) {
-  if (!badges?.length) return null
-  return BADGE_HIERARCHY.find(b => badges.includes(b)) || null
+  'Owner':           { ...BADGE_META['Owner'],           desc: 'RotMarket owner' },
+  'Moderator':       { ...BADGE_META['Moderator'],       desc: 'Community moderator' },
+  'VIP':             { ...BADGE_META['VIP'],             desc: 'VIP supporter of RotMarket' },
+  'Verified Trader': { ...BADGE_META['Verified Trader'], desc: 'Trusted trader — 25 five-star reviews' },
 }
 
 export default function ProfilePage() {
@@ -458,7 +453,7 @@ export default function ProfilePage() {
                       const expiringSoon = days !== null && days <= 5
                       return (
                         <div key={l.id} style={{ position: 'relative' }}>
-                          <ListingCard listing={{ ...l, profiles: profile }} />
+                          <ListingCard listing={l} />
                           {/* Pending offer badge */}
                           {isOwn && listingOffers[l.id] > 0 && (
                             <Link href={`/listing/${l.id}`} style={{
@@ -499,8 +494,8 @@ export default function ProfilePage() {
                 ? <EmptyState icon="🏷️" title="No sales yet" message="Completed trades will appear here." />
                 : <div className="listing-grid">
                     {soldListings.map(l => (
-                      <div key={l.id} style={{ opacity: 0.6, pointerEvents: 'none' }}>
-                        <ListingCard listing={{ ...l, profiles: profile }} />
+                      <div key={l.id} style={{ opacity: 0.65 }}>
+                        <ListingCard listing={l} />
                       </div>
                     ))}
                   </div>
@@ -519,7 +514,7 @@ export default function ProfilePage() {
                       {expiredListings.map(l => (
                         <div key={l.id}>
                           <div style={{ opacity: 0.55, pointerEvents: 'none' }}>
-                            <ListingCard listing={{ ...l, profiles: profile }} />
+                            <ListingCard listing={l} />
                           </div>
                           <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
                             <button onClick={() => handleRenew(l.id)} style={{
@@ -564,7 +559,7 @@ export default function ProfilePage() {
                             fontSize: 13, fontWeight: 900, color: '#0a0a0f',
                           }}>
                             {r.reviewer?.avatar_url
-                              ? <img src={r.reviewer?.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              ? <img src={r.reviewer.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                               : getInitial(r.reviewer?.username || '?')
                             }
                           </div>
@@ -572,12 +567,12 @@ export default function ProfilePage() {
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                               {r.reviewer?.username
-                                ? <Link href={`/profile/${r.reviewer?.username}`} style={{ fontSize: 13, fontWeight: 700, color: '#d1d5db', textDecoration: 'none' }}>
-                                    {r.reviewer?.username}
+                                ? <Link href={`/profile/${r.reviewer.username}`} style={{ fontSize: 13, fontWeight: 700, color: '#d1d5db', textDecoration: 'none' }}>
+                                    {r.reviewer.username}
                                   </Link>
                                 : <span style={{ fontSize: 13, fontWeight: 700, color: '#6b7280' }}>Unknown</span>
                               }
-                              <StarRating rating={r.rating} size={12} />
+                              <StarRating rating={r.rating} size={12} showValue />
                             </div>
                             <div style={{ fontSize: 11, color: '#4b5563', marginTop: 1 }}>{timeAgo(r.created_at)}</div>
                           </div>

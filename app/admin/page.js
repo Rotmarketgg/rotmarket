@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Navbar from '@/components/Navbar'
 import { getUser, getProfile, supabase } from '@/lib/supabase'
-import { BADGE_HIERARCHY, BADGE_META, getPrimaryBadge } from '@/lib/constants'
 import { timeAgo, getInitial } from '@/lib/utils'
 
 const BADGE_COLORS = {
@@ -45,8 +44,9 @@ export default function AdminPage() {
   const [disputes, setDisputes] = useState([])
   const [disputesLoading, setDisputesLoading] = useState(false)
 
-  const isOwner = profile?.badge === 'Owner'
-  const isMod = profile?.badge === 'Moderator'
+  const profileBadges = profile?.badges?.length ? profile.badges : profile?.badge ? [profile.badge] : []
+  const isOwner = profileBadges.includes('Owner')
+  const isMod = profileBadges.includes('Moderator'
 
   // Reports state
   const [reports, setReports] = useState([])
@@ -77,7 +77,8 @@ export default function AdminPage() {
       const u = await getUser()
       if (!u) { router.push('/auth/login'); return }
       const p = await getProfile(u.id)
-      if (!p || !['Owner', 'Moderator'].includes(p.badge)) {
+      const pBadges = p?.badges?.length ? p.badges : p?.badge ? [p.badge] : []
+      if (!p || !['Owner', 'Moderator'].some(b => pBadges.includes(b))) {
         setUnauthorized(true); setLoading(false); return
       }
       setUser(u)
@@ -673,7 +674,13 @@ function ReportCard({ report, onUpdate }) {
 
 // ─── USER ROW ─────────────────────────────────────────────────────
 
-const ALL_BADGES = BADGE_HIERARCHY
+const ALL_BADGES = ['Owner', 'Moderator', 'VIP', 'Verified Trader']
+const BADGE_HIERARCHY = ['Owner', 'Moderator', 'VIP', 'Verified Trader']
+
+function getPrimaryBadge(badges) {
+  if (!badges?.length) return null
+  return BADGE_HIERARCHY.find(b => badges.includes(b)) || null
+}
 
 function UserRow({ user, onUpdateBadge, onToggleBan }) {
   // Support both legacy badge and new badges array
