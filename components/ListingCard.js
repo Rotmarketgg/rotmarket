@@ -5,8 +5,8 @@ import { getRarityStyle, timeAgo, formatPrice, getInitial } from '@/lib/utils'
 import { BADGE_HIERARCHY, BADGE_META, getPrimaryBadge } from '@/lib/constants'
 
 const TYPE_CONFIG = {
-  sale:  { label: 'SALE',  bg: 'rgba(22,163,74,0.9)',  border: '#16a34a', color: '#fff' },
-  trade: { label: 'TRADE', bg: 'rgba(37,99,235,0.9)',  border: '#2563eb', color: '#fff' },
+  sale:  { label: 'FOR SALE',  bg: 'rgba(22,163,74,0.9)',  border: '#16a34a', color: '#fff' },
+  trade: { label: 'FOR TRADE', bg: 'rgba(37,99,235,0.9)',  border: '#2563eb', color: '#fff' },
   sold:  { label: 'SOLD',  bg: 'rgba(239,68,68,0.85)', border: '#ef4444', color: '#fff' },
 }
 

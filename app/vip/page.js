@@ -6,8 +6,8 @@ import Link from 'next/link'
 import Navbar from '@/components/Navbar'
 import { getUser, getProfile } from '@/lib/supabase'
 
-const CASHAPP = '$YourCashAppHandle'                     // ← replace
-const VENMO   = '@YourVenmoHandle'                      // ← replace
+const CASHAPP = '$tdowdy94'
+const VENMO   = '@davari'
 
 const VIP_PERKS = [
   { icon: '📋', title: '10 listings/day', sub: 'Free: 3  ·  Verified: 5  ·  VIP: 10' },
