@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { AuthLayout } from '../signup/page'
@@ -10,8 +10,26 @@ export default function UpdatePasswordPage() {
   const [form, setForm] = useState({ password: '', confirm: '' })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [ready, setReady] = useState(false)
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  useEffect(() => {
+    // Listen for the PASSWORD_RECOVERY event — fired when user arrives
+    // via the reset link. Without this the token is consumed silently.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setReady(true)
+      }
+    })
+
+    // Also check if already in a recovery session (e.g. page refresh)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) setReady(true)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
 
   const handleSubmit = async () => {
     if (form.password.length < 8) { setError('Password must be at least 8 characters.'); return }
@@ -21,13 +39,23 @@ export default function UpdatePasswordPage() {
     try {
       const { error } = await supabase.auth.updateUser({ password: form.password })
       if (error) throw error
-      router.push('/?reset=success')
+      await supabase.auth.signOut()
+      router.push('/auth/login?reset=success')
     } catch (err) {
       setError(err.message || 'Failed to update password.')
     } finally {
       setLoading(false)
     }
   }
+
+  // Show a loading state while waiting for the recovery event
+  if (!ready) return (
+    <AuthLayout title="Verifying link..." subtitle="Just a moment">
+      <div style={{ textAlign: 'center', padding: '20px 0', color: '#6b7280', fontSize: 14 }}>
+        Checking your reset link...
+      </div>
+    </AuthLayout>
+  )
 
   return (
     <AuthLayout title="New Password" subtitle="Choose a strong password">
