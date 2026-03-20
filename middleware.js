@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 
-// Passthrough proxy — all auth is handled client-side per page.
+// Passthrough middleware — all auth is handled client-side per page.
 // Keeping this minimal to avoid Edge Runtime compatibility issues on Vercel.
-export function proxy() {
+export function middleware() {
   return NextResponse.next()
 }
 
