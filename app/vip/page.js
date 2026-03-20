@@ -20,10 +20,10 @@ const VIP_PERKS = [
 
 const COMPARISON = [
   { feature: 'Listings per day',  free: '3',        verified: '5',         vip: '10' },
-  { feature: 'Posting cooldown',  free: '15 min',   verified: '15 min',    vip: 'None ⚡' },
+  { feature: 'Posting cooldown',  free: '15 min',   verified: '15 min',    vip: 'None' },
   { feature: 'Listing lifetime',  free: '7 days',   verified: '14 days',   vip: '30 days' },
   { feature: 'Profile badge',     free: '—',        verified: '✓ Green',   vip: '⭐ Gold' },
-  { feature: 'Card border',       free: 'Rarity',   verified: 'Rarity',    vip: 'Gold glow' },
+  { feature: 'Card border',       free: '—',        verified: 'Rarity',    vip: 'Gold' },
   { feature: 'Monthly price',     free: 'Free',     verified: 'Free',       vip: '$10/mo' },
 ]
 
