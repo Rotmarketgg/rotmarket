@@ -46,41 +46,17 @@ export default function LeaderboardPage() {
         if (!error) setTraders(data || [])
         else console.error('Leaderboard error:', error)
       } else {
-        // Pull directly from reviews table — bypasses stale profile.rating column
-        // Groups by seller, counts reviews, averages rating
-        const { data: reviewData, error } = await supabase
-          .from('reviews')
-          .select('seller_id, rating')
-        if (error) { console.error('Leaderboard error:', error); setLoading(false); return }
-
-        // Aggregate client-side
-        const map = {}
-        for (const r of reviewData || []) {
-          if (!map[r.seller_id]) map[r.seller_id] = { total: 0, count: 0 }
-          map[r.seller_id].total += r.rating
-          map[r.seller_id].count += 1
-        }
-
-        // Only show sellers with at least 1 review
-        const sellerIds = Object.keys(map)
-        if (sellerIds.length === 0) { setTraders([]); setLoading(false); return }
-
-        const { data: profiles, error: pErr } = await supabase
+        // Query profiles directly — rating/review_count are kept in sync by DB trigger
+        const { data, error } = await supabase
           .from('profiles')
           .select('id, username, trade_count, rating, review_count, badge, avatar_url')
-          .in('id', sellerIds)
           .not('username', 'is', null)
-
-        if (pErr) { console.error('Leaderboard error:', pErr); setLoading(false); return }
-
-        const enriched = (profiles || []).map(p => ({
-          ...p,
-          // Use live-computed values from reviews table, not stale profile columns
-          rating: Math.round((map[p.id]?.total / map[p.id]?.count) * 10) / 10 || p.rating,
-          review_count: map[p.id]?.count || p.review_count,
-        })).sort((a, b) => b.rating - a.rating || b.review_count - a.review_count)
-
-        setTraders(enriched)
+          .gt('review_count', 0)
+          .order('rating', { ascending: false })
+          .order('review_count', { ascending: false })
+          .limit(50)
+        if (error) { console.error('Leaderboard error:', error); setLoading(false); return }
+        setTraders(data || [])
       }
       setLoading(false)
     }

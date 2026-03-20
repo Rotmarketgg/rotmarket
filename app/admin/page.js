@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Navbar from '@/components/Navbar'
 import { getUser, getProfile, supabase } from '@/lib/supabase'
+import { BADGE_HIERARCHY, BADGE_META, getPrimaryBadge } from '@/lib/constants'
 import { timeAgo, getInitial } from '@/lib/utils'
 
 const BADGE_COLORS = {
@@ -264,22 +265,6 @@ export default function AdminPage() {
     }
   }
 
-  async function deleteUser(userId, username) {
-    if (userId === user?.id) {
-      alert('You cannot delete your own account.')
-      return
-    }
-    if (!confirm(`Permanently delete @${username}? This will delete all their listings, reviews, messages, and trades. This cannot be undone.`)) return
-    try {
-      const { error } = await supabase.rpc('admin_delete_user', { target_id: userId })
-      if (error) throw error
-      loadUsers(userSearch)
-      loadStats()
-    } catch (err) {
-      alert('Failed: ' + err.message)
-    }
-  }
-
   async function toggleBan(userId, currentlyBanned, username) {
     // Prevent owner from banning themselves
     if (userId === user?.id) {
@@ -502,7 +487,7 @@ export default function AdminPage() {
               ? <div style={{ color: '#6b7280', padding: 20 }}>Loading...</div>
               : <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {users.map(u => (
-                    <UserRow key={u.id} user={u} onUpdateBadge={updateBadge} onToggleBan={toggleBan} onDelete={deleteUser} />
+                    <UserRow key={u.id} user={u} onUpdateBadge={updateBadge} onToggleBan={toggleBan} />
                   ))}
                 </div>
             }
@@ -688,15 +673,9 @@ function ReportCard({ report, onUpdate }) {
 
 // ─── USER ROW ─────────────────────────────────────────────────────
 
-const ALL_BADGES = ['Owner', 'Moderator', 'VIP', 'Verified Trader']
-const BADGE_HIERARCHY = ['Owner', 'Moderator', 'VIP', 'Verified Trader']
+const ALL_BADGES = BADGE_HIERARCHY
 
-function getPrimaryBadge(badges) {
-  if (!badges?.length) return null
-  return BADGE_HIERARCHY.find(b => badges.includes(b)) || null
-}
-
-function UserRow({ user, onUpdateBadge, onToggleBan, onDelete }) {
+function UserRow({ user, onUpdateBadge, onToggleBan }) {
   // Support both legacy badge and new badges array
   const initialBadges = user.badges?.length ? user.badges
     : user.badge ? [user.badge]

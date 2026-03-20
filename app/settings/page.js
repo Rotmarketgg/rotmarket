@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 import Navbar from '@/components/Navbar'
 import { getUser, getProfile, updateProfile, supabase } from '@/lib/supabase'
+import { getInitial } from '@/lib/utils'
 import { validateClean } from '@/lib/profanity'
 
 export default function SettingsPageWrapper() {
@@ -142,7 +143,6 @@ function SettingsPage() {
     else alert('Failed to send reset email.')
   }
 
-  const getInitial = (username) => (username || '?')[0].toUpperCase()
 
   if (loading) return (
     <div style={{ minHeight: '100vh' }}>

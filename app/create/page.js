@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Navbar from '@/components/Navbar'
-import { getUser, getProfile, createListing, updateListing, uploadListingImage } from '@/lib/supabase'
+import { getUser, getProfile, createListing, updateListing, uploadListingImage, supabase } from '@/lib/supabase'
 import { GAMES, RARITIES, PAYMENT_METHODS, LISTING_TYPES } from '@/lib/constants'
 import { validateListing, checkRateLimit } from '@/lib/utils'
 import { validateClean, validateContent } from '@/lib/profanity'
@@ -20,8 +20,7 @@ export default function CreateListingPage() {
   const [loading, setLoading] = useState(false)
   const [authLoading, setAuthLoading] = useState(true)
   const [errors, setErrors] = useState({})
-  const [imageFiles, setImageFiles] = useState([])
-  const [imagePreviews, setImagePreviews] = useState([])
+  const [images, setImages] = useState([]) // [{file, preview}]
   const [success, setSuccess] = useState(false)
 
   const [form, setForm] = useState({
@@ -59,28 +58,24 @@ export default function CreateListingPage() {
   }
 
   const handleImages = (files) => {
-    const MAX_SIZE = 5 * 1024 * 1024 // 5MB
-    const valid = []
+    const MAX_SIZE = 5 * 1024 * 1024
     const rejected = []
-    Array.from(files).forEach(f => {
-      if (!f.type.startsWith('image/')) return
-      if (f.size > MAX_SIZE) { rejected.push(f.name); return }
-      valid.push(f)
+    const valid = Array.from(files).filter(f => {
+      if (!f.type.startsWith('image/')) return false
+      if (f.size > MAX_SIZE) { rejected.push(f.name); return false }
+      return true
     })
     if (rejected.length > 0) alert(`These files exceed the 5MB limit and were not added:\n${rejected.join('\n')}`)
-    const toAdd = [...imageFiles, ...valid].slice(0, 4)
-    setImageFiles(toAdd)
-    toAdd.slice(imageFiles.length).forEach(f => {
+    const slots = 4 - images.length
+    const toAdd = valid.slice(0, slots)
+    toAdd.forEach(file => {
       const reader = new FileReader()
-      reader.onload = e => setImagePreviews(prev => [...prev, e.target.result].slice(0, 4))
-      reader.readAsDataURL(f)
+      reader.onload = e => setImages(prev => [...prev, { file, preview: e.target.result }].slice(0, 4))
+      reader.readAsDataURL(file)
     })
   }
 
-  const removeImage = (i) => {
-    setImageFiles(prev => prev.filter((_, idx) => idx !== i))
-    setImagePreviews(prev => prev.filter((_, idx) => idx !== i))
-  }
+  const removeImage = (i) => setImages(prev => prev.filter((_, idx) => idx !== i))
 
   const handleSubmit = async () => {
     const errs = validateListing(form)
@@ -111,11 +106,17 @@ export default function CreateListingPage() {
         images: [],
       })
 
-      // Upload images
-      const imageUrls = []
-      for (let i = 0; i < imageFiles.length; i++) {
-        const url = await uploadListingImage(imageFiles[i], listing.id, i)
-        imageUrls.push(url)
+      // Upload images — clean up listing if uploads fail
+      let imageUrls = []
+      try {
+        for (let i = 0; i < images.length; i++) {
+          const url = await uploadListingImage(images[i].file, listing.id, i)
+          imageUrls.push(url)
+        }
+      } catch (uploadErr) {
+        // Delete the listing so we don't leave a ghost listing with no images
+        await supabase.from('listings').delete().eq('id', listing.id)
+        throw new Error('Image upload failed. Your listing was not created. Please try again.')
       }
 
       // Update with image URLs
@@ -126,7 +127,7 @@ export default function CreateListingPage() {
       setSuccess(true)
       setTimeout(() => router.push(`/listing/${listing.id}`), 1200)
     } catch (err) {
-      alert('Failed to create listing. Please try again.\n' + err.message)
+      alert(err.message || 'Failed to create listing. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -340,7 +341,7 @@ export default function CreateListingPage() {
               style={{
                 border: '2px dashed #2d2d3f', borderRadius: 12, padding: 24,
                 textAlign: 'center', cursor: 'pointer', transition: 'border-color 0.15s',
-                marginBottom: imagePreviews.length > 0 ? 12 : 0,
+                marginBottom: images.length > 0 ? 12 : 0,
               }}
               onMouseEnter={e => e.currentTarget.style.borderColor = '#4ade80'}
               onMouseLeave={e => e.currentTarget.style.borderColor = '#2d2d3f'}
@@ -351,11 +352,11 @@ export default function CreateListingPage() {
               <input ref={fileInputRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={e => handleImages(e.target.files)} />
             </div>
 
-            {imagePreviews.length > 0 && (
+            {images.length > 0 && (
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {imagePreviews.map((src, i) => (
+                {images.map(({ preview }, i) => (
                   <div key={i} style={{ position: 'relative', width: 80, height: 80 }}>
-                    <img src={src} alt="" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8, border: '1px solid #2d2d3f' }} />
+                    <img src={preview} alt="" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8, border: '1px solid #2d2d3f' }} />
                     {i === 0 && <div style={{ position: 'absolute', bottom: 2, left: 2, fontSize: 8, background: 'rgba(74,222,128,0.9)', color: '#000', borderRadius: 3, padding: '1px 4px', fontWeight: 700 }}>MAIN</div>}
                     <button
                       onClick={() => removeImage(i)}

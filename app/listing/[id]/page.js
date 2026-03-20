@@ -8,6 +8,7 @@ import StarRating from '@/components/StarRating'
 import ReportButton from '@/components/ReportButton'
 import { getListing, getReviews, getUser, getProfile, createReview, supabase } from '@/lib/supabase'
 import { getRarityStyle, timeAgo, formatPrice, getInitial, checkRateLimit } from '@/lib/utils'
+import { BADGE_HIERARCHY, BADGE_META, getPrimaryBadge } from '@/lib/constants'
 import { PAYMENT_METHODS } from '@/lib/constants'
 import { isClean } from '@/lib/profanity'
 
@@ -454,13 +455,6 @@ export default function ListingPage() {
           </div>
         )}
 
-        {listing.promoted && (
-          <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.35)', borderRadius: 10, padding: '10px 16px', marginBottom: 14, color: '#f59e0b', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
-            ⚡ PROMOTED LISTING
-            <span style={{ fontSize: 11, fontWeight: 500, color: '#d97706' }}>— Featured by the seller</span>
-          </div>
-        )}
-
         <div style={{ background: '#0f0f18', border: `1px solid ${rarity.border}44`, borderRadius: 16, overflow: 'hidden', boxShadow: `0 0 40px ${rarity.glow}66, 0 20px 60px rgba(0,0,0,0.5)` }}>
 
           {/* Rarity accent bar — matches card design */}
@@ -699,13 +693,6 @@ export default function ListingPage() {
 
                         {/* All badges — hierarchy order */}
                         {(() => {
-                          const BADGE_HIERARCHY = ['Owner', 'Moderator', 'VIP', 'Verified Trader']
-                          const BADGE_META = {
-                            'Owner':           { icon: '👑', color: '#ef4444', bg: 'rgba(239,68,68,0.1)',   border: 'rgba(239,68,68,0.3)' },
-                            'Moderator':       { icon: '🛡️', color: '#60a5fa', bg: 'rgba(96,165,250,0.1)',  border: 'rgba(96,165,250,0.3)' },
-                            'VIP':             { icon: '⭐', color: '#f59e0b', bg: 'rgba(245,158,11,0.1)',  border: 'rgba(245,158,11,0.3)' },
-                            'Verified Trader': { icon: '✓',  color: '#4ade80', bg: 'rgba(74,222,128,0.1)',  border: 'rgba(74,222,128,0.3)' },
-                          }
                           const sellerBadges = seller.badges?.length ? seller.badges
                             : seller.badge ? [seller.badge] : []
                           const activeBadges = BADGE_HIERARCHY.filter(b => sellerBadges.includes(b))

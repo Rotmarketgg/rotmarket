@@ -60,10 +60,17 @@ function MessagesInner() {
       .on('postgres_changes', {
         event: 'INSERT', schema: 'public', table: 'messages',
         filter: `listing_id=eq.${activeConvo.listing_id}`,
-      }, (payload) => {
+      }, async (payload) => {
+        // Fetch full message with sender profile — raw payload lacks the join
+        const { data } = await supabase
+          .from('messages')
+          .select('*, sender:profiles!messages_sender_id_fkey (id, username, avatar_url)')
+          .eq('id', payload.new.id)
+          .single()
+        const msg = data || payload.new
         setMessages(prev => {
-          if (prev.find(m => m.id === payload.new.id)) return prev
-          return [...prev, payload.new]
+          if (prev.find(m => m.id === msg.id)) return prev
+          return [...prev, msg]
         })
         scrollToBottom()
       })

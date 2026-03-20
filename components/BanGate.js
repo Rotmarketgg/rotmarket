@@ -37,7 +37,7 @@ export default function BanGate({ children }) {
   }, [])
 
   // Don't flash anything while checking
-  if (!checked) return null
+  if (!checked) return children
 
   if (banned) {
     return (
