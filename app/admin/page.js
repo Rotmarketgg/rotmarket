@@ -264,6 +264,22 @@ export default function AdminPage() {
     }
   }
 
+  async function deleteUser(userId, username) {
+    if (userId === user?.id) {
+      alert('You cannot delete your own account.')
+      return
+    }
+    if (!confirm(`Permanently delete @${username}? This will delete all their listings, reviews, messages, and trades. This cannot be undone.`)) return
+    try {
+      const { error } = await supabase.rpc('admin_delete_user', { target_id: userId })
+      if (error) throw error
+      loadUsers(userSearch)
+      loadStats()
+    } catch (err) {
+      alert('Failed: ' + err.message)
+    }
+  }
+
   async function toggleBan(userId, currentlyBanned, username) {
     // Prevent owner from banning themselves
     if (userId === user?.id) {
@@ -486,7 +502,7 @@ export default function AdminPage() {
               ? <div style={{ color: '#6b7280', padding: 20 }}>Loading...</div>
               : <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {users.map(u => (
-                    <UserRow key={u.id} user={u} onUpdateBadge={updateBadge} onToggleBan={toggleBan} />
+                    <UserRow key={u.id} user={u} onUpdateBadge={updateBadge} onToggleBan={toggleBan} onDelete={deleteUser} />
                   ))}
                 </div>
             }
@@ -680,7 +696,7 @@ function getPrimaryBadge(badges) {
   return BADGE_HIERARCHY.find(b => badges.includes(b)) || null
 }
 
-function UserRow({ user, onUpdateBadge, onToggleBan }) {
+function UserRow({ user, onUpdateBadge, onToggleBan, onDelete }) {
   // Support both legacy badge and new badges array
   const initialBadges = user.badges?.length ? user.badges
     : user.badge ? [user.badge]
