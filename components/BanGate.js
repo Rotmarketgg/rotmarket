@@ -33,8 +33,8 @@ export default function BanGate({ children }) {
     check()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      // Skip token refresh events — no need to re-check ban on every silent refresh
-      if (event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') return
+      // Skip token refresh events — no need to re-check ban on silent refresh
+      if (event === 'TOKEN_REFRESHED') return
 
       if (!session) {
         setBanned(false)
@@ -44,7 +44,7 @@ export default function BanGate({ children }) {
       }
 
       // Only re-check ban on actual sign-in events
-      if (event === 'SIGNED_IN' || event === 'PASSWORD_RECOVERY') {
+      if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'PASSWORD_RECOVERY') {
         const { data: profile } = await supabase
           .from('profiles')
           .select('banned, ban_reason')

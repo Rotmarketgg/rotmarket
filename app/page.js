@@ -5,7 +5,7 @@ import Navbar from '@/components/Navbar'
 import ListingCard, { ListingCardSkeleton } from '@/components/ListingCard'
 import { getListings } from '@/lib/supabase'
 
-const withTimeout = (promise, ms = 7000) =>
+const withTimeout = (promise, ms = 10000) =>
   Promise.race([
     promise,
     new Promise((_, reject) =>

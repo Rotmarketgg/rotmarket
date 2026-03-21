@@ -37,20 +37,19 @@ export default function Navbar() {
       }
     })
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      // Ignore token refresh events — these fire SIGNED_OUT then SIGNED_IN
-      // in quick succession and cause a visible "logged out" flash
-      if (event === 'TOKEN_REFRESHED') return
-      if (event === 'INITIAL_SESSION') return
+      if (event === 'TOKEN_REFRESHED') return  // silent refresh, no UI change needed
 
       if (session?.user) {
+        // INITIAL_SESSION, SIGNED_IN, USER_UPDATED — all restore user state
         setUser(session.user)
         getProfile(session.user.id).then(setProfile)
         getUnreadCount(session.user.id).then(setUnread)
         fetchPendingOffers(session.user.id)
       } else if (event === 'SIGNED_OUT') {
-        // Only clear state on explicit sign-out, not transient token events
+        // Only clear on explicit sign-out
         setUser(null); setProfile(null); setUnread(0); setPendingOffers(0)
       }
+      // For any other event with no session, do nothing — avoids false signed-out flashes
     })
     return () => subscription.unsubscribe()
   }, [])

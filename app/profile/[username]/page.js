@@ -9,7 +9,7 @@ import StarRating from '@/components/StarRating'
 import ReportButton from '@/components/ReportButton'
 import { getProfileByUsername, getUser, getUserListings, getReviews, deleteListing, supabase } from '@/lib/supabase'
 
-const withTimeout = (promise, ms = 8000) =>
+const withTimeout = (promise, ms = 12000) =>
   Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error('Request timed out')), ms))])
 import { timeAgo, getInitial } from '@/lib/utils'
 import { BADGE_HIERARCHY, BADGE_META, getPrimaryBadge } from '@/lib/constants'
@@ -75,9 +75,14 @@ export default function ProfilePage() {
       } catch (err) {
         console.error('Profile load error:', err)
         if (err.message === 'Request timed out') {
-          setNotFound(true) // show not found rather than infinite spinner
+          // Timeout means DB was slow, not that the user doesn't exist
+          // Reload the page so they get a fresh attempt
+          window.location.reload()
+        } else {
+          // Actual not found or permission error
+          setNotFound(true)
+          setLoading(false)
         }
-        setLoading(false)
       }
     }
     load()

@@ -22,7 +22,9 @@ function LoginForm() {
     setLoading(true)
     try {
       await signIn(form.email, form.password)
-      // Full page reload ensures all components re-initialise with fresh session
+      // Wait briefly for Supabase to persist session to localStorage
+      // before navigating — prevents "stuck on logging in" on slow connections
+      await new Promise(resolve => setTimeout(resolve, 300))
       window.location.href = redirect
     } catch (err) {
       setError(err.message || 'Invalid email or password.')
