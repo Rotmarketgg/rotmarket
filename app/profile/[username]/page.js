@@ -163,7 +163,7 @@ export default function ProfilePage() {
         <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', flexWrap: 'wrap' }}>
 
           {/* ── LEFT SIDEBAR ──────────────────────────────────── */}
-          <div style={{ width: 260, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ width: 260, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 12 }} className="full-mobile">
 
             {/* Identity card */}
             <div style={{
@@ -337,7 +337,7 @@ export default function ProfilePage() {
                 ].map((s, i) => (
                   <button key={i} onClick={s.onClick} style={{
                     width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '10px 14px', borderRadius: 8, border: 'none',
+                    padding: '8px 12px', borderRadius: 8, border: 'none',
                     background: 'transparent', cursor: 'pointer',
                     transition: 'background 0.12s',
                     textAlign: 'left',
@@ -404,13 +404,13 @@ export default function ProfilePage() {
           </div>
 
           {/* ── RIGHT CONTENT ─────────────────────────────────── */}
-          <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ flex: 1, minWidth: 0 }} className="full-mobile">
 
             {/* Tab bar */}
             <div style={{
               display: 'flex', gap: 4, marginBottom: 20,
               background: '#111118', border: '1px solid #1f2937',
-              borderRadius: 12, padding: 4,
+              borderRadius: 12, padding: 4, flexWrap: 'wrap',
             }}>
               {[
                 { id: 'listings', label: 'Active', count: activeListings.length },

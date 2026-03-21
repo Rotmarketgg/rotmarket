@@ -28,6 +28,7 @@ function MessagesInner() {
   const [disputeForm, setDisputeForm] = useState({ reason: '', details: '' })
   const [disputeLoading, setDisputeLoading] = useState(false)
   const [disputeSuccess, setDisputeSuccess] = useState(false)
+  const [mobileView, setMobileView] = useState('list') // 'list' | 'chat'
 
   useEffect(() => {
     async function init() {
@@ -108,6 +109,7 @@ function MessagesInner() {
     setActiveConvo(c)
     setDisputeOpen(false)
     setDisputeSuccess(false)
+    setMobileView('chat')
     setTimeout(() => inputRef.current?.focus(), 100)
   }
 
@@ -119,7 +121,7 @@ function MessagesInner() {
     })
     const updated = await getConversations(user.id)
     setConversations(updated || [])
-    if (!isArchived) setActiveConvo(null)
+    if (!isArchived) { setActiveConvo(null); setMobileView('list') }
   }
 
   const handleOpenDispute = async () => {
@@ -176,10 +178,12 @@ function MessagesInner() {
           background: '#111118', border: '1px solid #1f2937',
           borderRadius: 16, overflow: 'hidden',
           height: 'calc(100vh - 160px)', minHeight: 560,
+          position: 'relative',
         }}>
 
           {/* ── SIDEBAR ──────────────────────────────── */}
-          <div style={{ width: 320, flexShrink: 0, borderRight: '1px solid #1f2937', display: 'flex', flexDirection: 'column', background: '#0a0a0f' }}>
+          <div style={{ width: 320, flexShrink: 0, borderRight: '1px solid #1f2937', display: 'flex', flexDirection: 'column', background: '#0a0a0f', flex: 'none' }}
+            className={`${mobileView === 'chat' ? 'hide-mobile' : ''} full-mobile`}>
 
             {/* Inbox / Archived tab bar */}
             <div style={{ padding: '14px 14px 10px', borderBottom: '1px solid #1f2937' }}>
@@ -294,7 +298,8 @@ function MessagesInner() {
           </div>
 
           {/* ── MAIN CHAT ──────────────────────────── */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}
+            className={mobileView === 'list' ? 'hide-mobile' : ''}>
             {!activeConvo ? (
               <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 10 }}>
                 <div style={{ fontSize: 52, opacity: 0.2 }}>💬</div>
@@ -304,6 +309,8 @@ function MessagesInner() {
               <>
                 {/* Chat header */}
                 <div style={{ padding: '12px 18px', borderBottom: '1px solid #1f2937', background: '#0d0d14', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  {/* Mobile back button */}
+                  <button className="hide-desktop" onClick={() => setMobileView('list')} style={{ background: 'none', border: '1px solid #2d2d3f', borderRadius: 6, color: '#9ca3af', padding: '5px 10px', fontSize: 12, cursor: 'pointer', flexShrink: 0 }}>← Back</button>
                   {otherUser?.username ? (
                     <Link href={`/profile/${otherUser.username}`} style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
                       <div style={{

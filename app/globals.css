@@ -184,3 +184,15 @@ select option {
     gap: 10px;
   }
 }
+
+/* ── MOBILE UTILITIES ──────────────────────────────────────── */
+@media (max-width: 767px) {
+  .hide-mobile { display: none !important; }
+  .stack-mobile { flex-direction: column !important; }
+  .full-mobile { width: 100% !important; min-width: 0 !important; max-width: 100% !important; }
+  .pad-mobile { padding: 12px !important; }
+  .no-border-mobile { border-right: none !important; border-bottom: 1px solid #1f2937 !important; }
+}
+@media (min-width: 768px) {
+  .hide-desktop { display: none !important; }
+}

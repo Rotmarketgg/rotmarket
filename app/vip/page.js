@@ -96,7 +96,8 @@ export default function VIPPage() {
           <div style={{ padding: '14px 18px', borderBottom: '1px solid #1f2937', fontSize: 12, fontWeight: 700, color: '#6b7280', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
             Plan Comparison
           </div>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 360 }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #1f2937' }}>
                 <th style={{ padding: '10px 18px', textAlign: 'left', color: '#6b7280', fontWeight: 600, fontSize: 12 }}>Feature</th>
@@ -122,6 +123,7 @@ export default function VIPPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
 
         {/* Price card */}

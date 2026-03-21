@@ -169,7 +169,7 @@ function SettingsPage() {
 
           {/* Avatar */}
           <Section title="Profile Picture">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
               <div
                 onClick={() => avatarInputRef.current?.click()}
                 style={{
@@ -199,7 +199,7 @@ function SettingsPage() {
 
           {/* Public Profile */}
           <Section title="Public Profile">
-            <div style={{ padding: '8px 12px', background: '#0d0d14', border: '1px solid #1f2937', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ padding: '8px 12px', background: '#0d0d14', border: '1px solid #1f2937', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <div style={{ fontSize: 12, color: '#6b7280', fontWeight: 600 }}>Username</div>
               <div style={{ fontSize: 14, fontWeight: 700, color: '#f9fafb' }}>{form.username}</div>
               <div style={{ marginLeft: 'auto', fontSize: 11, color: '#4b5563' }}>Set at signup · cannot be changed</div>
@@ -256,13 +256,13 @@ function SettingsPage() {
 
           {/* Account */}
           <Section title="Account">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #1f2937' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #1f2937', flexWrap: 'wrap', gap: 8 }}>
               <div>
                 <div style={{ fontSize: 13, fontWeight: 600, color: '#d1d5db' }}>Email</div>
                 <div style={{ fontSize: 12, color: '#6b7280' }}>{user?.email}</div>
               </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', flexWrap: 'wrap', gap: 8 }}>
               <div>
                 <div style={{ fontSize: 13, fontWeight: 600, color: '#d1d5db' }}>Password</div>
                 <div style={{ fontSize: 12, color: '#6b7280' }}>Change your account password</div>

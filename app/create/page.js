@@ -279,8 +279,8 @@ export default function CreateListingPage() {
                   >+</button>
                 </div>
                 {form.quantity > 1 && (
-                  <div style={{ fontSize: 13, color: '#4ade80', fontWeight: 600 }}>
-                    {form.quantity} copies · ${form.price ? (parseFloat(form.price) * form.quantity).toFixed(2) : '0.00'} total value
+                  <div style={{ fontSize: 12, color: '#4ade80', fontWeight: 600 }}>
+                    {form.quantity}× · ${form.price ? (parseFloat(form.price) * form.quantity).toFixed(2) : '0.00'}
                   </div>
                 )}
               </div>
@@ -310,7 +310,7 @@ export default function CreateListingPage() {
                     />
                     <span style={{ fontSize: 16 }}>{pm.emoji}</span>
                     <div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: '#d1d5db' }}>{pm.label}</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#d1d5db', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pm.label}</div>
                       <div style={{ fontSize: 11, color: '#6b7280' }}>{pm.note}</div>
                     </div>
                   </label>

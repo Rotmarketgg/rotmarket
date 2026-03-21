@@ -95,13 +95,13 @@ export default function LeaderboardPage() {
       <div style={{ maxWidth: 800, margin: '0 auto', padding: '32px 16px' }}>
 
         {/* Tabs */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 24 }} className="full-mobile">
           {[
             { id: 'trades', label: '🔄 Most Trades' },
             { id: 'rating', label: '⭐ Highest Rated' },
           ].map(t => (
             <button key={t.id} onClick={() => setTab(t.id)} style={{
-              padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
+              flex: 1, padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
               background: tab === t.id ? 'rgba(245,158,11,0.15)' : '#111118',
               color: tab === t.id ? '#f59e0b' : '#6b7280',
               boxShadow: tab === t.id ? '0 0 0 1px rgba(245,158,11,0.4)' : '0 0 0 1px #2d2d3f',
@@ -123,7 +123,7 @@ export default function LeaderboardPage() {
           <>
             {/* Podium — only show if at least 1 trader */}
             {podiumOrder.some(t => t !== null) && (
-              <div style={{ display: 'flex', gap: 12, marginBottom: 24, alignItems: 'flex-end' }}>
+              <div style={{ display: 'flex', gap: 12, marginBottom: 24, alignItems: 'flex-end' }} className="stack-mobile">
                 {podiumOrder.map((trader, i) => {
                   const rank = podiumRanks[i]
                   if (!trader) return <div key={i} style={{ flex: 1 }} />
@@ -133,7 +133,7 @@ export default function LeaderboardPage() {
                         background: '#111118', border: '1px solid #2d2d3f',
                         borderRadius: 14, padding: '20px 12px',
                         textAlign: 'center',
-                        marginBottom: rank === 0 ? 0 : rank === 1 ? 16 : 24,
+                        marginBottom: 0,
                         transition: 'transform 0.15s',
                       }}
                         onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-3px)'}

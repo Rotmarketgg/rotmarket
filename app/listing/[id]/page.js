@@ -464,16 +464,16 @@ export default function ListingPage() {
             <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: rarity.text, background: `${rarity.bg}88`, border: `1px solid ${rarity.border}88`, borderRadius: 4, padding: '3px 9px' }}>{listing.rarity?.replace('_', ' ')}</span>
             <span style={{ fontSize: 13, color: '#475569' }}>·</span>
             <span style={{ fontSize: 13, color: '#64748b', fontWeight: 600 }}>{listing.game === 'fortnite' ? '🎮 Fortnite Brainrot' : '🟥 Roblox Brainrot'}</span>
-            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }} className="hide-mobile">
               <span style={{ fontSize: 12, color: '#475569' }}>👁 {listing.views}</span>
               <span style={{ fontSize: 12, color: '#374151' }}>{timeAgo(listing.created_at)}</span>
             </div>
           </div>
 
-          <div style={{ display: 'flex', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap' }} className="stack-mobile">
 
             {/* LEFT COLUMN */}
-            <div style={{ width: 240, minWidth: 200, borderRight: '1px solid #1a1a2e', padding: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, background: 'rgba(0,0,0,0.3)' }}>
+            <div style={{ width: 240, minWidth: 200, borderRight: '1px solid #1a1a2e', padding: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, background: 'rgba(0,0,0,0.3)' }} className="full-mobile no-border-mobile pad-mobile">
 
               {/* Main image */}
               <div onClick={() => listing.images?.[selectedImage] && setLightboxOpen(true)} style={{
@@ -547,10 +547,10 @@ export default function ListingPage() {
             </div>
 
             {/* RIGHT COLUMN */}
-            <div style={{ flex: 1, minWidth: 0, padding: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ flex: 1, minWidth: 0, padding: 24, display: 'flex', flexDirection: 'column', gap: 14 }} className="pad-mobile">
               <div>
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
-                  <h1 style={{ margin: '0 0 4px', fontSize: 24, fontWeight: 700, color: '#f9fafb', fontFamily: '"DM Sans", system-ui, -apple-system, sans-serif', letterSpacing: '-0.3px' }}>
+                  <h1 style={{ margin: '0 0 4px', fontSize: 'clamp(18px, 4vw, 24px)', fontWeight: 700, color: '#f9fafb', fontFamily: '"DM Sans", system-ui, -apple-system, sans-serif', letterSpacing: '-0.3px' }}>
                     {listing.title}
                   </h1>
                   {!isSeller && user && seller && (
@@ -713,7 +713,7 @@ export default function ListingPage() {
                     </Link>
 
                     {/* Stats row */}
-                    <div style={{ display: 'flex', gap: 10 }}>
+                    <div style={{ display: 'flex', gap: 10 }} className="stack-mobile">
                       <div style={{ flex: 1, background: '#0d0d14', border: '1px solid #1f2937', borderRadius: 8, padding: '12px', textAlign: 'center' }}>
                         <div style={{ fontSize: 22, fontWeight: 900, color: '#4ade80' }}>{seller.trade_count || 0}</div>
                         <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Trades</div>
