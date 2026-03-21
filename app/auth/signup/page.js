@@ -32,7 +32,19 @@ export default function SignupPage() {
       await signUp(form.email, form.password, form.username)
       setSuccess(true)
     } catch (err) {
-      setError(err.message || 'Failed to create account.')
+      const msg = err.message || ''
+      // Supabase returns this opaque message when the email is already registered
+      if (msg.includes('Database error finding user') || msg.includes('User already registered') || msg.includes('already been registered')) {
+        setError('An account with this email already exists. Try logging in instead.')
+      } else if (msg.includes('already taken')) {
+        setError(msg)
+      } else if (msg.includes('invalid') && msg.toLowerCase().includes('email')) {
+        setError('Please enter a valid email address.')
+      } else if (msg.includes('Password') || msg.includes('password')) {
+        setError('Password must be at least 8 characters.')
+      } else {
+        setError(msg || 'Failed to create account. Please try again.')
+      }
     } finally {
       setLoading(false)
     }
@@ -86,6 +98,13 @@ export default function SignupPage() {
         {error && (
           <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#f87171' }}>
             ⚠️ {error}
+            {error.includes('already exists') && (
+              <div style={{ marginTop: 8 }}>
+                <Link href="/auth/login" style={{ color: '#4ade80', fontWeight: 700, textDecoration: 'none', fontSize: 13 }}>
+                  → Log in instead
+                </Link>
+              </div>
+            )}
           </div>
         )}
 
