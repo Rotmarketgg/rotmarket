@@ -4,9 +4,6 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import Navbar from '@/components/Navbar'
 import ListingCard, { ListingCardSkeleton } from '@/components/ListingCard'
 import { getListings } from '@/lib/supabase'
-
-const withTimeout = (promise, ms = 8000) =>
-  Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error('Request timed out')), ms))])
 import { GAMES } from '@/lib/constants'
 import Link from 'next/link'
 
@@ -47,14 +44,14 @@ export default function HomePage() {
     else setLoadingMore(true)
 
     try {
-      const { data, total: t } = await withTimeout(getListings({
+      const { data, total: t } = await getListings({
         game: game === 'all' ? null : game,
         type: typeFilter === 'all' || typeFilter === 'sold' ? null : typeFilter,
         status: typeFilter === 'sold' ? 'sold' : 'active',
         search: debouncedSearch || null,
         limit: PAGE_SIZE,
         offset: pageNum * PAGE_SIZE,
-      }))
+      })
 
       if (isFirst) {
         setListings(data)
@@ -64,9 +61,8 @@ export default function HomePage() {
       }
       setTotal(t)
       setHasMore(data.length === PAGE_SIZE && !debouncedSearch)
-    } catch (err) {
-      console.error('Failed to load listings:', err)
-      if (isFirst) setListings([])  // ensure grid shows empty state not infinite spinner
+    } catch {
+      // Silent fail
     } finally {
       setLoading(false)
       setLoadingMore(false)
@@ -232,7 +228,7 @@ export default function HomePage() {
       <footer style={{ borderTop: '1px solid #1f2937', marginTop: 64, padding: '24px 16px', textAlign: 'center' }}>
         <div style={{ fontSize: 12, color: '#374151', lineHeight: 1.8 }}>
           RotMarket is not affiliated with Epic Games or Roblox Corporation.<br />
-          Trade at your own risk. Always use Goods & Services payments for buyer protection.
+          Trade at your own risk. Always use a payment method that offers buyer protection.
         </div>
       </footer>
     </div>
