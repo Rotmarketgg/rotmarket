@@ -30,7 +30,7 @@ const STEPS = [
   {
     number: '04',
     title: 'Complete the Trade',
-    description: 'Once you accept an offer, your payment info is revealed to the buyer. Use PayPal Goods & Services for buyer protection. Both parties confirm when the trade is done.',
+    description: 'Once you accept an offer, your payment info is revealed to the buyer. Both parties confirm when the trade is done.',
     icon: '🤝',
     color: '#f59e0b',
   },
@@ -50,11 +50,11 @@ const FAQS = [
   },
   {
     q: 'How do I stay safe from scams?',
-    a: 'Always use PayPal Goods & Services — never Friends & Family. Check a trader\'s review count and trade history before agreeing. Use our trade confirmation system so both parties confirm before reviews are posted.',
+    a: 'Always check a trader\'s review count and trade history before agreeing. Use our trade confirmation system so both parties confirm before reviews are posted.',
   },
   {
     q: 'What payment methods are supported?',
-    a: 'PayPal G&S (recommended), Cash App, and Venmo. Always use business or goods & services payment options, never personal transfers, so you have recourse if something goes wrong.',
+    a: 'PayPal, Cash App, and Venmo. Always use a payment method that offers buyer protection where possible.',
   },
   {
     q: 'Is RotMarket affiliated with Epic Games or Roblox?',
@@ -66,7 +66,7 @@ const FAQS = [
   },
   {
     q: 'What happens if I get scammed?',
-    a: 'Use the Report button on the scammer\'s profile or listing to file a report with our moderation team. If you used PayPal G&S, also open a dispute through PayPal directly. We take scam reports seriously and ban confirmed bad actors.',
+    a: 'Use the Report button on the scammer\'s profile or listing to file a report with our moderation team. If you paid via PayPal, also open a dispute through PayPal directly. We take scam reports seriously and ban confirmed bad actors.',
   },
   {
     q: 'How do I report a user or listing?',
