@@ -352,7 +352,7 @@ export default function ListingPage() {
           /* SALE listing: show payment info */
           <div style={{ background: '#0d0d14', border: '1px solid #2d2d3f', borderRadius: 8, padding: 12, marginBottom: 10 }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: '#6b7280', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.08em' }}>💳 Payment Info</div>
-            {seller?.paypal_email && <div style={{ fontSize: 12, color: '#d1d5db', marginBottom: 3 }}>🔵 PayPal G&S: <strong>{seller.paypal_email}</strong></div>}
+            {seller?.paypal_email && <div style={{ fontSize: 12, color: '#d1d5db', marginBottom: 3 }}>🔵 PayPal: <strong>{seller.paypal_email}</strong></div>}
             {seller?.cashapp_handle && <div style={{ fontSize: 12, color: '#d1d5db', marginBottom: 3 }}>🟢 Cash App: <strong>{seller.cashapp_handle}</strong></div>}
             {seller?.venmo_handle && <div style={{ fontSize: 12, color: '#d1d5db', marginBottom: 3 }}>💙 Venmo: <strong>{seller.venmo_handle}</strong></div>}
             {!seller?.paypal_email && !seller?.cashapp_handle && !seller?.venmo_handle && (
@@ -659,8 +659,7 @@ export default function ListingPage() {
                                 </div>
                               </div>
                             )}
-                            <textarea rows={3} placeholder={listing.type === 'trade' ? 'What are you offering to trade?' : "Hi! I'd like to buy this..."} value={offerMessage} onChange={e => setOfferMessage(e.target.value)} onKeyDown={e => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') handleSendOffer() }} style={{ marginBottom: 10, resize: 'vertical' }} />
-                            <div style={{ fontSize: 10, color: '#4b5563', marginBottom: 8, textAlign: 'right' }}>Ctrl+Enter to send</div>
+                            <textarea rows={3} placeholder={listing.type === 'trade' ? 'What are you offering to trade?' : "Hi! I'd like to buy this..."} value={offerMessage} onChange={e => setOfferMessage(e.target.value)} style={{ marginBottom: 10, resize: 'vertical' }} />
                             <button onClick={handleSendOffer} disabled={offerLoading || !offerMessage.trim()} className="btn-primary" style={{ width: '100%' }}>
                               {offerLoading ? 'Sending...' : listing.type === 'trade' ? '🔄 Send Trade Offer' : '💰 Send Offer'}
                             </button>
