@@ -11,6 +11,7 @@ export default function UpdatePasswordPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [ready, setReady] = useState(false)
+  const [expired, setExpired] = useState(false)
   const recoveryHandled = useRef(false)
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
@@ -39,13 +40,17 @@ export default function UpdatePasswordPage() {
           if (session && !recoveryHandled.current) {
             recoveryHandled.current = true
             setReady(true)
+          } else if (!session && !recoveryHandled.current) {
+            setExpired(true)
           }
         })
       }
-    }, 1000)
+    }, 1500)
 
     return () => subscription.unsubscribe()
   }, [])
+
+  const handleKeyDown = (e) => { if (e.key === 'Enter') handleSubmit() }
 
   const handleSubmit = async () => {
     if (form.password.length < 8) { setError('Password must be at least 8 characters.'); return }
@@ -65,6 +70,23 @@ export default function UpdatePasswordPage() {
       setLoading(false)
     }
   }
+
+  if (expired) return (
+    <AuthLayout title="Link Expired" subtitle="This reset link has already been used or expired">
+      <div style={{ textAlign: 'center', padding: '10px 0' }}>
+        <div style={{ fontSize: 48, marginBottom: 16 }}>⏰</div>
+        <p style={{ color: '#9ca3af', fontSize: 14, lineHeight: 1.7, marginBottom: 20 }}>
+          Password reset links expire after 1 hour and can only be used once.
+        </p>
+        <a href="/auth/reset" style={{
+          display: 'inline-block', padding: '10px 24px',
+          background: '#4ade80', color: '#0a0a0f',
+          borderRadius: 8, textDecoration: 'none',
+          fontSize: 13, fontWeight: 700,
+        }}>Request a new link</a>
+      </div>
+    </AuthLayout>
+  )
 
   if (!ready) return (
     <AuthLayout title="Verifying link..." subtitle="Just a moment">
@@ -86,6 +108,7 @@ export default function UpdatePasswordPage() {
             placeholder="Min. 8 characters"
             value={form.password}
             onChange={e => set('password', e.target.value)}
+            onKeyDown={handleKeyDown}
             autoFocus
           />
         </div>
@@ -98,6 +121,7 @@ export default function UpdatePasswordPage() {
             placeholder="Same password again"
             value={form.confirm}
             onChange={e => set('confirm', e.target.value)}
+            onKeyDown={handleKeyDown}
           />
         </div>
 

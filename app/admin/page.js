@@ -421,8 +421,8 @@ export default function AdminPage() {
             <h1 style={{ margin: '0 0 4px', fontSize: 26, fontWeight: 900, color: '#f9fafb', fontFamily: 'var(--font-display)' }}>Admin Panel</h1>
             <div style={{ fontSize: 13, color: '#6b7280' }}>
               Signed in as{' '}
-              <strong style={{ color: BADGE_COLORS[profile?.badge] || '#f9fafb' }}>{profile?.username}</strong>
-              {' '}— <span style={{ color: BADGE_COLORS[profile?.badge] || '#6b7280' }}>{profile?.badge}</span>
+              <strong style={{ color: BADGE_COLORS[profileBadges[0]] || '#f9fafb' }}>{profile?.username}</strong>
+              {' '}— <span style={{ color: BADGE_COLORS[profileBadges[0]] || '#6b7280' }}>{profileBadges[0] || profile?.badge}</span>
             </div>
           </div>
           {isOwner && (

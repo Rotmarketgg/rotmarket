@@ -104,12 +104,15 @@ export default function ProfilePage() {
     try {
       const { error } = await supabase.rpc('renew_listing', { listing_id: listingId })
       if (error) throw error
-      const primary = primaryBadgeName
-      const days = primary === 'VIP' || primary === 'Owner' ? 30 : primary === 'Verified Trader' ? 14 : 7
-      setListings(prev => prev.map(l => l.id === listingId
-        ? { ...l, status: 'active', expires_at: new Date(Date.now() + days * 86400000).toISOString() }
-        : l
-      ))
+      // Reload from DB so expiry date is accurate (don't trust client clock)
+      const { data: updated } = await supabase
+        .from('listings')
+        .select('*')
+        .eq('id', listingId)
+        .single()
+      if (updated) {
+        setListings(prev => prev.map(l => l.id === listingId ? { ...l, ...updated } : l))
+      }
     } catch (err) {
       alert('Failed to renew: ' + err.message)
     }

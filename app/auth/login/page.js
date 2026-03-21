@@ -10,6 +10,7 @@ function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirect = searchParams.get('redirect') || '/'
+  const resetSuccess = searchParams.get('reset') === 'success'
   const [form, setForm] = useState({ email: '', password: '' })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -22,8 +23,7 @@ function LoginForm() {
     setLoading(true)
     try {
       await signIn(form.email, form.password)
-      router.push(redirect)
-      router.refresh()
+      window.location.href = redirect
     } catch (err) {
       setError(err.message || 'Invalid email or password.')
     } finally {
@@ -38,6 +38,11 @@ function LoginForm() {
   return (
     <AuthLayout title="Welcome Back" subtitle="Log in to your RotMarket account">
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {resetSuccess && (
+          <div style={{ background: 'rgba(74,222,128,0.1)', border: '1px solid rgba(74,222,128,0.3)', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#4ade80', fontWeight: 600 }}>
+            ✓ Password updated successfully. Log in with your new password.
+          </div>
+        )}
         <div>
           <label style={{ fontSize: 12, fontWeight: 700, color: '#9ca3af', display: 'block', marginBottom: 6 }}>
             Username or Email <span style={{ color: '#ef4444' }}>*</span>

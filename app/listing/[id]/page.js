@@ -659,7 +659,8 @@ export default function ListingPage() {
                                 </div>
                               </div>
                             )}
-                            <textarea rows={3} placeholder={listing.type === 'trade' ? 'What are you offering to trade?' : "Hi! I'd like to buy this..."} value={offerMessage} onChange={e => setOfferMessage(e.target.value)} style={{ marginBottom: 10, resize: 'vertical' }} />
+                            <textarea rows={3} placeholder={listing.type === 'trade' ? 'What are you offering to trade?' : "Hi! I'd like to buy this..."} value={offerMessage} onChange={e => setOfferMessage(e.target.value)} onKeyDown={e => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') handleSendOffer() }} style={{ marginBottom: 10, resize: 'vertical' }} />
+                            <div style={{ fontSize: 10, color: '#4b5563', marginBottom: 8, textAlign: 'right' }}>Ctrl+Enter to send</div>
                             <button onClick={handleSendOffer} disabled={offerLoading || !offerMessage.trim()} className="btn-primary" style={{ width: '100%' }}>
                               {offerLoading ? 'Sending...' : listing.type === 'trade' ? '🔄 Send Trade Offer' : '💰 Send Offer'}
                             </button>
