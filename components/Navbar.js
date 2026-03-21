@@ -36,13 +36,19 @@ export default function Navbar() {
         fetchPendingOffers(session.user.id)
       }
     })
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      // Ignore token refresh events — these fire SIGNED_OUT then SIGNED_IN
+      // in quick succession and cause a visible "logged out" flash
+      if (event === 'TOKEN_REFRESHED') return
+      if (event === 'INITIAL_SESSION') return
+
       if (session?.user) {
         setUser(session.user)
         getProfile(session.user.id).then(setProfile)
         getUnreadCount(session.user.id).then(setUnread)
         fetchPendingOffers(session.user.id)
-      } else {
+      } else if (event === 'SIGNED_OUT') {
+        // Only clear state on explicit sign-out, not transient token events
         setUser(null); setProfile(null); setUnread(0); setPendingOffers(0)
       }
     })

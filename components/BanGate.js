@@ -32,27 +32,33 @@ export default function BanGate({ children }) {
     }
     check()
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      // Skip token refresh events — no need to re-check ban on every silent refresh
+      if (event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') return
+
       if (!session) {
         setBanned(false)
         setBanReason(null)
         setChecked(true)
         return
       }
-      // Re-check ban status on every auth state change (e.g. tab focus, token refresh)
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('banned, ban_reason')
-        .eq('id', session.user.id)
-        .single()
-      if (profile?.banned) {
-        setBanned(true)
-        setBanReason(profile.ban_reason || null)
-      } else {
-        setBanned(false)
-        setBanReason(null)
+
+      // Only re-check ban on actual sign-in events
+      if (event === 'SIGNED_IN' || event === 'PASSWORD_RECOVERY') {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('banned, ban_reason')
+          .eq('id', session.user.id)
+          .single()
+        if (profile?.banned) {
+          setBanned(true)
+          setBanReason(profile.ban_reason || null)
+        } else {
+          setBanned(false)
+          setBanReason(null)
+        }
+        setChecked(true)
       }
-      setChecked(true)
     })
     return () => subscription.unsubscribe()
   }, [])
