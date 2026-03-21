@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Navbar from '@/components/Navbar'
 import { getUser, getProfile } from '@/lib/supabase'
@@ -29,7 +28,6 @@ const COMPARISON = [
 ]
 
 export default function VIPPage() {
-  const router = useRouter()
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
   const [copied, setCopied] = useState('')
@@ -37,9 +35,10 @@ export default function VIPPage() {
 
   useEffect(() => {
     getUser().then(u => {
-      if (!u) { router.push('/auth/login'); return }
-      setUser(u)
-      getProfile(u.id).then(setProfile)
+      if (u) {
+        setUser(u)
+        getProfile(u.id).then(setProfile)
+      }
       setAuthChecked(true)
     })
   }, [])

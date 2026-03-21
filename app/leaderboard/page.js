@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import Navbar from '@/components/Navbar'
 import { supabase, getUser } from '@/lib/supabase'
 import { getInitial } from '@/lib/utils'
@@ -14,17 +13,13 @@ const MEDALS = ['🥇', '🥈', '🥉']
 const MEDAL_COLORS = ['#f59e0b', '#9ca3af', '#cd7c2f']
 
 export default function LeaderboardPage() {
-  const router = useRouter()
   const [traders, setTraders] = useState([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('trades')
   const [authChecked, setAuthChecked] = useState(false)
 
   useEffect(() => {
-    getUser().then(u => {
-      if (!u) { router.push('/auth/login'); return }
-      setAuthChecked(true)
-    })
+    getUser().then(() => setAuthChecked(true))
   }, [])
 
   useEffect(() => {
