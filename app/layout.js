@@ -36,6 +36,11 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en" className={`${displayFont.variable} ${bodyFont.variable}`}>
+      <head>
+        {/* Preconnect to Supabase for faster first query */}
+        <link rel="preconnect" href="https://iuskguniacqeeaqscpfj.supabase.co" />
+        <link rel="dns-prefetch" href="https://iuskguniacqeeaqscpfj.supabase.co" />
+      </head>
       <body className="bg-rot-dark text-white font-body antialiased min-h-screen">
         <BanGate>{children}</BanGate>
       </body>

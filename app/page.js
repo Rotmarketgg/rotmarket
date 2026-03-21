@@ -4,6 +4,14 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import Navbar from '@/components/Navbar'
 import ListingCard, { ListingCardSkeleton } from '@/components/ListingCard'
 import { getListings } from '@/lib/supabase'
+
+const withTimeout = (promise, ms = 7000) =>
+  Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Loading took too long — please refresh')), ms)
+    )
+  ])
 import { GAMES } from '@/lib/constants'
 import Link from 'next/link'
 
@@ -44,14 +52,14 @@ export default function HomePage() {
     else setLoadingMore(true)
 
     try {
-      const { data, total: t } = await getListings({
+      const { data, total: t } = await withTimeout(getListings({
         game: game === 'all' ? null : game,
         type: typeFilter === 'all' || typeFilter === 'sold' ? null : typeFilter,
         status: typeFilter === 'sold' ? 'sold' : 'active',
         search: debouncedSearch || null,
         limit: PAGE_SIZE,
         offset: pageNum * PAGE_SIZE,
-      })
+      }))
 
       if (isFirst) {
         setListings(data)
@@ -61,9 +69,11 @@ export default function HomePage() {
       }
       setTotal(t)
       setHasMore(data.length === PAGE_SIZE && !debouncedSearch)
-    } catch {
-      // Silent fail
+    } catch (err) {
+      console.error('Listings load error:', err.message)
+      if (isFirst) setListings([]) // clear loading state — never leave it stuck
     } finally {
+      // Always runs — guarantees loading spinner clears no matter what
       setLoading(false)
       setLoadingMore(false)
     }
@@ -228,7 +238,7 @@ export default function HomePage() {
       <footer style={{ borderTop: '1px solid #1f2937', marginTop: 64, padding: '24px 16px', textAlign: 'center' }}>
         <div style={{ fontSize: 12, color: '#374151', lineHeight: 1.8 }}>
           RotMarket is not affiliated with Epic Games or Roblox Corporation.<br />
-          Trade at your own risk. Always use a payment method that offers buyer protection.
+          Trade at your own risk. Always use Goods & Services payments for buyer protection.
         </div>
       </footer>
     </div>
