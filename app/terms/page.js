@@ -19,7 +19,7 @@ export default function TermsPage() {
     },
     {
       title: '4. Payments & Trades',
-      content: `RotMarket does not process payments. Buyers and sellers agree on payment terms directly. We strongly recommend using PayPal Goods & Services or other payment methods that include buyer protection. RotMarket is not responsible for lost funds, scams, or failed trades.`,
+      content: `RotMarket does not process payments. Buyers and sellers agree on payment terms directly. We strongly recommend using payment methods that include buyer protection where possible. RotMarket is not responsible for lost funds, scams, or failed trades.`,
     },
     {
       title: '5. Prohibited Activity',
