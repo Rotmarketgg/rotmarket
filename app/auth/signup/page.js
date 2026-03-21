@@ -24,6 +24,7 @@ export default function SignupPage() {
   }
 
   const handleSubmit = async () => {
+    if (loading) return
     const err = validate()
     if (err) { setError(err); return }
     setError('')
@@ -33,21 +34,21 @@ export default function SignupPage() {
       setSuccess(true)
     } catch (err) {
       const msg = err.message || ''
-      // Supabase returns this opaque message when the email is already registered
       if (msg.includes('Database error finding user') || msg.includes('User already registered') || msg.includes('already been registered')) {
-        setError('An account with this email already exists. Try logging in instead.')
+        setError('An account with this email already exists.')
       } else if (msg.includes('already taken')) {
         setError(msg)
-      } else if (msg.includes('invalid') && msg.toLowerCase().includes('email')) {
-        setError('Please enter a valid email address.')
-      } else if (msg.includes('Password') || msg.includes('password')) {
-        setError('Password must be at least 8 characters.')
       } else {
         setError(msg || 'Failed to create account. Please try again.')
       }
     } finally {
+      // Always clear loading — never leave it stuck
       setLoading(false)
     }
+  }
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') handleSubmit()
   }
 
   if (success) return (
@@ -77,22 +78,45 @@ export default function SignupPage() {
             placeholder="VaultKing_AL"
             value={form.username}
             onChange={e => set('username', e.target.value.replace(/\s/g, ''))}
+            onKeyDown={handleKeyDown}
             maxLength={20}
             autoComplete="username"
+            autoFocus
           />
           <div style={{ fontSize: 11, color: '#4b5563', marginTop: 3 }}>Letters, numbers, underscores only. This is public.</div>
         </Field>
 
         <Field label="Email" required>
-          <input type="email" placeholder="you@email.com" value={form.email} onChange={e => set('email', e.target.value)} autoComplete="email" />
+          <input
+            type="email"
+            placeholder="you@email.com"
+            value={form.email}
+            onChange={e => set('email', e.target.value)}
+            onKeyDown={handleKeyDown}
+            autoComplete="email"
+          />
         </Field>
 
         <Field label="Password" required>
-          <input type="password" placeholder="Min. 8 characters" value={form.password} onChange={e => set('password', e.target.value)} autoComplete="new-password" />
+          <input
+            type="password"
+            placeholder="Min. 8 characters"
+            value={form.password}
+            onChange={e => set('password', e.target.value)}
+            onKeyDown={handleKeyDown}
+            autoComplete="new-password"
+          />
         </Field>
 
         <Field label="Confirm Password" required>
-          <input type="password" placeholder="Same password again" value={form.confirm} onChange={e => set('confirm', e.target.value)} autoComplete="new-password" />
+          <input
+            type="password"
+            placeholder="Same password again"
+            value={form.confirm}
+            onChange={e => set('confirm', e.target.value)}
+            onKeyDown={handleKeyDown}
+            autoComplete="new-password"
+          />
         </Field>
 
         {error && (
@@ -100,7 +124,7 @@ export default function SignupPage() {
             ⚠️ {error}
             {error.includes('already exists') && (
               <div style={{ marginTop: 8 }}>
-                <Link href="/auth/login" style={{ color: '#4ade80', fontWeight: 700, textDecoration: 'none', fontSize: 13 }}>
+                <Link href="/auth/login" style={{ color: '#4ade80', fontWeight: 700, textDecoration: 'none' }}>
                   → Log in instead
                 </Link>
               </div>
@@ -147,16 +171,12 @@ export function AuthLayout({ title, subtitle, children }) {
       padding: 16,
     }}>
       <div style={{ width: '100%', maxWidth: 420 }}>
-        {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
           <Link href="/" style={{ textDecoration: 'none' }}>
             <span style={{ fontSize: 28, fontWeight: 900, color: '#4ade80', fontFamily: 'var(--font-display)' }}>ROT</span>
             <span style={{ fontSize: 28, fontWeight: 900, color: '#fff', fontFamily: 'var(--font-display)' }}>MARKET</span>
-            
           </Link>
         </div>
-
-        {/* Card */}
         <div style={{
           background: '#111118', border: '1px solid #1f2937',
           borderRadius: 16, padding: 28,

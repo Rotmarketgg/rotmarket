@@ -11,6 +11,8 @@ export default function ResetPage() {
   const [sent, setSent] = useState(false)
   const [error, setError] = useState('')
 
+  const handleKeyDown = (e) => { if (e.key === 'Enter') handleSubmit() }
+
   const handleSubmit = async () => {
     if (!email.includes('@')) { setError('Enter a valid email.'); return }
     setError('')
@@ -49,7 +51,7 @@ export default function ResetPage() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div>
           <label style={{ fontSize: 12, fontWeight: 700, color: '#9ca3af', display: 'block', marginBottom: 6 }}>Email</label>
-          <input type="email" placeholder="you@email.com" value={email} onChange={e => setEmail(e.target.value)} autoFocus />
+          <input type="email" placeholder="you@email.com" value={email} onChange={e => setEmail(e.target.value)} onKeyDown={handleKeyDown} autoFocus />
         </div>
 
         {error && (
