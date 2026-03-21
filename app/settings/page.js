@@ -4,9 +4,8 @@ import { useState, useEffect, useRef, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 import Navbar from '@/components/Navbar'
 import { getUser, getProfile, updateProfile, supabase } from '@/lib/supabase'
+import { withTimeout } from '@/lib/utils'
 
-const withTimeout = (promise, ms = 8000) =>
-  Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))])
 import { getInitial } from '@/lib/utils'
 import { validateClean } from '@/lib/profanity'
 

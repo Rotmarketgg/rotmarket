@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Navbar from '@/components/Navbar'
 import { getUser, getProfile, supabase } from '@/lib/supabase'
+import { withTimeout } from '@/lib/utils'
 import { BADGE_HIERARCHY, BADGE_META, getPrimaryBadge } from '@/lib/constants'
 import { timeAgo, getInitial } from '@/lib/utils'
 
@@ -75,9 +76,10 @@ export default function AdminPage() {
 
   useEffect(() => {
     async function init() {
-      const u = await getUser()
+      try {
+      const u = await withTimeout(getUser())
       if (!u) { router.push('/auth/login'); return }
-      const p = await getProfile(u.id)
+      const p = await withTimeout(getProfile(u.id))
       const pBadges = p?.badges?.length ? p.badges : p?.badge ? [p.badge] : []
       if (!p || !['Owner', 'Moderator'].some(b => pBadges.includes(b))) {
         setUnauthorized(true); setLoading(false); return
@@ -87,6 +89,10 @@ export default function AdminPage() {
       setLoading(false)
       loadStats()
       loadReports('pending')
+      } catch (err) {
+        console.error('Admin init error:', err)
+        router.push('/auth/login')
+      }
     }
     init()
   }, [])

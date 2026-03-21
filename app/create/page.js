@@ -6,7 +6,7 @@ import Link from 'next/link'
 import Navbar from '@/components/Navbar'
 import { getUser, getProfile, createListing, updateListing, uploadListingImage, supabase } from '@/lib/supabase'
 import { GAMES, RARITIES, PAYMENT_METHODS, LISTING_TYPES } from '@/lib/constants'
-import { validateListing, checkRateLimit } from '@/lib/utils'
+import { validateListing, checkRateLimit, withTimeout } from '@/lib/utils'
 import { validateClean, validateContent } from '@/lib/profanity'
 
 const MAX_IMAGE_SIZE_MB = 10
@@ -36,12 +36,17 @@ export default function CreateListingPage() {
 
   useEffect(() => {
     async function checkAuth() {
-      const currentUser = await getUser()
-      if (!currentUser) { router.push('/auth/login'); return }
-      setUser(currentUser)
-      const p = await getProfile(currentUser.id)
-      setProfile(p)
-      setAuthLoading(false)
+      try {
+        const currentUser = await withTimeout(getUser())
+        if (!currentUser) { router.push('/auth/login'); return }
+        setUser(currentUser)
+        const p = await withTimeout(getProfile(currentUser.id))
+        setProfile(p)
+        setAuthLoading(false)
+      } catch (err) {
+        console.error('Auth check error:', err)
+        router.push('/auth/login')
+      }
     }
     checkAuth()
   }, [])

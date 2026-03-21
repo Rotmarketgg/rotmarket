@@ -5,11 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Navbar from '@/components/Navbar'
 import { getUser, getConversations, getMessages, sendMessage, getProfile, supabase } from '@/lib/supabase'
-import { timeAgo, getInitial, checkRateLimit } from '@/lib/utils'
+import { timeAgo, getInitial, checkRateLimit, withTimeout } from '@/lib/utils'
 import { isClean } from '@/lib/profanity'
-
-const withTimeout = (promise, ms = 8000) =>
-  Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))])
 
 function MessagesInner() {
   const router = useRouter()

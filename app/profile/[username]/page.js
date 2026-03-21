@@ -9,9 +9,7 @@ import StarRating from '@/components/StarRating'
 import ReportButton from '@/components/ReportButton'
 import { getProfileByUsername, getUser, getUserListings, getReviews, deleteListing, supabase } from '@/lib/supabase'
 
-const withTimeout = (promise, ms = 12000) =>
-  Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error('Request timed out')), ms))])
-import { timeAgo, getInitial } from '@/lib/utils'
+import { timeAgo, getInitial, withTimeout } from '@/lib/utils'
 import { BADGE_HIERARCHY, BADGE_META, getPrimaryBadge } from '@/lib/constants'
 
 // Extend shared BADGE_META with profile-specific desc field

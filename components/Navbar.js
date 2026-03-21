@@ -6,6 +6,32 @@ import { useRouter, usePathname } from 'next/navigation'
 import { supabase, getProfile, getUnreadCount } from '@/lib/supabase'
 import { getInitial } from '@/lib/utils'
 
+// Cache profile in sessionStorage to avoid re-fetching on every page load
+// This prevents the avatar from re-fetching its URL on every navigation
+const PROFILE_CACHE_KEY = 'rotmarket-profile-cache'
+const PROFILE_CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+
+function getCachedProfile(userId) {
+  try {
+    const raw = sessionStorage.getItem(PROFILE_CACHE_KEY)
+    if (!raw) return null
+    const { id, data, ts } = JSON.parse(raw)
+    if (id !== userId) return null
+    if (Date.now() - ts > PROFILE_CACHE_TTL) return null
+    return data
+  } catch { return null }
+}
+
+function setCachedProfile(userId, data) {
+  try {
+    sessionStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify({ id: userId, data, ts: Date.now() }))
+  } catch {}
+}
+
+function clearProfileCache() {
+  try { sessionStorage.removeItem(PROFILE_CACHE_KEY) } catch {}
+}
+
 export default function Navbar() {
   const router = useRouter()
   const pathname = usePathname()
@@ -31,7 +57,16 @@ export default function Navbar() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         setUser(session.user)
-        getProfile(session.user.id).then(setProfile)
+        // Use cached profile to prevent avatar URL re-fetch on every page load
+        const cached = getCachedProfile(session.user.id)
+        if (cached) {
+          setProfile(cached)
+        } else {
+          getProfile(session.user.id).then(p => {
+            setProfile(p)
+            if (p) setCachedProfile(session.user.id, p)
+          })
+        }
         getUnreadCount(session.user.id).then(setUnread)
         fetchPendingOffers(session.user.id)
       }
@@ -40,14 +75,22 @@ export default function Navbar() {
       if (event === 'TOKEN_REFRESHED') return  // silent refresh, no UI change needed
 
       if (session?.user) {
-        // INITIAL_SESSION, SIGNED_IN, USER_UPDATED — all restore user state
         setUser(session.user)
-        getProfile(session.user.id).then(setProfile)
+        // For INITIAL_SESSION use cache — avoids avatar re-fetch on tab switch/navigation
+        const cached = event === 'INITIAL_SESSION' ? getCachedProfile(session.user.id) : null
+        if (cached) {
+          setProfile(cached)
+        } else {
+          getProfile(session.user.id).then(p => {
+            setProfile(p)
+            if (p) setCachedProfile(session.user.id, p)
+          })
+        }
         getUnreadCount(session.user.id).then(setUnread)
         fetchPendingOffers(session.user.id)
       } else if (event === 'SIGNED_OUT') {
-        // Only clear on explicit sign-out
         setUser(null); setProfile(null); setUnread(0); setPendingOffers(0)
+        clearProfileCache()
       }
       // For any other event with no session, do nothing — avoids false signed-out flashes
     })

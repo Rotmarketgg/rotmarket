@@ -1,23 +1,24 @@
 'use client'
 
+import { useId } from 'react'
+
 // Supports half-star display (e.g. 3.2 = 3 full + 1 half star)
 // Interactive mode for review submission (whole stars only)
 export default function StarRating({ rating = 0, size = 14, interactive = false, onChange, showValue = false }) {
+  // useId gives a stable ID across server/client — Math.random() caused hydration mismatches
+  const reactId = useId()
+  const id = `star-half-${reactId.replace(/:/g, '')}`
   const stars = [1, 2, 3, 4, 5]
 
   const getStarFill = (star) => {
     if (interactive) {
-      // Whole stars only in interactive mode
       return star <= Math.round(rating) ? 'full' : 'empty'
     }
-    // Half-star logic: within 0.25 of a half = half star
     const diff = rating - (star - 1)
     if (diff >= 0.75) return 'full'
     if (diff >= 0.25) return 'half'
     return 'empty'
   }
-
-  const id = `star-half-${Math.random().toString(36).slice(2, 7)}`
 
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
