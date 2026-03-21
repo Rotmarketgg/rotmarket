@@ -8,6 +8,9 @@ import ListingCard from '@/components/ListingCard'
 import StarRating from '@/components/StarRating'
 import ReportButton from '@/components/ReportButton'
 import { getProfileByUsername, getUser, getUserListings, getReviews, deleteListing, supabase } from '@/lib/supabase'
+
+const withTimeout = (promise, ms = 8000) =>
+  Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error('Request timed out')), ms))])
 import { timeAgo, getInitial } from '@/lib/utils'
 import { BADGE_HIERARCHY, BADGE_META, getPrimaryBadge } from '@/lib/constants'
 
@@ -32,16 +35,17 @@ export default function ProfilePage() {
 
   useEffect(() => {
     async function load() {
-      const [p, u] = await Promise.all([
+      try {
+      const [p, u] = await withTimeout(Promise.all([
         getProfileByUsername(decodeURIComponent(username)),
         getUser(),
-      ])
+      ]))
       if (!p) { setNotFound(true); setLoading(false); return }
       setCurrentUser(u)
-      const [listingsData, reviewsData] = await Promise.all([
+      const [listingsData, reviewsData] = await withTimeout(Promise.all([
         getUserListings(p.id),
         getReviews(p.id),
-      ])
+      ]))
       const reviewCount = reviewsData?.length || 0
       const avgRating = reviewCount > 0
         ? Math.round((reviewsData.reduce((sum, r) => sum + r.rating, 0) / reviewCount) * 10) / 10
@@ -68,6 +72,13 @@ export default function ProfilePage() {
       }
 
       setLoading(false)
+      } catch (err) {
+        console.error('Profile load error:', err)
+        if (err.message === 'Request timed out') {
+          setNotFound(true) // show not found rather than infinite spinner
+        }
+        setLoading(false)
+      }
     }
     load()
   }, [username])
@@ -104,15 +115,12 @@ export default function ProfilePage() {
     try {
       const { error } = await supabase.rpc('renew_listing', { listing_id: listingId })
       if (error) throw error
-      // Reload from DB so expiry date is accurate (don't trust client clock)
-      const { data: updated } = await supabase
-        .from('listings')
-        .select('*')
-        .eq('id', listingId)
-        .single()
-      if (updated) {
-        setListings(prev => prev.map(l => l.id === listingId ? { ...l, ...updated } : l))
-      }
+      const primary = primaryBadgeName
+      const days = primary === 'VIP' || primary === 'Owner' ? 30 : primary === 'Verified Trader' ? 14 : 7
+      setListings(prev => prev.map(l => l.id === listingId
+        ? { ...l, status: 'active', expires_at: new Date(Date.now() + days * 86400000).toISOString() }
+        : l
+      ))
     } catch (err) {
       alert('Failed to renew: ' + err.message)
     }

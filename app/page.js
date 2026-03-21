@@ -4,6 +4,9 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import Navbar from '@/components/Navbar'
 import ListingCard, { ListingCardSkeleton } from '@/components/ListingCard'
 import { getListings } from '@/lib/supabase'
+
+const withTimeout = (promise, ms = 8000) =>
+  Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error('Request timed out')), ms))])
 import { GAMES } from '@/lib/constants'
 import Link from 'next/link'
 
@@ -44,14 +47,14 @@ export default function HomePage() {
     else setLoadingMore(true)
 
     try {
-      const { data, total: t } = await getListings({
+      const { data, total: t } = await withTimeout(getListings({
         game: game === 'all' ? null : game,
         type: typeFilter === 'all' || typeFilter === 'sold' ? null : typeFilter,
         status: typeFilter === 'sold' ? 'sold' : 'active',
         search: debouncedSearch || null,
         limit: PAGE_SIZE,
         offset: pageNum * PAGE_SIZE,
-      })
+      }))
 
       if (isFirst) {
         setListings(data)
@@ -61,8 +64,9 @@ export default function HomePage() {
       }
       setTotal(t)
       setHasMore(data.length === PAGE_SIZE && !debouncedSearch)
-    } catch {
-      // Silent fail
+    } catch (err) {
+      console.error('Failed to load listings:', err)
+      if (isFirst) setListings([])  // ensure grid shows empty state not infinite spinner
     } finally {
       setLoading(false)
       setLoadingMore(false)
