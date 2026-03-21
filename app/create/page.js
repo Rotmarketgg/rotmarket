@@ -9,7 +9,7 @@ import { GAMES, RARITIES, PAYMENT_METHODS, LISTING_TYPES } from '@/lib/constants
 import { validateListing, checkRateLimit } from '@/lib/utils'
 import { validateClean, validateContent } from '@/lib/profanity'
 
-const MAX_IMAGE_SIZE_MB = 5
+const MAX_IMAGE_SIZE_MB = 10
 const MAX_IMAGE_SIZE_BYTES = MAX_IMAGE_SIZE_MB * 1024 * 1024
 
 export default function CreateListingPage() {
@@ -58,14 +58,14 @@ export default function CreateListingPage() {
   }
 
   const handleImages = (files) => {
-    const MAX_SIZE = 5 * 1024 * 1024
+    const MAX_SIZE = 10 * 1024 * 1024
     const rejected = []
     const valid = Array.from(files).filter(f => {
       if (!f.type.startsWith('image/')) return false
       if (f.size > MAX_SIZE) { rejected.push(f.name); return false }
       return true
     })
-    if (rejected.length > 0) alert(`These files exceed the 5MB limit and were not added:\n${rejected.join('\n')}`)
+    if (rejected.length > 0) alert(`These files exceed the 10MB limit and were not added:\n${rejected.join('\n')}`)
     const slots = 4 - images.length
     const toAdd = valid.slice(0, slots)
     toAdd.forEach(file => {
@@ -348,7 +348,7 @@ export default function CreateListingPage() {
             >
               <div style={{ fontSize: 28, marginBottom: 8 }}>📸</div>
               <div style={{ fontSize: 13, color: '#6b7280' }}>Click or drag images here</div>
-              <div style={{ fontSize: 11, color: '#4b5563', marginTop: 4 }}>PNG, JPG, GIF up to 5MB each</div>
+              <div style={{ fontSize: 11, color: '#4b5563', marginTop: 4 }}>PNG, JPG, GIF up to 10MB each</div>
               <input ref={fileInputRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={e => handleImages(e.target.files)} />
             </div>
 
