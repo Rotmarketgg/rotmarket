@@ -3,7 +3,7 @@ import { Resend } from 'resend'
 const resend = new Resend(process.env.RESEND_API_KEY)
 
 // Your admin email — change this to your real email
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@rotmarket.gg'
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'davari101@gmail.com'
 
 // Simple in-memory rate limit — 1 submission per IP per 10 minutes
 // For production scale use Redis/Upstash, but this handles abuse at launch
