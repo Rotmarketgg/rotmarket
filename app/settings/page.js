@@ -4,6 +4,9 @@ import { useState, useEffect, useRef, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 import Navbar from '@/components/Navbar'
 import { getUser, getProfile, updateProfile, supabase } from '@/lib/supabase'
+
+const withTimeout = (promise, ms = 8000) =>
+  Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))])
 import { getInitial } from '@/lib/utils'
 import { validateClean } from '@/lib/profanity'
 
@@ -42,10 +45,11 @@ function SettingsPage() {
 
   useEffect(() => {
     async function load() {
-      const u = await getUser()
+      try {
+      const u = await withTimeout(getUser())
       if (!u) { router.push('/auth/login'); return }
       setUser(u)
-      const p = await getProfile(u.id)
+      const p = await withTimeout(getProfile(u.id))
       if (p) {
         setForm({
           username: p.username || '',
@@ -61,6 +65,10 @@ function SettingsPage() {
         if (p.avatar_url) setAvatarPreview(p.avatar_url)
       }
       setLoading(false)
+      } catch (err) {
+        console.error('Settings load error:', err)
+        setLoading(false)
+      }
     }
     load()
   }, [])
@@ -243,13 +251,13 @@ function SettingsPage() {
             <Field label="Cash App Handle">
               <div style={{ position: 'relative' }}>
                 <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }}>$</span>
-                <input type="text" placeholder="YourHandle" value={(form.cashapp_handle || '').replace('$', '')} onChange={e => set('cashapp_handle', '$' + e.target.value.replace('$', ''))} style={{ paddingLeft: 28 }} />
+                <input type="text" placeholder="YourHandle" value={form.cashapp_handle.replace('$', '')} onChange={e => set('cashapp_handle', '$' + e.target.value.replace('$', ''))} style={{ paddingLeft: 28 }} />
               </div>
             </Field>
             <Field label="Venmo Handle">
               <div style={{ position: 'relative' }}>
                 <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }}>@</span>
-                <input type="text" placeholder="YourHandle" value={(form.venmo_handle || '').replace('@', '')} onChange={e => set('venmo_handle', '@' + e.target.value.replace('@', ''))} style={{ paddingLeft: 28 }} />
+                <input type="text" placeholder="YourHandle" value={form.venmo_handle.replace('@', '')} onChange={e => set('venmo_handle', '@' + e.target.value.replace('@', ''))} style={{ paddingLeft: 28 }} />
               </div>
             </Field>
           </Section>

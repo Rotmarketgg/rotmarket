@@ -8,6 +8,9 @@ import { getUser, getConversations, getMessages, sendMessage, getProfile, supaba
 import { timeAgo, getInitial, checkRateLimit } from '@/lib/utils'
 import { isClean } from '@/lib/profanity'
 
+const withTimeout = (promise, ms = 8000) =>
+  Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))])
+
 function MessagesInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -28,35 +31,35 @@ function MessagesInner() {
   const [disputeForm, setDisputeForm] = useState({ reason: '', details: '' })
   const [disputeLoading, setDisputeLoading] = useState(false)
   const [disputeSuccess, setDisputeSuccess] = useState(false)
-  const [mobileView, setMobileView] = useState('list')
-  const [pendingUser, setPendingUser] = useState(null) // user we want to message but no convo exists yet // 'list' | 'chat'
+  const [mobileView, setMobileView] = useState('list') // 'list' | 'chat'
 
   useEffect(() => {
     async function init() {
-      const u = await getUser()
+      try {
+      const u = await withTimeout(getUser())
       if (!u) { router.push('/auth/login'); return }
       setUser(u)
-      const p = await getProfile(u.id)
+      const [p, convos] = await withTimeout(Promise.all([
+        getProfile(u.id),
+        getConversations(u.id),
+      ]))
       setProfile(p)
-      const convos = await getConversations(u.id)
       setConversations(convos || [])
       const targetUsername = searchParams.get('user')
-      if (targetUsername) {
-        const match = (convos || []).find(c => {
+      if (targetUsername && convos?.length > 0) {
+        const match = convos.find(c => {
           const other = c.sender_id === u.id ? c.receiver : c.sender
           return other?.username === targetUsername
         })
-        if (match) {
-          setActiveConvo(match)
-          setMobileView('chat')
-        } else {
-          // No existing conversation — show a prompt to browse their listings
-          setPendingUser(targetUsername)
-          setMobileView('chat')
-        }
+        if (match) setActiveConvo(match)
       }
       setAuthLoading(false)
       setLoading(false)
+      } catch (err) {
+        console.error('Messages load error:', err)
+        setAuthLoading(false)
+        setLoading(false)
+      }
     }
     init()
   }, [])
@@ -309,24 +312,9 @@ function MessagesInner() {
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}
             className={mobileView === 'list' ? 'hide-mobile' : ''}>
             {!activeConvo ? (
-              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 10, padding: 24, textAlign: 'center' }}>
-                {pendingUser ? (
-                  <>
-                    <div style={{ fontSize: 40, marginBottom: 4 }}>💬</div>
-                    <div style={{ fontSize: 15, fontWeight: 700, color: '#f9fafb', marginBottom: 6 }}>No conversation with @{pendingUser} yet</div>
-                    <p style={{ fontSize: 13, color: '#6b7280', maxWidth: 280, lineHeight: 1.6, marginBottom: 16 }}>
-                      To start a conversation, find one of their listings and send an offer or message from there.
-                    </p>
-                    <a href={`/profile/${pendingUser}`} style={{ padding: '9px 20px', background: 'rgba(74,222,128,0.12)', border: '1px solid rgba(74,222,128,0.3)', borderRadius: 8, color: '#4ade80', textDecoration: 'none', fontSize: 13, fontWeight: 700 }}>
-                      View @{pendingUser}'s Profile →
-                    </a>
-                  </>
-                ) : (
-                  <>
-                    <div style={{ fontSize: 52, opacity: 0.2 }}>💬</div>
-                    <div style={{ fontSize: 15, color: '#4b5563', fontWeight: 600 }}>Select a conversation</div>
-                  </>
-                )}
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 10 }}>
+                <div style={{ fontSize: 52, opacity: 0.2 }}>💬</div>
+                <div style={{ fontSize: 15, color: '#4b5563', fontWeight: 600 }}>Select a conversation</div>
               </div>
             ) : (
               <>
