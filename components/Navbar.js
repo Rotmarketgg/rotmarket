@@ -85,9 +85,17 @@ export default function Navbar() {
   useEffect(() => { setMobileOpen(false) }, [pathname])
 
   const handleSignOut = async () => {
+    // Clear local state immediately so UI updates right away
+    setUser(null)
+    setProfile(null)
+    setUnread(0)
+    setPendingOffers(0)
+    setMenuOpen(false)
+    setMobileOpen(false)
     await supabase.auth.signOut()
-    router.push('/')
-    router.refresh()
+    // Use window.location instead of router.push so the full page
+    // re-initialises from scratch with no stale session in memory
+    window.location.href = '/'
   }
 
   const isActive = (href) => pathname === href
