@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Navbar from '@/components/Navbar'
 import Link from 'next/link'
 import { getUser } from '@/lib/supabase'
+import { withTimeout } from '@/lib/utils'
 
 const TOPICS = [
   { id: 'scam', label: 'Report a Scam', emoji: '🚨', description: 'Report a user who scammed or attempted to scam you' },
@@ -22,9 +23,16 @@ export default function ContactPage() {
   const [authChecked, setAuthChecked] = useState(false)
 
   useEffect(() => {
-    getUser().then(u => {
-      setAuthChecked(true)
-    })
+    async function init() {
+      try {
+        await withTimeout(getUser())
+      } catch (err) {
+        console.error('Contact init error:', err)
+      } finally {
+        setAuthChecked(true)
+      }
+    }
+    init()
   }, [])
 
   if (!authChecked) return <div style={{ minHeight: '100vh' }}><Navbar /></div>

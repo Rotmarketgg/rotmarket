@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Navbar from '@/components/Navbar'
 import { getUser, getProfile } from '@/lib/supabase'
+import { withTimeout } from '@/lib/utils'
 import { getPrimaryBadge } from '@/lib/constants'
 
 const CASHAPP = '$tdowdy94'
@@ -34,13 +35,21 @@ export default function VIPPage() {
   const [authChecked, setAuthChecked] = useState(false)
 
   useEffect(() => {
-    getUser().then(u => {
-      if (u) {
-        setUser(u)
-        getProfile(u.id).then(setProfile)
+    async function init() {
+      try {
+        const u = await withTimeout(getUser())
+        if (u) {
+          setUser(u)
+          const p = await withTimeout(getProfile(u.id))
+          setProfile(p)
+        }
+      } catch (err) {
+        console.error('VIP init error:', err)
+      } finally {
+        setAuthChecked(true)
       }
-      setAuthChecked(true)
-    })
+    }
+    init()
   }, [])
 
   const profileBadges = profile?.badges?.length ? profile.badges : profile?.badge ? [profile.badge] : []

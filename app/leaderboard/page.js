@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Navbar from '@/components/Navbar'
 import { supabase, getUser } from '@/lib/supabase'
-import { getInitial } from '@/lib/utils'
+import { getInitial, withTimeout } from '@/lib/utils'
 import { BADGE_META, BADGE_HIERARCHY, getPrimaryBadge } from '@/lib/constants'
 
 const BADGE_STYLES = BADGE_META
@@ -26,30 +26,24 @@ export default function LeaderboardPage() {
     if (!authChecked) return
     setLoading(true)
     async function load() {
-      if (tab === 'trades') {
-        const { data, error } = await supabase
+      try {
+        const baseQuery = supabase
           .from('profiles')
           .select('id, username, trade_count, rating, review_count, badge, badges, avatar_url')
           .not('username', 'is', null)
-          .gt('trade_count', 0)
-          .order('trade_count', { ascending: false })
-          .limit(10)
-        if (!error) setTraders(data || [])
-        else console.error('Leaderboard error:', error)
-      } else {
-        // Query profiles directly — rating/review_count are kept in sync by DB trigger
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('id, username, trade_count, rating, review_count, badge, badges, avatar_url')
-          .not('username', 'is', null)
-          .gt('review_count', 0)
-          .order('rating', { ascending: false })
-          .order('review_count', { ascending: false })
-          .limit(10)
-        if (error) { console.error('Leaderboard error:', error); setLoading(false); return }
+
+        const query = tab === 'trades'
+          ? baseQuery.gt('trade_count', 0).order('trade_count', { ascending: false }).limit(10)
+          : baseQuery.gt('review_count', 0).order('rating', { ascending: false }).order('review_count', { ascending: false }).limit(10)
+
+        const { data, error } = await withTimeout(query)
+        if (error) throw error
         setTraders(data || [])
+      } catch (err) {
+        console.error('Leaderboard error:', err)
+      } finally {
+        setLoading(false)
       }
-      setLoading(false)
     }
     load()
   }, [tab, authChecked])

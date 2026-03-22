@@ -2,11 +2,9 @@
 
 import { useState, useEffect, useRef, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
-import Navbar from '@/components/Navbar'
+import Navbar, { clearProfileCache } from '@/components/Navbar'
 import { getUser, getProfile, updateProfile, supabase } from '@/lib/supabase'
-import { withTimeout } from '@/lib/utils'
-
-import { getInitial } from '@/lib/utils'
+import { withTimeout, getInitial } from '@/lib/utils'
 import { validateClean } from '@/lib/profanity'
 
 export default function SettingsPageWrapper() {
@@ -135,6 +133,8 @@ function SettingsPage() {
       })
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
+      // Bust the Navbar profile cache so updated avatar/username shows immediately
+      clearProfileCache()
     } catch (err) {
       setError(err.message || 'Failed to save. Username may already be taken.')
     } finally {

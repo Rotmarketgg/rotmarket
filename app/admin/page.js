@@ -5,9 +5,8 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Navbar from '@/components/Navbar'
 import { getUser, getProfile, supabase } from '@/lib/supabase'
-import { withTimeout } from '@/lib/utils'
+import { withTimeout, timeAgo, getInitial } from '@/lib/utils'
 import { BADGE_HIERARCHY, BADGE_META, getPrimaryBadge } from '@/lib/constants'
-import { timeAgo, getInitial } from '@/lib/utils'
 
 const BADGE_COLORS = {
   'Verified Trader': '#4ade80',

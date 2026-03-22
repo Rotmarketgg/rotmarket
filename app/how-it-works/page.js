@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Navbar from '@/components/Navbar'
 import Link from 'next/link'
 import { getUser } from '@/lib/supabase'
+import { withTimeout } from '@/lib/utils'
 
 const STEPS = [
   {
@@ -79,7 +80,15 @@ export default function HowItWorksPage() {
   const [openFaq, setOpenFaq] = useState(null)
 
   useEffect(() => {
-    getUser().then(u => setUser(u || null))
+    async function init() {
+      try {
+        const u = await withTimeout(getUser())
+        setUser(u || null)
+      } catch (err) {
+        console.error('How it works init error:', err)
+      }
+    }
+    init()
   }, [])
 
   return (

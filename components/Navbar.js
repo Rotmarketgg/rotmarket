@@ -28,7 +28,7 @@ function setCachedProfile(userId, data) {
   } catch {}
 }
 
-function clearProfileCache() {
+export function clearProfileCache() {
   try { sessionStorage.removeItem(PROFILE_CACHE_KEY) } catch {}
 }
 
