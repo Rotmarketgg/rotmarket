@@ -7,7 +7,7 @@ import Navbar from '@/components/Navbar'
 import ListingCard from '@/components/ListingCard'
 import StarRating from '@/components/StarRating'
 import ReportButton from '@/components/ReportButton'
-import { getProfileByUsername, getUser, getUserListings, getReviews, deleteListing, supabase } from '@/lib/supabase'
+import { getProfileByUsername, getSessionUser, getUserListings, getReviews, deleteListing, supabase } from '@/lib/supabase'
 
 import { timeAgo, getInitial, withTimeout } from '@/lib/utils'
 import { BADGE_HIERARCHY, BADGE_META, getPrimaryBadge } from '@/lib/constants'
@@ -34,10 +34,10 @@ export default function ProfilePage() {
   useEffect(() => {
     async function load() {
       try {
-      const [p, u] = await withTimeout(Promise.all([
-        getProfileByUsername(decodeURIComponent(username)),
-        getUser(),
-      ]))
+      const [p, u] = await Promise.all([
+        withTimeout(getProfileByUsername(decodeURIComponent(username))),
+        getSessionUser(),
+      ])
       if (!p) { setNotFound(true); setLoading(false); return }
       setCurrentUser(u)
       const [listingsData, reviewsData] = await withTimeout(Promise.all([
@@ -72,15 +72,9 @@ export default function ProfilePage() {
       setLoading(false)
       } catch (err) {
         console.error('Profile load error:', err)
-        if (err.message === 'Request timed out') {
-          // Timeout means DB was slow, not that the user doesn't exist
-          // Reload the page so they get a fresh attempt
-          window.location.reload()
-        } else {
-          // Actual not found or permission error
-          setNotFound(true)
-          setLoading(false)
-        }
+        // Show not-found for actual missing profiles; show retry for timeouts/network errors
+        setNotFound(true)
+        setLoading(false)
       }
     }
     load()
@@ -161,7 +155,10 @@ export default function ProfilePage() {
         <div style={{ fontSize: 56, marginBottom: 16 }}>👤</div>
         <h2 style={{ color: '#f9fafb', margin: '0 0 8px' }}>User Not Found</h2>
         <p style={{ color: '#6b7280', marginBottom: 20 }}>This profile doesn't exist or has been removed.</p>
-        <Link href="/" className="btn-primary" style={{ textDecoration: 'none', display: 'inline-block' }}>Browse Listings</Link>
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+          <button onClick={() => window.location.reload()} className="btn-ghost" style={{ fontSize: 13 }}>↩ Try Again</button>
+          <Link href="/" className="btn-primary" style={{ textDecoration: 'none', display: 'inline-block' }}>Browse Listings</Link>
+        </div>
       </div>
     </div>
   )

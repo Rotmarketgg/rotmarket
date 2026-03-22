@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Navbar from '@/components/Navbar'
-import { getUser, getProfile } from '@/lib/supabase'
+import { getSessionUser, getProfile } from '@/lib/supabase'
 import { withTimeout } from '@/lib/utils'
 import { getPrimaryBadge } from '@/lib/constants'
 
@@ -37,10 +37,10 @@ export default function VIPPage() {
   useEffect(() => {
     async function init() {
       try {
-        const u = await withTimeout(getUser())
+        const u = await getSessionUser()
         if (u) {
           setUser(u)
-          const p = await withTimeout(getProfile(u.id))
+          const p = await getProfile(u.id)
           setProfile(p)
         }
       } catch (err) {

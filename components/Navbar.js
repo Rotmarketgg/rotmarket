@@ -57,7 +57,6 @@ export default function Navbar() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         setUser(session.user)
-        // Use cached profile to prevent avatar URL re-fetch on every page load
         const cached = getCachedProfile(session.user.id)
         if (cached) {
           setProfile(cached)
@@ -71,12 +70,19 @@ export default function Navbar() {
         fetchPendingOffers(session.user.id)
       }
     })
+
+    // Debounce timer — prevents false logouts during transient token refresh failures
+    let signedOutTimer = null
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'TOKEN_REFRESHED') return  // silent refresh, no UI change needed
+      // Silent token refresh — never update UI or clear state
+      if (event === 'TOKEN_REFRESHED') return
 
       if (session?.user) {
+        // Cancel any pending false-logout
+        if (signedOutTimer) { clearTimeout(signedOutTimer); signedOutTimer = null }
+
         setUser(session.user)
-        // For INITIAL_SESSION use cache — avoids avatar re-fetch on tab switch/navigation
         const cached = event === 'INITIAL_SESSION' ? getCachedProfile(session.user.id) : null
         if (cached) {
           setProfile(cached)
@@ -89,12 +95,28 @@ export default function Navbar() {
         getUnreadCount(session.user.id).then(setUnread)
         fetchPendingOffers(session.user.id)
       } else if (event === 'SIGNED_OUT') {
-        setUser(null); setProfile(null); setUnread(0); setPendingOffers(0)
-        clearProfileCache()
+        // Wait 2s before clearing state — verify it's a real sign-out, not a
+        // transient token refresh failure that self-recovers. If a new session
+        // arrives within the window, the timer is cancelled and nothing is cleared.
+        signedOutTimer = setTimeout(async () => {
+          const { data: { session: currentSession } } = await supabase.auth.getSession()
+          if (!currentSession) {
+            setUser(null)
+            setProfile(null)
+            setUnread(0)
+            setPendingOffers(0)
+            clearProfileCache()
+          }
+          signedOutTimer = null
+        }, 2000)
       }
-      // For any other event with no session, do nothing — avoids false signed-out flashes
+      // Any other event with no session — do nothing, avoids false signed-out flashes
     })
-    return () => subscription.unsubscribe()
+
+    return () => {
+      subscription.unsubscribe()
+      if (signedOutTimer) clearTimeout(signedOutTimer)
+    }
   }, [])
 
   // Real-time unread messages
@@ -313,9 +335,12 @@ export default function Navbar() {
                       <MenuItem href="/create" label="Post Listing" emoji="➕" onClick={() => setMenuOpen(false)} />
                       <MenuItem href="/messages" label="Messages" emoji="💬" badge={unread} onClick={() => setMenuOpen(false)} />
                       <MenuItem href="/settings" label="Settings" emoji="⚙️" onClick={() => setMenuOpen(false)} />
-                      {['Owner', 'Moderator'].includes(profile?.badge) && (
-                        <MenuItem href="/admin" label="Admin Panel" emoji="🛡️" onClick={() => setMenuOpen(false)} />
-                      )}
+                      {(() => {
+                        const profileBadges = profile?.badges?.length ? profile.badges : profile?.badge ? [profile.badge] : []
+                        return profileBadges.some(b => ['Owner', 'Moderator'].includes(b)) ? (
+                          <MenuItem href="/admin" label="Admin Panel" emoji="🛡️" onClick={() => setMenuOpen(false)} />
+                        ) : null
+                      })()}
                       <div style={{ borderTop: '1px solid #1f2937', marginTop: 6, paddingTop: 6 }}>
                         <button onClick={handleSignOut} style={{ width: '100%', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: '8px 12px', borderRadius: 6, fontSize: 13, color: '#ef4444', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
                           🚪 Sign Out

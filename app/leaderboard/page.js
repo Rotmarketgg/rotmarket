@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Navbar from '@/components/Navbar'
-import { supabase, getUser } from '@/lib/supabase'
+import { supabase, getSessionUser } from '@/lib/supabase'
 import { getInitial, withTimeout } from '@/lib/utils'
 import { BADGE_META, BADGE_HIERARCHY, getPrimaryBadge } from '@/lib/constants'
 
@@ -19,7 +19,7 @@ export default function LeaderboardPage() {
   const [authChecked, setAuthChecked] = useState(false)
 
   useEffect(() => {
-    getUser().then(() => setAuthChecked(true))
+    getSessionUser().then(() => setAuthChecked(true))
   }, [])
 
   useEffect(() => {

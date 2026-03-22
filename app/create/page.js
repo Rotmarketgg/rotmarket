@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Navbar from '@/components/Navbar'
-import { getUser, getProfile, createListing, updateListing, uploadListingImage, supabase } from '@/lib/supabase'
+import { getSessionUser, getProfile, createListing, updateListing, uploadListingImage, supabase } from '@/lib/supabase'
 import { GAMES, RARITIES, PAYMENT_METHODS, LISTING_TYPES } from '@/lib/constants'
 import { validateListing, checkRateLimit, withTimeout } from '@/lib/utils'
 import { validateClean, validateContent } from '@/lib/profanity'
@@ -37,10 +37,10 @@ export default function CreateListingPage() {
   useEffect(() => {
     async function checkAuth() {
       try {
-        const currentUser = await withTimeout(getUser())
+        const currentUser = await getSessionUser()
         if (!currentUser) { router.push('/auth/login'); return }
         setUser(currentUser)
-        const p = await withTimeout(getProfile(currentUser.id))
+        const p = await getProfile(currentUser.id)
         setProfile(p)
         setAuthLoading(false)
       } catch (err) {
@@ -119,8 +119,8 @@ export default function CreateListingPage() {
           imageUrls.push(url)
         }
       } catch (uploadErr) {
-        // Delete the listing so we don't leave a ghost listing with no images
-        await supabase.from('listings').delete().eq('id', listing.id)
+        // Soft-delete the listing so we don't leave a ghost — consistent with rest of app
+        await supabase.rpc('soft_delete_listing', { listing_id: listing.id })
         throw new Error('Image upload failed. Your listing was not created. Please try again.')
       }
 

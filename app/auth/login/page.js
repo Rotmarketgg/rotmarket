@@ -20,15 +20,20 @@ function LoginForm() {
     if (!form.email || !form.password) { setError('Please fill in all fields.'); return }
     setError('')
     setLoading(true)
+    // Safety net — never leave the button stuck for more than 12 seconds
+    const safetyTimer = setTimeout(() => setLoading(false), 12000)
     try {
       await signIn(form.email, form.password)
-      // Wait briefly for Supabase to persist session to localStorage
-      // before navigating — prevents "stuck on logging in" on slow connections
-      await new Promise(resolve => setTimeout(resolve, 300))
+      // Clear loading before navigating so if the redirect somehow fails
+      // the user isn't left staring at a frozen "Logging in..." button
+      clearTimeout(safetyTimer)
+      setLoading(false)
+      // Small pause lets Supabase finish writing the session to localStorage
+      await new Promise(resolve => setTimeout(resolve, 150))
       window.location.href = redirect
     } catch (err) {
+      clearTimeout(safetyTimer)
       setError(err.message || 'Invalid email or password.')
-    } finally {
       setLoading(false)
     }
   }

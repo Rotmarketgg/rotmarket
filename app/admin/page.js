@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Navbar from '@/components/Navbar'
-import { getUser, getProfile, supabase } from '@/lib/supabase'
+import { getSessionUser, getProfile, supabase } from '@/lib/supabase'
 import { withTimeout, timeAgo, getInitial } from '@/lib/utils'
 import { BADGE_HIERARCHY, BADGE_META, getPrimaryBadge } from '@/lib/constants'
 
@@ -76,9 +76,9 @@ export default function AdminPage() {
   useEffect(() => {
     async function init() {
       try {
-      const u = await withTimeout(getUser())
+      const u = await getSessionUser()
       if (!u) { router.push('/auth/login'); return }
-      const p = await withTimeout(getProfile(u.id))
+      const p = await getProfile(u.id)
       const pBadges = p?.badges?.length ? p.badges : p?.badge ? [p.badge] : []
       if (!p || !['Owner', 'Moderator'].some(b => pBadges.includes(b))) {
         setUnauthorized(true); setLoading(false); return
@@ -294,7 +294,7 @@ export default function AdminPage() {
     if (currentlyBanned) {
       if (!confirm(`Unban @${username}?`)) return
       const { error } = await supabase.rpc('admin_update_profile', {
-        target_id: userId, new_badge: null,
+        target_id: userId, new_badges: null,
         new_banned: false, new_ban_reason: null,
       })
       if (error) { alert('Failed: ' + error.message); return }
@@ -302,7 +302,7 @@ export default function AdminPage() {
       const reason = prompt(`Reason for banning @${username}:`)
       if (!reason) return
       const { error } = await supabase.rpc('admin_update_profile', {
-        target_id: userId, new_badge: null,
+        target_id: userId, new_badges: null,
         new_banned: true, new_ban_reason: reason,
       })
       if (error) { alert('Failed: ' + error.message); return }

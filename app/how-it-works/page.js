@@ -3,8 +3,7 @@
 import { useState, useEffect } from 'react'
 import Navbar from '@/components/Navbar'
 import Link from 'next/link'
-import { getUser } from '@/lib/supabase'
-import { withTimeout } from '@/lib/utils'
+import { getSessionUser } from '@/lib/supabase'
 
 const STEPS = [
   {
@@ -82,7 +81,7 @@ export default function HowItWorksPage() {
   useEffect(() => {
     async function init() {
       try {
-        const u = await withTimeout(getUser())
+        const u = await getSessionUser()
         setUser(u || null)
       } catch (err) {
         console.error('How it works init error:', err)

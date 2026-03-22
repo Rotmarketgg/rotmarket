@@ -63,8 +63,9 @@ export default function BanGate({ children }) {
     return () => subscription.unsubscribe()
   }, [])
 
-  // Don't flash anything while checking
-  if (!checked) return children
+  // Show nothing while checking — prevents banned users seeing a flash of content.
+  // Non-banned users experience no visible difference (check is near-instant).
+  if (!checked) return null
 
   // Let banned users access auth pages so they can sign out / appeal
   if (banned && !ALLOWED_PATHS.some(p => pathname?.startsWith(p))) {

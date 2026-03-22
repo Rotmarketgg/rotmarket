@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect, useRef, Suspense } from 'react'
+import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Navbar from '@/components/Navbar'
-import { getUser, getConversations, getMessages, sendMessage, getProfile, supabase } from '@/lib/supabase'
+import { getSessionUser, getConversations, getMessages, sendMessage, getProfile, supabase } from '@/lib/supabase'
 import { timeAgo, getInitial, checkRateLimit, withTimeout } from '@/lib/utils'
 import { isClean } from '@/lib/profanity'
 
@@ -33,7 +33,7 @@ function MessagesInner() {
   useEffect(() => {
     async function init() {
       try {
-      const u = await withTimeout(getUser())
+      const u = await getSessionUser()
       if (!u) { router.push('/auth/login'); return }
       setUser(u)
       const [p, convos] = await withTimeout(Promise.all([
@@ -69,18 +69,33 @@ function MessagesInner() {
       .on('postgres_changes', {
         event: 'INSERT', schema: 'public', table: 'messages',
         filter: `listing_id=eq.${activeConvo.listing_id}`,
-      }, (payload) => {
+      }, async (payload) => {
+        // Raw postgres_changes payload has no joined profile data — fetch the
+        // full row with sender profile so avatars and usernames render correctly
+        const { data: fullMsg } = await supabase
+          .from('messages')
+          .select('*, sender:profiles!messages_sender_id_fkey (id, username, avatar_url)')
+          .eq('id', payload.new.id)
+          .single()
+
+        const msg = fullMsg || payload.new // fallback to raw if fetch fails
         setMessages(prev => {
-          if (prev.find(m => m.id === payload.new.id)) return prev
-          return [...prev, payload.new]
+          if (prev.find(m => m.id === msg.id)) return prev
+          return [...prev, msg]
         })
+        // Update sidebar: refresh latest message preview + timestamp
+        setConversations(prev => prev.map(c =>
+          c.listing_id === activeConvo.listing_id
+            ? { ...c, content: msg.content, created_at: msg.created_at }
+            : c
+        ))
         scrollToBottom()
       })
       .subscribe()
     return () => supabase.removeChannel(channel)
-  }, [activeConvo])
+  }, [activeConvo, loadMessages])
 
-  const loadMessages = async () => {
+  const loadMessages = useCallback(async () => {
     if (!activeConvo || !user) return
     const otherId = activeConvo.sender_id === user.id ? activeConvo.receiver_id : activeConvo.sender_id
     const msgs = await getMessages(user.id, otherId, activeConvo.listing_id)
@@ -90,7 +105,7 @@ function MessagesInner() {
     setConversations(prev => prev.map(c =>
       c.listing_id === activeConvo.listing_id ? { ...c, read: true } : c
     ))
-  }
+  }, [activeConvo, user])
 
   const scrollToBottom = () => {
     setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 80)

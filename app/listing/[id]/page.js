@@ -6,7 +6,7 @@ import Link from 'next/link'
 import Navbar from '@/components/Navbar'
 import StarRating from '@/components/StarRating'
 import ReportButton from '@/components/ReportButton'
-import { getListing, getReviews, getUser, getProfile, createReview, supabase } from '@/lib/supabase'
+import { getListing, getReviews, getSessionUser, getProfile, createReview, supabase } from '@/lib/supabase'
 import { getRarityStyle, timeAgo, formatPrice, getInitial, checkRateLimit, withTimeout } from '@/lib/utils'
 import { BADGE_HIERARCHY, BADGE_META, getPrimaryBadge, PAYMENT_METHODS } from '@/lib/constants'
 import { isClean } from '@/lib/profanity'
@@ -110,7 +110,7 @@ export default function ListingPage() {
   useEffect(() => {
     async function load() {
       try {
-        const [listingData, currentUser] = await withTimeout(Promise.all([getListing(id), getUser()]))
+        const [listingData, currentUser] = await Promise.all([withTimeout(getListing(id)), getSessionUser()])
         setListing(listingData)
         setUser(currentUser)
         const [reviewsData, profileData] = await withTimeout(Promise.all([
