@@ -32,8 +32,6 @@ export default function VIPPage() {
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
   const [copied, setCopied] = useState('')
-  const [authChecked, setAuthChecked] = useState(false)
-
   useEffect(() => {
     async function init() {
       try {
@@ -45,8 +43,6 @@ export default function VIPPage() {
         }
       } catch (err) {
         console.error('VIP init error:', err)
-      } finally {
-        setAuthChecked(true)
       }
     }
     init()
@@ -55,8 +51,6 @@ export default function VIPPage() {
   const profileBadges = profile?.badges?.length ? profile.badges : profile?.badge ? [profile.badge] : []
   const primaryBadge = getPrimaryBadge(profileBadges)
   const isVip = primaryBadge === 'VIP' || primaryBadge === 'Owner'
-
-  if (!authChecked) return <div style={{ minHeight: '100vh' }}><Navbar /></div>
 
   const copy = (text, key) => {
     navigator.clipboard.writeText(text)

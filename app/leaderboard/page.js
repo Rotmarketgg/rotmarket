@@ -23,7 +23,6 @@ export default function LeaderboardPage() {
   }, [])
 
   useEffect(() => {
-    if (!authChecked) return
     setLoading(true)
     async function load() {
       try {
@@ -54,8 +53,6 @@ export default function LeaderboardPage() {
     document.addEventListener('visibilitychange', onVisible)
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [tab])
-
-  if (!authChecked) return <div style={{ minHeight: '100vh' }}><Navbar /></div>
 
   const getValue = (trader) => tab === 'trades' ? trader.trade_count : trader.rating
   const getLabel = () => tab === 'trades' ? 'trades' : 'avg rating'

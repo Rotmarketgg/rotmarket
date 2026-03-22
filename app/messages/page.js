@@ -22,7 +22,7 @@ function MessagesInner() {
   const [newMsg, setNewMsg] = useState('')
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
-  const [authLoading, setAuthLoading] = useState(true)
+  const [authLoading, setAuthLoading] = useState(false)
   const [inboxTab, setInboxTab] = useState('active')
   const [disputeOpen, setDisputeOpen] = useState(false)
   const [disputeForm, setDisputeForm] = useState({ reason: '', details: '' })
@@ -175,11 +175,7 @@ function MessagesInner() {
     finally { setDisputeLoading(false) }
   }
 
-  if (authLoading) return (
-    <div style={{ minHeight: '100vh' }}><Navbar />
-      <div style={{ textAlign: 'center', padding: 80, color: '#6b7280' }}>Loading...</div>
-    </div>
-  )
+
 
   const getOtherUser = (convo) => {
     if (!convo || !user) return null

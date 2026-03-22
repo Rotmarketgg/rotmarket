@@ -18,7 +18,7 @@ export default function CreateListingPage() {
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(false)
-  const [authLoading, setAuthLoading] = useState(true)
+  const [authLoading, setAuthLoading] = useState(false)
   const [errors, setErrors] = useState({})
   const [images, setImages] = useState([]) // [{file, preview}]
   const [success, setSuccess] = useState(false)
@@ -140,12 +140,7 @@ export default function CreateListingPage() {
 
   const rarities = RARITIES[form.game] || RARITIES.fortnite
 
-  if (authLoading) return (
-    <div style={{ minHeight: '100vh' }}>
-      <Navbar />
-      <div style={{ textAlign: 'center', padding: 80, color: '#6b7280' }}>Loading...</div>
-    </div>
-  )
+
 
   if (success) return (
     <div style={{ minHeight: '100vh' }}>

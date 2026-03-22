@@ -11,12 +11,12 @@ export default function BanGate({ children }) {
   const pathname = usePathname()
   const [banned, setBanned] = useState(false)
   const [banReason, setBanReason] = useState(null)
-  const [checked, setChecked] = useState(false)
 
   useEffect(() => {
     async function check() {
+      // Use getSession (localStorage, no network) to avoid blocking on stale connections
       const { data: { session } } = await supabase.auth.getSession()
-      if (!session?.user) { setChecked(true); return }
+      if (!session?.user) return
 
       const { data: profile } = await supabase
         .from('profiles')
@@ -28,22 +28,18 @@ export default function BanGate({ children }) {
         setBanned(true)
         setBanReason(profile.ban_reason || null)
       }
-      setChecked(true)
     }
     check()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      // Skip token refresh events — no need to re-check ban on silent refresh
       if (event === 'TOKEN_REFRESHED') return
 
       if (!session) {
         setBanned(false)
         setBanReason(null)
-        setChecked(true)
         return
       }
 
-      // Only re-check ban on actual sign-in events
       if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'PASSWORD_RECOVERY') {
         const { data: profile } = await supabase
           .from('profiles')
@@ -57,17 +53,15 @@ export default function BanGate({ children }) {
           setBanned(false)
           setBanReason(null)
         }
-        setChecked(true)
       }
     })
     return () => subscription.unsubscribe()
   }, [])
 
-  // Show nothing while checking — prevents banned users seeing a flash of content.
-  // Non-banned users experience no visible difference (check is near-instant).
-  if (!checked) return null
-
-  // Let banned users access auth pages so they can sign out / appeal
+  // CRITICAL: Always render children immediately — never block on a network check.
+  // Ban status loads in the background. The 99.9% case (non-banned user) sees
+  // zero delay. Banned users see content for ~200ms then get the ban screen —
+  // that is acceptable and far better than every user seeing a blank page.
   if (banned && !ALLOWED_PATHS.some(p => pathname?.startsWith(p))) {
     return (
       <div style={{

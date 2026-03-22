@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import Navbar from '@/components/Navbar'
 import Link from 'next/link'
-import { getSessionUser } from '@/lib/supabase'
 
 const TOPICS = [
   { id: 'scam', label: 'Report a Scam', emoji: '🚨', description: 'Report a user who scammed or attempted to scam you' },
@@ -19,23 +18,6 @@ export default function ContactPage() {
   const [submitted, setSubmitted] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [authChecked, setAuthChecked] = useState(false)
-
-  useEffect(() => {
-    async function init() {
-      try {
-        await getSessionUser()
-      } catch (err) {
-        console.error('Contact init error:', err)
-      } finally {
-        setAuthChecked(true)
-      }
-    }
-    init()
-  }, [])
-
-  if (!authChecked) return <div style={{ minHeight: '100vh' }}><Navbar /></div>
-
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
   const handleSubmit = async () => {
