@@ -80,6 +80,13 @@ export default function ProfilePage() {
     load()
   }, [username])
 
+  // Refetch when tab becomes visible again after browser throttled the connection
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === 'visible') load() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [username])
+
   const isOwn = currentUser?.id === profile?.id
   // Support both legacy badge and new badges array
   const profileBadges = profile?.badges?.length ? profile.badges

@@ -48,6 +48,13 @@ export default function LeaderboardPage() {
     load()
   }, [tab, authChecked])
 
+  // Refetch when tab becomes visible again
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === 'visible') load() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [tab])
+
   if (!authChecked) return <div style={{ minHeight: '100vh' }}><Navbar /></div>
 
   const getValue = (trader) => tab === 'trades' ? trader.trade_count : trader.rating

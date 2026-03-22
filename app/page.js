@@ -76,6 +76,20 @@ export default function HomePage() {
   // Reset and fetch when filters change
   useEffect(() => { fetchListings(true, 0) }, [game, typeFilter, debouncedSearch])
 
+  // Re-fetch when tab becomes visible again after being idle/backgrounded.
+  // Browsers throttle/suspend network when a tab is hidden — when the user
+  // comes back the Supabase connection may be stale and queries hang silently.
+  // visibilitychange fires the moment the tab is foregrounded again.
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        fetchListings(true, 0)
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [fetchListings])
+
   // Load next page
   const loadMore = useCallback(() => {
     if (loadingMore || !hasMore) return

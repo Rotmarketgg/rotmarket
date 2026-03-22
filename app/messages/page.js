@@ -61,6 +61,13 @@ function MessagesInner() {
     init()
   }, [])
 
+  // Refetch conversations when tab becomes visible again
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === 'visible') init() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [])
+
   useEffect(() => {
     if (!activeConvo || !user) return
     loadMessages()

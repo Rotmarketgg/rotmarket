@@ -138,6 +138,13 @@ export default function ListingPage() {
     load()
   }, [id])
 
+  // Refetch when tab becomes visible again after browser throttled the connection
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === 'visible') load() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [id])
+
   const rarity = listing ? getRarityStyle(listing.rarity) : getRarityStyle('common')
   const seller = listing?.profiles
   const isSeller = user && seller && user.id === seller.id
