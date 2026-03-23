@@ -53,7 +53,9 @@ export default function HomePage() {
         search: debouncedSearch || null,
         limit: PAGE_SIZE,
         offset: pageNum * PAGE_SIZE,
-      }))\n\n      if (isFirst) {
+      }))
+
+      if (isFirst) {
         setListings(data)
         setPage(0)
       } else {
