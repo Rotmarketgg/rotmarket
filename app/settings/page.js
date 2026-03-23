@@ -20,6 +20,7 @@ function SettingsPage() {
   const avatarInputRef = useRef(null)
 
   const [user, setUser] = useState(null)
+  const [profileUsername, setProfileUsername] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -29,7 +30,6 @@ function SettingsPage() {
   const [avatarUploading, setAvatarUploading] = useState(false)
 
   const [form, setForm] = useState({
-    username: '',
     epic_username: '',
     roblox_username: '',
     paypal_email: '',
@@ -48,8 +48,8 @@ function SettingsPage() {
       setUser(u)
       const p = await getProfile(u.id)
       if (p) {
+        setProfileUsername(p.username || '')
         setForm({
-          username: p.username || '',
           epic_username: p.epic_username || '',
           roblox_username: p.roblox_username || '',
           paypal_email: p.paypal_email || '',
@@ -117,6 +117,11 @@ function SettingsPage() {
   const handleSave = async () => {
     const bioErr = validateClean(form.bio, 'Bio')
     if (bioErr) { setError(bioErr); return }
+    // Validate profile URL — must be http/https to prevent javascript: XSS
+    if (form.profile_url.trim() && !/^https?:\/\//i.test(form.profile_url.trim())) {
+      setError('Profile link must start with https:// or http://')
+      return
+    }
     setError('')
     setSaving(true)
     try {
@@ -191,7 +196,7 @@ function SettingsPage() {
               >
                 {avatarPreview
                   ? <img src={avatarPreview} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  : <span style={{ fontSize: 28, fontWeight: 900, color: '#0a0a0f', fontFamily: 'var(--font-display)' }}>{getInitial(form.username)}</span>
+                  : <span style={{ fontSize: 28, fontWeight: 900, color: '#0a0a0f', fontFamily: 'var(--font-display)' }}>{getInitial(profileUsername)}</span>
                 }
               </div>
               <div>
@@ -208,7 +213,7 @@ function SettingsPage() {
           <Section title="Public Profile">
             <div style={{ padding: '8px 12px', background: '#0d0d14', border: '1px solid #1f2937', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <div style={{ fontSize: 12, color: '#6b7280', fontWeight: 600 }}>Username</div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#f9fafb' }}>{form.username}</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#f9fafb' }}>{profileUsername}</div>
               <div style={{ marginLeft: 'auto', fontSize: 11, color: '#4b5563' }}>Set at signup · cannot be changed</div>
             </div>
             <Field label="Bio" hint="Optional — tell traders about yourself">

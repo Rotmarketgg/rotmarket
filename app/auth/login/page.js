@@ -9,7 +9,10 @@ import { AuthLayout } from '../signup/page'
 function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const redirect = searchParams.get('redirect') || '/'
+  // Sanitise redirect — only allow relative paths to prevent open-redirect attacks.
+  // Strips anything that looks like a protocol (http://, javascript:, //evil.com, etc.)
+  const rawRedirect = searchParams.get('redirect') || '/'
+  const redirect = rawRedirect.startsWith('/') && !rawRedirect.startsWith('//') ? rawRedirect : '/'
   const [form, setForm] = useState({ email: '', password: '' })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')

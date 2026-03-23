@@ -1,6 +1,7 @@
 import { Barlow_Condensed, DM_Sans } from 'next/font/google'
 import './globals.css'
 import BanGate from '@/components/BanGate'
+import Footer from '@/components/Footer'
 
 const displayFont = Barlow_Condensed({
   subsets: ['latin'],
@@ -51,6 +52,7 @@ export default function RootLayout({ children }) {
       </head>
       <body className="bg-rot-dark text-white font-body antialiased min-h-screen">
         <BanGate>{children}</BanGate>
+        <Footer />
       </body>
     </html>
   )

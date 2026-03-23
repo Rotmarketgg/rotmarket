@@ -78,6 +78,181 @@ async function completeTrade(requestId) {
   if (error) throw error
 }
 
+// ─── MODULE-LEVEL SUB-COMPONENTS ─────────────────────────────────────────────
+// Defined outside ListingPage so React doesn't recreate their identity on every
+// parent render. Previously defined inside caused unmount/remount on each render,
+// destroying local state (e.g. `working` in SellerOfferCard mid-action).
+
+function SellerOfferCard({ offer, onUpdate, onSetListing }) {
+  const [working, setWorking] = useState(false)
+  const buyer = offer.buyer
+  const statusColor = { pending: '#f59e0b', accepted: '#4ade80', completed: '#4ade80' }[offer.status] || '#6b7280'
+
+  const doAction = async (fn) => {
+    setWorking(true)
+    try { await fn() } finally { setWorking(false) }
+  }
+
+  return (
+    <div style={{
+      background: '#0d0d14',
+      border: `1px solid ${offer.status === 'pending' ? 'rgba(245,158,11,0.25)' : '#1f2937'}`,
+      borderRadius: 10, padding: '12px 14px',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+        <div style={{
+          width: 30, height: 30, borderRadius: '50%', overflow: 'hidden', flexShrink: 0,
+          background: buyer?.avatar_url ? 'transparent' : 'linear-gradient(135deg, #4ade80, #22c55e)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 12, fontWeight: 900, color: '#0a0a0f',
+        }}>
+          {buyer?.avatar_url ? <img src={buyer.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : getInitial(buyer?.username)}
+        </div>
+        <div style={{ flex: 1 }}>
+          <Link href={`/profile/${buyer?.username}`} style={{ fontSize: 13, fontWeight: 700, color: '#f9fafb', textDecoration: 'none' }}>
+            {buyer?.username || 'Unknown'}
+          </Link>
+          <span style={{ marginLeft: 8, fontSize: 10, color: '#6b7280' }}>{buyer?.trade_count || 0} trades</span>
+          {buyer?.rating > 0 && <span style={{ marginLeft: 6, fontSize: 10, color: '#6b7280' }}>⭐{buyer.rating}</span>}
+        </div>
+        <span style={{
+          fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em',
+          color: statusColor, background: `${statusColor}18`, border: `1px solid ${statusColor}40`,
+          borderRadius: 3, padding: '2px 6px',
+        }}>{offer.status}</span>
+      </div>
+
+      {offer.offer_price && (
+        <div style={{ fontSize: 12, color: '#4ade80', fontWeight: 700, marginBottom: 4 }}>Offered: ${offer.offer_price}</div>
+      )}
+      <p style={{ margin: '0 0 10px', fontSize: 12, color: '#9ca3af', lineHeight: 1.5 }}>{offer.offer_message}</p>
+
+      {offer.status === 'pending' && (
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button disabled={working} onClick={() => doAction(async () => {
+            const u = await updateTradeRequest(offer.id, { status: 'accepted' })
+            onUpdate(offer.id, u)
+          })} style={{ flex: 1, padding: '7px 0', borderRadius: 7, border: 'none', background: '#16a34a', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+            {working ? '...' : '✓ Accept'}
+          </button>
+          <button disabled={working} onClick={() => doAction(async () => {
+            const u = await updateTradeRequest(offer.id, { status: 'declined' })
+            onUpdate(offer.id, u)
+          })} style={{ flex: 1, padding: '7px 0', borderRadius: 7, border: 'none', background: 'rgba(239,68,68,0.15)', color: '#f87171', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+            {working ? '...' : '✕ Decline'}
+          </button>
+        </div>
+      )}
+
+      {offer.status === 'accepted' && (
+        <button disabled={offer.seller_confirmed || working} onClick={() => doAction(async () => {
+          const u = await updateTradeRequest(offer.id, { seller_confirmed: true })
+          if (u.buyer_confirmed) {
+            await completeTrade(offer.id)
+            u.status = 'completed'
+            onSetListing(prev => {
+              const newQty = Math.max(0, (prev.quantity || 1) - 1)
+              return { ...prev, quantity: newQty, status: newQty <= 0 ? 'sold' : prev.status }
+            })
+          }
+          onUpdate(offer.id, u)
+        })} style={{
+          width: '100%', padding: '7px 0', borderRadius: 7, border: 'none',
+          background: offer.seller_confirmed ? 'rgba(74,222,128,0.15)' : '#16a34a',
+          color: offer.seller_confirmed ? '#4ade80' : '#fff',
+          fontSize: 11, fontWeight: 700, cursor: offer.seller_confirmed ? 'default' : 'pointer',
+        }}>
+          {offer.seller_confirmed ? '✓ You Confirmed' : '💰 I Received Payment'}
+        </button>
+      )}
+
+      {offer.status === 'completed' && (
+        <div style={{ fontSize: 11, color: '#4ade80', fontWeight: 600 }}>🎉 Trade Complete</div>
+      )}
+    </div>
+  )
+}
+
+function BuyerTradePanel({ myOffer, listing, seller, listingId, copiedId, setCopiedId, handleBuyerConfirm, setMyOffer, setOfferSent, setOfferMessage, setOfferPrice }) {
+  if (!myOffer) return null
+  const isTradeType = listing?.type === 'trade'
+
+  if (myOffer.status === 'pending') return (
+    <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 10, padding: 14, marginTop: 14 }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: '#fde68a', marginBottom: 4 }}>⏳ Offer Pending</div>
+      <p style={{ margin: '0 0 10px', fontSize: 12, color: '#9ca3af' }}>Waiting for the seller to respond.</p>
+      <button onClick={async () => {
+        if (!confirm('Cancel your offer?')) return
+        await updateTradeRequest(myOffer.id, { status: 'cancelled' })
+        setMyOffer(null); setOfferSent(false); setOfferMessage(''); setOfferPrice('')
+      }} style={{ background: 'none', border: '1px solid #2d2d3f', color: '#6b7280', borderRadius: 6, padding: '5px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+        Cancel Offer
+      </button>
+    </div>
+  )
+
+  if (myOffer.status === 'declined') return (
+    <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 10, padding: 14, marginTop: 14 }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: '#f87171', marginBottom: 6 }}>✕ Offer Declined</div>
+      <p style={{ margin: '0 0 10px', fontSize: 12, color: '#9ca3af' }}>The seller declined. You can send a new offer.</p>
+      <button onClick={() => { setMyOffer(null); setOfferSent(false); setOfferMessage(''); setOfferPrice('') }}
+        className="btn-ghost" style={{ fontSize: 12, padding: '6px 12px' }}>↩ Send New Offer</button>
+    </div>
+  )
+
+  if (myOffer.status === 'accepted') return (
+    <div style={{ background: 'rgba(74,222,128,0.06)', border: '1px solid rgba(74,222,128,0.25)', borderRadius: 10, padding: 14, marginTop: 14 }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: '#4ade80', marginBottom: 10 }}>✓ Offer Accepted</div>
+
+      {isTradeType ? (
+        <div style={{ background: '#0d0d14', border: '1px solid #2d2d3f', borderRadius: 8, padding: 12, marginBottom: 10 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#6b7280', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.08em' }}>🔄 Next Steps</div>
+          <p style={{ margin: 0, fontSize: 12, color: '#9ca3af', lineHeight: 1.7 }}>
+            The seller accepted your trade. Message them to coordinate the exchange — agree on how you'll swap items, then both confirm below once the trade is done.
+          </p>
+          <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Link href={`/messages?user=${seller?.username}`} style={{
+              display: 'inline-block', padding: '7px 14px',
+              background: 'rgba(74,222,128,0.15)', border: '1px solid rgba(74,222,128,0.3)',
+              borderRadius: 6, fontSize: 11, fontWeight: 700, color: '#4ade80', textDecoration: 'none',
+            }}>💬 Message Seller</Link>
+          </div>
+        </div>
+      ) : (
+        <div style={{ background: '#0d0d14', border: '1px solid #2d2d3f', borderRadius: 8, padding: 12, marginBottom: 10 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#6b7280', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.08em' }}>💳 Payment Info</div>
+          {seller?.paypal_email && <div style={{ fontSize: 12, color: '#d1d5db', marginBottom: 3 }}>🔵 PayPal: <strong>{seller.paypal_email}</strong></div>}
+          {seller?.cashapp_handle && <div style={{ fontSize: 12, color: '#d1d5db', marginBottom: 3 }}>🟢 Cash App: <strong>{seller.cashapp_handle}</strong></div>}
+          {seller?.venmo_handle && <div style={{ fontSize: 12, color: '#d1d5db', marginBottom: 3 }}>💙 Venmo: <strong>{seller.venmo_handle}</strong></div>}
+          {!seller?.paypal_email && !seller?.cashapp_handle && !seller?.venmo_handle && (
+            <div style={{ fontSize: 12, color: '#4b5563' }}>Message the seller for payment details.</div>
+          )}
+          <div style={{ marginTop: 8, fontSize: 10, color: '#4b5563', borderTop: '1px solid #1f2937', paddingTop: 6 }}>
+            Memo: <strong style={{ color: '#9ca3af' }}>{listingId.slice(0, 8)}</strong>
+            <button onClick={() => { navigator.clipboard.writeText(listingId); setCopiedId(true); setTimeout(() => setCopiedId(false), 2000) }}
+              style={{ marginLeft: 8, background: 'none', border: '1px solid #2d2d3f', color: copiedId ? '#4ade80' : '#6b7280', borderRadius: 4, padding: '1px 7px', fontSize: 10, cursor: 'pointer', fontWeight: 700 }}>
+              {copiedId ? '✓' : 'Copy'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      <button onClick={handleBuyerConfirm} disabled={myOffer.buyer_confirmed}
+        style={{ width: '100%', padding: '9px 0', borderRadius: 8, border: 'none', cursor: myOffer.buyer_confirmed ? 'default' : 'pointer', background: myOffer.buyer_confirmed ? 'rgba(74,222,128,0.15)' : '#16a34a', color: myOffer.buyer_confirmed ? '#4ade80' : '#fff', fontSize: 12, fontWeight: 700 }}>
+        {myOffer.buyer_confirmed ? '✓ You Confirmed' : isTradeType ? '🔄 I Received My Item' : '📦 I Received My Item'}
+      </button>
+    </div>
+  )
+
+  if (myOffer.status === 'completed') return (
+    <div style={{ background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.3)', borderRadius: 10, padding: 14, marginTop: 14 }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: '#4ade80' }}>🎉 Trade Complete!</div>
+      <p style={{ margin: '5px 0 0', fontSize: 12, color: '#9ca3af' }}>Go to the Reviews tab to leave feedback.</p>
+    </div>
+  )
+  return null
+}
+
 // ─── MAIN COMPONENT ───────────────────────────────────────────────
 
 export default function ListingPage() {
@@ -139,11 +314,16 @@ export default function ListingPage() {
 
   useEffect(() => { load() }, [load])
 
-  // Silent refresh on tab return — keeps existing listing visible while data updates
+  // Silent refresh on tab return — fires after rotmarket:tab-visible (600ms delay)
+  // so the Supabase client has been verified healthy before we hit the DB.
+  // Previously used raw visibilitychange which fired before client recovery.
   useEffect(() => {
-    const onVisible = () => { if (document.visibilityState === 'visible') load(true) }
-    document.addEventListener('visibilitychange', onVisible)
-    return () => document.removeEventListener('visibilitychange', onVisible)
+    const onVisible = async () => {
+      try { await load(true) }
+      catch { setTimeout(() => load(true), 2000) }
+    }
+    window.addEventListener('rotmarket:tab-visible', onVisible)
+    return () => window.removeEventListener('rotmarket:tab-visible', onVisible)
   }, [load])
 
   const rarity = listing ? getRarityStyle(listing.rarity) : getRarityStyle('common')
@@ -212,185 +392,11 @@ export default function ListingPage() {
     } catch { alert('Failed to confirm.') }
   }
 
-  // ─── SELLER OFFER CARD ────────────────────────────────────────
-
-  function SellerOfferCard({ offer, onUpdate }) {
-    const [working, setWorking] = useState(false)
-    const buyer = offer.buyer
-    const statusColor = { pending: '#f59e0b', accepted: '#4ade80', completed: '#4ade80' }[offer.status] || '#6b7280'
-
-    const doAction = async (fn) => {
-      setWorking(true)
-      try { await fn() } finally { setWorking(false) }
-    }
-
-    return (
-      <div style={{
-        background: '#0d0d14',
-        border: `1px solid ${offer.status === 'pending' ? 'rgba(245,158,11,0.25)' : '#1f2937'}`,
-        borderRadius: 10, padding: '12px 14px',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-          <div style={{
-            width: 30, height: 30, borderRadius: '50%', overflow: 'hidden', flexShrink: 0,
-            background: buyer?.avatar_url ? 'transparent' : 'linear-gradient(135deg, #4ade80, #22c55e)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 12, fontWeight: 900, color: '#0a0a0f',
-          }}>
-            {buyer?.avatar_url ? <img src={buyer.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : getInitial(buyer?.username)}
-          </div>
-          <div style={{ flex: 1 }}>
-            <Link href={`/profile/${buyer?.username}`} style={{ fontSize: 13, fontWeight: 700, color: '#f9fafb', textDecoration: 'none' }}>
-              {buyer?.username || 'Unknown'}
-            </Link>
-            <span style={{ marginLeft: 8, fontSize: 10, color: '#6b7280' }}>{buyer?.trade_count || 0} trades</span>
-            {buyer?.rating > 0 && <span style={{ marginLeft: 6, fontSize: 10, color: '#6b7280' }}>⭐{buyer.rating}</span>}
-          </div>
-          <span style={{
-            fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em',
-            color: statusColor, background: `${statusColor}18`, border: `1px solid ${statusColor}40`,
-            borderRadius: 3, padding: '2px 6px',
-          }}>{offer.status}</span>
-        </div>
-
-        {offer.offer_price && (
-          <div style={{ fontSize: 12, color: '#4ade80', fontWeight: 700, marginBottom: 4 }}>Offered: ${offer.offer_price}</div>
-        )}
-        <p style={{ margin: '0 0 10px', fontSize: 12, color: '#9ca3af', lineHeight: 1.5 }}>{offer.offer_message}</p>
-
-        {offer.status === 'pending' && (
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button disabled={working} onClick={() => doAction(async () => {
-              const u = await updateTradeRequest(offer.id, { status: 'accepted' })
-              onUpdate(offer.id, u)
-            })} style={{ flex: 1, padding: '7px 0', borderRadius: 7, border: 'none', background: '#16a34a', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
-              {working ? '...' : '✓ Accept'}
-            </button>
-            <button disabled={working} onClick={() => doAction(async () => {
-              const u = await updateTradeRequest(offer.id, { status: 'declined' })
-              onUpdate(offer.id, u)
-            })} style={{ flex: 1, padding: '7px 0', borderRadius: 7, border: 'none', background: 'rgba(239,68,68,0.15)', color: '#f87171', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
-              {working ? '...' : '✕ Decline'}
-            </button>
-          </div>
-        )}
-
-        {offer.status === 'accepted' && (
-          <button disabled={offer.seller_confirmed || working} onClick={() => doAction(async () => {
-            const u = await updateTradeRequest(offer.id, { seller_confirmed: true })
-            if (u.buyer_confirmed) {
-              await completeTrade(offer.id)
-              u.status = 'completed'
-              setListing(prev => {
-                const newQty = Math.max(0, (prev.quantity || 1) - 1)
-                return { ...prev, quantity: newQty, status: newQty <= 0 ? 'sold' : prev.status }
-              })
-            }
-            onUpdate(offer.id, u)
-          })} style={{
-            width: '100%', padding: '7px 0', borderRadius: 7, border: 'none',
-            background: offer.seller_confirmed ? 'rgba(74,222,128,0.15)' : '#16a34a',
-            color: offer.seller_confirmed ? '#4ade80' : '#fff',
-            fontSize: 11, fontWeight: 700, cursor: offer.seller_confirmed ? 'default' : 'pointer',
-          }}>
-            {offer.seller_confirmed ? '✓ You Confirmed' : '💰 I Received Payment'}
-          </button>
-        )}
-
-        {offer.status === 'completed' && (
-          <div style={{ fontSize: 11, color: '#4ade80', fontWeight: 600 }}>🎉 Trade Complete</div>
-        )}
-      </div>
-    )
-  }
 
   const updateSellerOffer = (offerId, updated) => {
     setSellerOffers(prev => prev.map(o => o.id === offerId ? { ...o, ...updated } : o))
   }
 
-  // ─── TRADE PANEL for buyer ────────────────────────────────────
-
-  const BuyerTradePanel = () => {
-    if (!myOffer) return null
-    const isTradeType = listing?.type === 'trade'
-
-    if (myOffer.status === 'pending') return (
-      <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 10, padding: 14, marginTop: 14 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: '#fde68a', marginBottom: 4 }}>⏳ Offer Pending</div>
-        <p style={{ margin: '0 0 10px', fontSize: 12, color: '#9ca3af' }}>Waiting for the seller to respond.</p>
-        <button onClick={async () => {
-          if (!confirm('Cancel your offer?')) return
-          await updateTradeRequest(myOffer.id, { status: 'cancelled' })
-          setMyOffer(null); setOfferSent(false); setOfferMessage(''); setOfferPrice('')
-        }} style={{ background: 'none', border: '1px solid #2d2d3f', color: '#6b7280', borderRadius: 6, padding: '5px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
-          Cancel Offer
-        </button>
-      </div>
-    )
-
-    if (myOffer.status === 'declined') return (
-      <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 10, padding: 14, marginTop: 14 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: '#f87171', marginBottom: 6 }}>✕ Offer Declined</div>
-        <p style={{ margin: '0 0 10px', fontSize: 12, color: '#9ca3af' }}>The seller declined. You can send a new offer.</p>
-        <button onClick={() => { setMyOffer(null); setOfferSent(false); setOfferMessage(''); setOfferPrice('') }}
-          className="btn-ghost" style={{ fontSize: 12, padding: '6px 12px' }}>↩ Send New Offer</button>
-      </div>
-    )
-
-    if (myOffer.status === 'accepted') return (
-      <div style={{ background: 'rgba(74,222,128,0.06)', border: '1px solid rgba(74,222,128,0.25)', borderRadius: 10, padding: 14, marginTop: 14 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: '#4ade80', marginBottom: 10 }}>✓ Offer Accepted</div>
-
-        {isTradeType ? (
-          /* TRADE listing: no payment needed, coordinate in messages */
-          <div style={{ background: '#0d0d14', border: '1px solid #2d2d3f', borderRadius: 8, padding: 12, marginBottom: 10 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: '#6b7280', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.08em' }}>🔄 Next Steps</div>
-            <p style={{ margin: 0, fontSize: 12, color: '#9ca3af', lineHeight: 1.7 }}>
-              The seller accepted your trade. Message them to coordinate the exchange — agree on how you'll swap items, then both confirm below once the trade is done.
-            </p>
-            <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Link href={`/messages?user=${seller?.username}`} style={{
-                display: 'inline-block', padding: '7px 14px',
-                background: 'rgba(74,222,128,0.15)', border: '1px solid rgba(74,222,128,0.3)',
-                borderRadius: 6, fontSize: 11, fontWeight: 700, color: '#4ade80', textDecoration: 'none',
-              }}>💬 Message Seller</Link>
-            </div>
-          </div>
-        ) : (
-          /* SALE listing: show payment info */
-          <div style={{ background: '#0d0d14', border: '1px solid #2d2d3f', borderRadius: 8, padding: 12, marginBottom: 10 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: '#6b7280', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.08em' }}>💳 Payment Info</div>
-            {seller?.paypal_email && <div style={{ fontSize: 12, color: '#d1d5db', marginBottom: 3 }}>🔵 PayPal: <strong>{seller.paypal_email}</strong></div>}
-            {seller?.cashapp_handle && <div style={{ fontSize: 12, color: '#d1d5db', marginBottom: 3 }}>🟢 Cash App: <strong>{seller.cashapp_handle}</strong></div>}
-            {seller?.venmo_handle && <div style={{ fontSize: 12, color: '#d1d5db', marginBottom: 3 }}>💙 Venmo: <strong>{seller.venmo_handle}</strong></div>}
-            {!seller?.paypal_email && !seller?.cashapp_handle && !seller?.venmo_handle && (
-              <div style={{ fontSize: 12, color: '#4b5563' }}>Message the seller for payment details.</div>
-            )}
-            <div style={{ marginTop: 8, fontSize: 10, color: '#4b5563', borderTop: '1px solid #1f2937', paddingTop: 6 }}>
-              Memo: <strong style={{ color: '#9ca3af' }}>{id.slice(0, 8)}</strong>
-              <button onClick={() => { navigator.clipboard.writeText(id); setCopiedId(true); setTimeout(() => setCopiedId(false), 2000) }}
-                style={{ marginLeft: 8, background: 'none', border: '1px solid #2d2d3f', color: copiedId ? '#4ade80' : '#6b7280', borderRadius: 4, padding: '1px 7px', fontSize: 10, cursor: 'pointer', fontWeight: 700 }}>
-                {copiedId ? '✓' : 'Copy'}
-              </button>
-            </div>
-          </div>
-        )}
-
-        <button onClick={handleBuyerConfirm} disabled={myOffer.buyer_confirmed}
-          style={{ width: '100%', padding: '9px 0', borderRadius: 8, border: 'none', cursor: myOffer.buyer_confirmed ? 'default' : 'pointer', background: myOffer.buyer_confirmed ? 'rgba(74,222,128,0.15)' : '#16a34a', color: myOffer.buyer_confirmed ? '#4ade80' : '#fff', fontSize: 12, fontWeight: 700 }}>
-          {myOffer.buyer_confirmed ? '✓ You Confirmed' : isTradeType ? '🔄 I Received My Item' : '📦 I Received My Item'}
-        </button>
-      </div>
-    )
-
-    if (myOffer.status === 'completed') return (
-      <div style={{ background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.3)', borderRadius: 10, padding: 14, marginTop: 14 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: '#4ade80' }}>🎉 Trade Complete!</div>
-        <p style={{ margin: '5px 0 0', fontSize: 12, color: '#9ca3af' }}>Go to the Reviews tab to leave feedback.</p>
-      </div>
-    )
-    return null
-  }
 
   // ─── LOADING / ERROR ─────────────────────────────────────────
 
@@ -610,7 +616,7 @@ export default function ListingPage() {
                         ) : (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                             {sellerOffers.filter(o => o.status !== 'declined').map(offer => (
-                              <SellerOfferCard key={offer.id} offer={offer} onUpdate={updateSellerOffer} />
+                              <SellerOfferCard key={offer.id} offer={offer} onUpdate={updateSellerOffer} onSetListing={setListing} />
                             ))}
                           </div>
                         )}
@@ -618,7 +624,7 @@ export default function ListingPage() {
                     )}
 
                     {/* BUYER: show their offer status */}
-                    {!isSeller && <BuyerTradePanel />}
+                    {!isSeller && <BuyerTradePanel myOffer={myOffer} listing={listing} seller={seller} listingId={id} copiedId={copiedId} setCopiedId={setCopiedId} handleBuyerConfirm={handleBuyerConfirm} setMyOffer={setMyOffer} setOfferSent={setOfferSent} setOfferMessage={setOfferMessage} setOfferPrice={setOfferPrice} />}
 
                     {/* REVIEW FORM — shows in details tab after completed trade */}
                     {!isSeller && user && myOffer?.status === 'completed' && (
@@ -738,34 +744,29 @@ export default function ListingPage() {
                         onMouseEnter={e => e.currentTarget.style.borderColor = '#f59e0b'}
                         onMouseLeave={e => e.currentTarget.style.borderColor = '#1f2937'}
                       >
-                        {reviews.length > 0 || seller.rating > 0 ? (() => {
-                          const count = reviews.length || seller.review_count || 0
-                          const avg = reviews.length > 0
-                            ? Math.round(reviews.reduce((s, r) => s + r.rating, 0) / reviews.length * 10) / 10
-                            : (seller.rating || 0)
-                          const rounded = Math.round(avg)
-                          return (
+                        {(() => {
+                          // Use DB-stored rating/review_count as primary source;
+                          // fall back to live calculation from fetched reviews if absent.
+                          const count = seller.review_count ?? reviews.length
+                          const avg = seller.rating ?? (
+                            reviews.length > 0
+                              ? Math.round(reviews.reduce((s, r) => s + r.rating, 0) / reviews.length * 10) / 10
+                              : 0
+                          )
+                          return count > 0 ? (
                             <>
-                              <div style={{ display: 'flex', justifyContent: 'center', gap: 2, marginBottom: 4 }}>
-                                {[1,2,3,4,5].map(n => (
-                                  <svg key={n} width={14} height={14} viewBox="0 0 24 24"
-                                    fill={n <= rounded ? '#f59e0b' : 'none'}
-                                    stroke="#f59e0b" strokeWidth="2.5">
-                                    <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
-                                  </svg>
-                                ))}
-                              </div>
+                              <StarRating rating={avg} size={14} />
                               <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
                                 {count} review{count !== 1 ? 's' : ''}
                               </div>
                             </>
+                          ) : (
+                            <>
+                              <div style={{ fontSize: 18, marginBottom: 2 }}>⭐</div>
+                              <div style={{ fontSize: 12, color: '#6b7280' }}>No reviews yet</div>
+                            </>
                           )
-                        })() : (
-                          <>
-                            <div style={{ fontSize: 18, marginBottom: 2 }}>⭐</div>
-                            <div style={{ fontSize: 12, color: '#6b7280' }}>No reviews yet</div>
-                          </>
-                        )}
+                        })()}
                       </Link>
                     </div>
 

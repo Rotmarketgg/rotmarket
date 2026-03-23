@@ -138,14 +138,6 @@ export default function HomePage() {
           </>
         )}
       </div>
-
-      {/* Footer */}
-      <footer style={{ borderTop: '1px solid #1f2937', marginTop: 64, padding: '24px 16px', textAlign: 'center' }}>
-        <div style={{ fontSize: 12, color: '#374151', lineHeight: 1.8 }}>
-          RotMarket is not affiliated with Epic Games or Roblox Corporation.<br />
-          Trade at your own risk. Always use Goods & Services payments for buyer protection.
-        </div>
-      </footer>
     </div>
   )
 }

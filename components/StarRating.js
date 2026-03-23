@@ -14,6 +14,10 @@ export default function StarRating({ rating = 0, size = 14, interactive = false,
     if (interactive) {
       return star <= Math.round(rating) ? 'full' : 'empty'
     }
+    // diff = how much of this star position is filled (0–1)
+    // >= 0.75 → full star  (e.g. 4.8 → star 5 gets diff 0.8 → full)
+    // >= 0.25 → half star  (e.g. 4.5 → star 5 gets diff 0.5 → half)
+    //  < 0.25 → empty      (e.g. 4.1 → star 5 gets diff 0.1 → empty)
     const diff = rating - (star - 1)
     if (diff >= 0.75) return 'full'
     if (diff >= 0.25) return 'half'

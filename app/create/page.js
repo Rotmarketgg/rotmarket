@@ -61,11 +61,11 @@ export default function CreateListingPage() {
   }
 
   const handleImages = (files) => {
-    const MAX_SIZE = 10 * 1024 * 1024
+    // Use the module-level MAX_IMAGE_SIZE_BYTES constant — no local duplicate
     const rejected = []
     const valid = Array.from(files).filter(f => {
       if (!f.type.startsWith('image/')) return false
-      if (f.size > MAX_SIZE) { rejected.push(f.name); return false }
+      if (f.size > MAX_IMAGE_SIZE_BYTES) { rejected.push(f.name); return false }
       return true
     })
     if (rejected.length > 0) alert(`These files exceed the 10MB limit and were not added:\n${rejected.join('\n')}`)

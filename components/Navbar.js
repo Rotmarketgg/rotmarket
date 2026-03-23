@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
 import { supabase, getProfile, getUnreadCount } from '@/lib/supabase'
-import { getInitial } from '@/lib/utils'
+import { getInitial, withTimeout } from '@/lib/utils'
 
 // Cache profile in sessionStorage to avoid re-fetching on every page load
 // This prevents the avatar from re-fetching its URL on every navigation
@@ -50,12 +50,19 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false)
 
   const fetchPendingOffers = async (userId) => {
-    const { count } = await supabase
-      .from('trade_requests')
-      .select('id', { count: 'exact', head: true })
-      .eq('seller_id', userId)
-      .eq('status', 'pending')
-    setPendingOffers(count || 0)
+    try {
+      const { count } = await withTimeout(
+        supabase
+          .from('trade_requests')
+          .select('id', { count: 'exact', head: true })
+          .eq('seller_id', userId)
+          .eq('status', 'pending'),
+        6000
+      )
+      setPendingOffers(count || 0)
+    } catch {
+      // Timeout or network error — leave the existing count rather than resetting to 0
+    }
   }
 
   useEffect(() => {
