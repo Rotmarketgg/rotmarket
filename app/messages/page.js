@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Navbar from '@/components/Navbar'
-import { getSessionUser, getConversations, getMessages, sendMessage, getProfile, supabase } from '@/lib/supabase'
+import { getSessionUser, getConversations, getMessagesPaginated, sendMessage, getProfile, supabase } from '@/lib/supabase'
 import { timeAgo, getInitial, checkRateLimit, withTimeout } from '@/lib/utils'
 import { isClean } from '@/lib/profanity'
 
@@ -22,13 +22,15 @@ function MessagesInner() {
   const [newMsg, setNewMsg] = useState('')
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
-  const [authLoading, setAuthLoading] = useState(false)
   const [inboxTab, setInboxTab] = useState('active')
   const [disputeOpen, setDisputeOpen] = useState(false)
   const [disputeForm, setDisputeForm] = useState({ reason: '', details: '' })
   const [disputeLoading, setDisputeLoading] = useState(false)
   const [disputeSuccess, setDisputeSuccess] = useState(false)
   const [mobileView, setMobileView] = useState('list') // 'list' | 'chat'
+  const [msgHasMore, setMsgHasMore] = useState(false)
+  const [msgCursor, setMsgCursor] = useState(null)
+  const [msgLoadingMore, setMsgLoadingMore] = useState(false)
 
   // Hoisted to useCallback so the visibilitychange handler below can call it.
   // Previously init() was defined inside the first useEffect, making it
@@ -52,11 +54,9 @@ function MessagesInner() {
         })
         if (match) setActiveConvo(match)
       }
-      setAuthLoading(false)
       setLoading(false)
     } catch (err) {
       console.error('Messages load error:', err)
-      setAuthLoading(false)
       setLoading(false)
     }
   }, [router, searchParams])
@@ -70,14 +70,36 @@ function MessagesInner() {
   const loadMessages = useCallback(async () => {
     if (!activeConvo || !user) return
     const otherId = activeConvo.sender_id === user.id ? activeConvo.receiver_id : activeConvo.sender_id
-    const msgs = await getMessages(user.id, otherId, activeConvo.listing_id)
-    setMessages(msgs || [])
+    const { messages: msgs, hasMore, nextCursor } = await getMessagesPaginated(
+      user.id, otherId, activeConvo.listing_id, null, 50
+    )
+    setMessages(msgs)
+    setMsgHasMore(hasMore)
+    setMsgCursor(nextCursor)
     scrollToBottom()
     // Update unread counts in sidebar without refetching entire conversation list
     setConversations(prev => prev.map(c =>
       c.listing_id === activeConvo.listing_id ? { ...c, read: true } : c
     ))
   }, [activeConvo, user])
+
+  const loadEarlierMessages = useCallback(async () => {
+    if (!activeConvo || !user || !msgCursor || msgLoadingMore) return
+    setMsgLoadingMore(true)
+    try {
+      const otherId = activeConvo.sender_id === user.id ? activeConvo.receiver_id : activeConvo.sender_id
+      const { messages: older, hasMore, nextCursor } = await getMessagesPaginated(
+        user.id, otherId, activeConvo.listing_id, msgCursor, 50
+      )
+      setMessages(prev => [...older, ...prev])
+      setMsgHasMore(hasMore)
+      setMsgCursor(nextCursor)
+    } catch (err) {
+      console.error('Load earlier messages error:', err)
+    } finally {
+      setMsgLoadingMore(false)
+    }
+  }, [activeConvo, user, msgCursor, msgLoadingMore])
 
   // Refetch conversations when tab becomes visible again.
   // rotmarket:tab-visible fires after 600ms network-recovery delay (lib/supabase.js).
@@ -341,9 +363,28 @@ function MessagesInner() {
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}
             className={mobileView === 'list' ? 'hide-mobile' : ''}>
             {!activeConvo ? (
-              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 10 }}>
-                <div style={{ fontSize: 52, opacity: 0.2 }}>💬</div>
-                <div style={{ fontSize: 15, color: '#4b5563', fontWeight: 600 }}>Select a conversation</div>
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12, padding: 32 }}>
+                {loading ? null : conversations.length === 0 ? (
+                  // True empty state — user has never messaged anyone
+                  <>
+                    <div style={{ fontSize: 56, opacity: 0.25 }}>💬</div>
+                    <div style={{ fontSize: 17, fontWeight: 700, color: '#d1d5db' }}>No messages yet</div>
+                    <div style={{ fontSize: 13, color: '#6b7280', textAlign: 'center', maxWidth: 280, lineHeight: 1.6 }}>
+                      Find a listing you like and message the seller to start trading.
+                    </div>
+                    <Link href="/browse" style={{
+                      marginTop: 8, padding: '10px 24px', borderRadius: 10,
+                      background: 'linear-gradient(135deg, #16a34a, #15803d)',
+                      color: '#fff', textDecoration: 'none', fontSize: 13, fontWeight: 700,
+                    }}>Browse Listings</Link>
+                  </>
+                ) : (
+                  // Conversations exist but none selected yet
+                  <>
+                    <div style={{ fontSize: 52, opacity: 0.2 }}>💬</div>
+                    <div style={{ fontSize: 15, color: '#4b5563', fontWeight: 600 }}>Select a conversation</div>
+                  </>
+                )}
               </div>
             ) : (
               <>
@@ -444,6 +485,23 @@ function MessagesInner() {
 
                 {/* Messages */}
                 <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {/* Load earlier messages button — shown when there are older pages */}
+                  {msgHasMore && (
+                    <div style={{ textAlign: 'center', paddingBottom: 8 }}>
+                      <button
+                        onClick={loadEarlierMessages}
+                        disabled={msgLoadingMore}
+                        style={{
+                          background: 'transparent', border: '1px solid #2d2d3f',
+                          borderRadius: 8, padding: '6px 16px', fontSize: 12,
+                          color: msgLoadingMore ? '#4b5563' : '#9ca3af',
+                          cursor: msgLoadingMore ? 'default' : 'pointer', fontWeight: 600,
+                        }}
+                      >
+                        {msgLoadingMore ? 'Loading...' : '↑ Load earlier messages'}
+                      </button>
+                    </div>
+                  )}
                   {messages.length === 0 && (
                     <div style={{ textAlign: 'center', color: '#4b5563', fontSize: 13, marginTop: 48 }}>
                       No messages yet — say hello!

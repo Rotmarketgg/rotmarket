@@ -18,7 +18,6 @@ export default function CreateListingPage() {
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(false)
-  const [authLoading, setAuthLoading] = useState(false)
   const [errors, setErrors] = useState({})
   const [images, setImages] = useState([]) // [{file, preview}]
   const [success, setSuccess] = useState(false)
@@ -42,7 +41,6 @@ export default function CreateListingPage() {
         setUser(currentUser)
         const p = await getProfile(currentUser.id)
         setProfile(p)
-        setAuthLoading(false)
       } catch (err) {
         console.error('Auth check error:', err)
         router.push('/auth/login')

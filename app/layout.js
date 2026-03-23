@@ -33,13 +33,21 @@ export const metadata = {
   },
 }
 
+// Derive hostname from the env var so it never drifts from the actual project URL.
+// Falls back to the hardcoded value so local dev without .env still works.
+const supabaseHost = (() => {
+  try {
+    return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://iuskguniacqeeaqscpfj.supabase.co').host
+  } catch { return 'iuskguniacqeeaqscpfj.supabase.co' }
+})()
+
 export default function RootLayout({ children }) {
   return (
     <html lang="en" className={`${displayFont.variable} ${bodyFont.variable}`}>
       <head>
-        {/* Preconnect to Supabase for faster first query */}
-        <link rel="preconnect" href="https://iuskguniacqeeaqscpfj.supabase.co" />
-        <link rel="dns-prefetch" href="https://iuskguniacqeeaqscpfj.supabase.co" />
+        {/* Preconnect to Supabase for faster first query — URL derived from env var */}
+        <link rel="preconnect" href={`https://${supabaseHost}`} />
+        <link rel="dns-prefetch" href={`https://${supabaseHost}`} />
       </head>
       <body className="bg-rot-dark text-white font-body antialiased min-h-screen">
         <BanGate>{children}</BanGate>

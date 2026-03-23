@@ -48,11 +48,16 @@ export default function ProfilePage() {
         getUserListings(p.id),
         getReviews(p.id),
       ]))
-      const reviewCount = reviewsData?.length || 0
-      const avgRating = reviewCount > 0
-        ? Math.round((reviewsData.reduce((sum, r) => sum + r.rating, 0) / reviewCount) * 10) / 10
+      // Use DB-stored rating/review_count (kept up-to-date by trigger) as the primary
+      // source. Only fall back to client-side calculation when the stored values are
+      // absent (e.g. legacy profiles created before the trigger existed).
+      const liveCount  = reviewsData?.length || 0
+      const liveRating = liveCount > 0
+        ? Math.round((reviewsData.reduce((sum, r) => sum + r.rating, 0) / liveCount) * 10) / 10
         : 0
-      setProfile({ ...p, review_count: reviewCount, rating: avgRating || p.rating })
+      const reviewCount = p.review_count ?? liveCount
+      const avgRating   = p.rating       ?? liveRating
+      setProfile({ ...p, review_count: reviewCount, rating: avgRating })
       setListings(listingsData || [])
       setReviews(reviewsData || [])
 
