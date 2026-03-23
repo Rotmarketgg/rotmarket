@@ -107,8 +107,9 @@ export default function Navbar() {
         getUnreadCount(session.user.id).then(setUnread)
         fetchPendingOffers(session.user.id)
       } else if (event === 'SIGNED_OUT') {
-        // Wait 2s before clearing state — verify it's a real sign-out, not a
-        // transient token refresh failure that self-recovers.
+        // Wait 5s before clearing state — long enough to outlast the getSessionUser()
+        // 4s wait, so a tab-return re-init (which transiently emits SIGNED_OUT) never
+        // causes a false logout. A real sign-out will still clear state after 5s.
         signedOutTimer = setTimeout(async () => {
           const { data: { session: currentSession } } = await supabase.auth.getSession()
           if (!currentSession) {
@@ -120,9 +121,12 @@ export default function Navbar() {
             clearProfileCache()
           }
           signedOutTimer = null
-        }, 2000)
+        }, 5000)
+      } else if (!session) {
+        // INITIAL_SESSION or other event with no session — cancel any pending
+        // false-logout timer. The session may still be loading.
+        if (signedOutTimer) { clearTimeout(signedOutTimer); signedOutTimer = null }
       }
-      // Any other event with no session — do nothing, avoids false signed-out flashes
     })
 
     return () => {

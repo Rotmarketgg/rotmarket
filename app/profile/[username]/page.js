@@ -74,8 +74,12 @@ export default function ProfilePage() {
       setLoading(false)
     } catch (err) {
       console.error('Profile load error:', err)
-      // On silent refresh, keep showing existing data — don't wipe to not-found on timeout
-      if (!silent) { setNotFound(true); setLoading(false) }
+      if (silent) return // Keep showing existing data on silent tab-return refresh
+      // A timeout is a connection failure, not a missing profile.
+      // Only show not-found for actual missing data (null profile), not errors.
+      // On timeout/error: just stop loading — the page will be empty but won't
+      // show a false "not found". The retry handler will fix it on next attempt.
+      setLoading(false)
     }
   }, [username])
 
