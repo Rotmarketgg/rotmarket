@@ -75,8 +75,12 @@ export default function Navbar() {
     let signedOutTimer = null
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      // Silent token refresh — never update UI or clear state
-      if (event === 'TOKEN_REFRESHED') return
+      // TOKEN_REFRESHED fires during silent background refreshes AND when the tab
+      // wakes up after suspension. If the UI already shows the user as logged in,
+      // skip it to avoid unnecessary re-renders. But if user is null (navbar is
+      // showing Login/Signup), a TOKEN_REFRESHED with a valid session means the
+      // tab just woke up and we must restore the auth UI — so fall through.
+      if (event === 'TOKEN_REFRESHED' && user) return
 
       if (session?.user) {
         // Cancel any pending false-logout
