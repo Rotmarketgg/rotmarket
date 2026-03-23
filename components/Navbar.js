@@ -225,7 +225,8 @@ export default function Navbar() {
   const isActive = (href) => pathname === href
 
   const NAV_LINKS = [
-    { href: '/', label: 'Browse' },
+    { href: '/', label: 'Home' },
+    { href: '/browse', label: 'Browse' },
     { href: '/leaderboard', label: 'Leaderboard' },
     { href: '/vip', label: '⭐ VIP', vip: true },
     { href: '/how-it-works', label: 'How It Works' },
