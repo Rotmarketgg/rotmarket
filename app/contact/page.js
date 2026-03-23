@@ -57,7 +57,7 @@ export default function ContactPage() {
           <p style={{ color: '#9ca3af', fontSize: 14, lineHeight: 1.7, margin: '0 0 24px' }}>
             We'll respond to <strong style={{ color: '#d1d5db' }}>{form.email}</strong> as soon as possible. For urgent scam reports, also use the Report button directly on the user's profile.
           </p>
-          <Link href="/" style={{
+          <Link href="/browse" style={{
             display: 'inline-block', padding: '10px 24px',
             background: 'linear-gradient(135deg, #16a34a, #15803d)',
             color: '#fff', textDecoration: 'none', borderRadius: 8,
