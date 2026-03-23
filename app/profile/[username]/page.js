@@ -177,7 +177,7 @@ export default function ProfilePage() {
         <p style={{ color: '#6b7280', marginBottom: 20 }}>This profile doesn't exist or has been removed.</p>
         <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
           <button onClick={() => window.location.reload()} className="btn-ghost" style={{ fontSize: 13 }}>↩ Try Again</button>
-          <Link href="/" className="btn-primary" style={{ textDecoration: 'none', display: 'inline-block' }}>Browse Listings</Link>
+          <Link href="/browse" className="btn-primary" style={{ textDecoration: 'none', display: 'inline-block' }}>Browse Listings</Link>
         </div>
       </div>
     </div>
