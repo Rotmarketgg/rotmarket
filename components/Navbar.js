@@ -39,6 +39,11 @@ export default function Navbar() {
   const mobileMenuRef = useRef(null)
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
+  // userRef mirrors the user state so the onAuthStateChange callback — which is
+  // created once inside useEffect(fn, []) — can always read the live current value
+  // without going stale. Without this, `user` inside that callback is permanently
+  // frozen as null from mount time (classic React stale closure).
+  const userRef = useRef(null)
   const [unread, setUnread] = useState(0)
   const [pendingOffers, setPendingOffers] = useState(0)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -56,6 +61,7 @@ export default function Navbar() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
+        userRef.current = session.user
         setUser(session.user)
         const cached = getCachedProfile(session.user.id)
         if (cached) {
@@ -76,16 +82,18 @@ export default function Navbar() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       // TOKEN_REFRESHED fires during silent background refreshes AND when the tab
-      // wakes up after suspension. If the UI already shows the user as logged in,
-      // skip it to avoid unnecessary re-renders. But if user is null (navbar is
-      // showing Login/Signup), a TOKEN_REFRESHED with a valid session means the
-      // tab just woke up and we must restore the auth UI — so fall through.
-      if (event === 'TOKEN_REFRESHED' && user) return
+      // wakes up after suspension. Use userRef.current (not the `user` state variable)
+      // because this callback is created once and `user` would be a stale null forever.
+      // If the user is already logged in, skip to avoid unnecessary re-renders.
+      // If userRef.current is null, the tab woke up showing logged-out — fall through
+      // so the session gets restored.
+      if (event === 'TOKEN_REFRESHED' && userRef.current) return
 
       if (session?.user) {
         // Cancel any pending false-logout
         if (signedOutTimer) { clearTimeout(signedOutTimer); signedOutTimer = null }
 
+        userRef.current = session.user
         setUser(session.user)
         const cached = event === 'INITIAL_SESSION' ? getCachedProfile(session.user.id) : null
         if (cached) {
@@ -100,11 +108,11 @@ export default function Navbar() {
         fetchPendingOffers(session.user.id)
       } else if (event === 'SIGNED_OUT') {
         // Wait 2s before clearing state — verify it's a real sign-out, not a
-        // transient token refresh failure that self-recovers. If a new session
-        // arrives within the window, the timer is cancelled and nothing is cleared.
+        // transient token refresh failure that self-recovers.
         signedOutTimer = setTimeout(async () => {
           const { data: { session: currentSession } } = await supabase.auth.getSession()
           if (!currentSession) {
+            userRef.current = null
             setUser(null)
             setProfile(null)
             setUnread(0)

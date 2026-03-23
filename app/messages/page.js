@@ -65,6 +65,20 @@ function MessagesInner() {
     init()
   }, [init])
 
+  // loadMessages must be defined BEFORE the useEffect below that lists it as a dependency.
+  // Having it after caused a use-before-define crash that Suspense caught as "Something went wrong".
+  const loadMessages = useCallback(async () => {
+    if (!activeConvo || !user) return
+    const otherId = activeConvo.sender_id === user.id ? activeConvo.receiver_id : activeConvo.sender_id
+    const msgs = await getMessages(user.id, otherId, activeConvo.listing_id)
+    setMessages(msgs || [])
+    scrollToBottom()
+    // Update unread counts in sidebar without refetching entire conversation list
+    setConversations(prev => prev.map(c =>
+      c.listing_id === activeConvo.listing_id ? { ...c, read: true } : c
+    ))
+  }, [activeConvo, user])
+
   // Refetch conversations when tab becomes visible again.
   // init is now a stable useCallback ref so this handler can safely reach it.
   useEffect(() => {
@@ -106,18 +120,6 @@ function MessagesInner() {
       .subscribe()
     return () => supabase.removeChannel(channel)
   }, [activeConvo, loadMessages])
-
-  const loadMessages = useCallback(async () => {
-    if (!activeConvo || !user) return
-    const otherId = activeConvo.sender_id === user.id ? activeConvo.receiver_id : activeConvo.sender_id
-    const msgs = await getMessages(user.id, otherId, activeConvo.listing_id)
-    setMessages(msgs || [])
-    scrollToBottom()
-    // Update unread counts in sidebar without refetching entire conversation list
-    setConversations(prev => prev.map(c =>
-      c.listing_id === activeConvo.listing_id ? { ...c, read: true } : c
-    ))
-  }, [activeConvo, user])
 
   const scrollToBottom = () => {
     setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 80)
