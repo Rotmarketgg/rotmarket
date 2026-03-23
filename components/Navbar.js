@@ -135,6 +135,44 @@ export default function Navbar() {
     }
   }, [])
 
+  // Re-bootstrap auth state when tab becomes visible.
+  // If the Supabase client was recreated due to being stuck (see lib/supabase.js),
+  // the onAuthStateChange subscription above is on the OLD dead client and will
+  // never fire. This handler re-reads the session from the current (possibly new)
+  // client instance on every tab return, keeping the Navbar in sync regardless.
+  useEffect(() => {
+    const onVisible = async () => {
+      // supabase is a live ES module binding — always references the current
+      // instance even if it was recreated by the tab-return recovery in lib/supabase.js
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user) {
+        userRef.current = session.user
+        setUser(session.user)
+        const cached = getCachedProfile(session.user.id)
+        if (cached) {
+          setProfile(cached)
+        } else {
+          getProfile(session.user.id).then(p => {
+            setProfile(p)
+            if (p) setCachedProfile(session.user.id, p)
+          })
+        }
+        getUnreadCount(session.user.id).then(setUnread)
+        fetchPendingOffers(session.user.id)
+      } else {
+        // Confirmed no session on the current client — genuinely logged out
+        userRef.current = null
+        setUser(null)
+        setProfile(null)
+        setUnread(0)
+        setPendingOffers(0)
+        clearProfileCache()
+      }
+    }
+    window.addEventListener('rotmarket:tab-visible', onVisible)
+    return () => window.removeEventListener('rotmarket:tab-visible', onVisible)
+  }, [])
+
   // Real-time unread messages
   useEffect(() => {
     if (!user) return
