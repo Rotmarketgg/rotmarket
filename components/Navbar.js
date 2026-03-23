@@ -81,6 +81,7 @@ export default function Navbar() {
     let signedOutTimer = null
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+  console.log('AUTH EVENT:', event, 'session:', !!session, 'userRef:', !!userRef.current)
       // TOKEN_REFRESHED fires during silent background refreshes AND when the tab
       // wakes up after suspension. Use userRef.current (not the `user` state variable)
       // because this callback is created once and `user` would be a stale null forever.
