@@ -407,7 +407,7 @@ export default function ListingPage() {
       <div style={{ textAlign: 'center', padding: '100px 24px' }}>
         <div style={{ fontSize: 48, marginBottom: 16 }}>😵</div>
         <h2 style={{ color: '#f9fafb', marginBottom: 8 }}>Listing Not Found</h2>
-        <Link href="/" className="btn-primary" style={{ textDecoration: 'none', display: 'inline-block' }}>Back to Listings</Link>
+        <Link href="/browse" className="btn-primary" style={{ textDecoration: 'none', display: 'inline-block' }}>Back to Listings</Link>
       </div>
     </div>
   )
@@ -451,7 +451,7 @@ export default function ListingPage() {
 
       <div style={{ maxWidth: 900, margin: '0 auto', padding: '24px 16px' }}>
         <div style={{ marginBottom: 14, fontSize: 12, color: '#6b7280' }}>
-          <Link href="/" style={{ color: '#6b7280', textDecoration: 'none' }}>Browse</Link>
+          <Link href="/browse" style={{ color: '#6b7280', textDecoration: 'none' }}>Browse</Link>
           <span style={{ margin: '0 6px' }}>›</span>
           <span style={{ color: '#9ca3af' }}>{listing.title}</span>
         </div>
