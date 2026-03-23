@@ -30,9 +30,11 @@ function MessagesInner() {
   const [disputeSuccess, setDisputeSuccess] = useState(false)
   const [mobileView, setMobileView] = useState('list') // 'list' | 'chat'
 
-  useEffect(() => {
-    async function init() {
-      try {
+  // Hoisted to useCallback so the visibilitychange handler below can call it.
+  // Previously init() was defined inside the first useEffect, making it
+  // unreachable from the second useEffect — causing a ReferenceError crash.
+  const init = useCallback(async () => {
+    try {
       const u = await getSessionUser()
       if (!u) { router.push('/auth/login'); return }
       setUser(u)
@@ -52,21 +54,24 @@ function MessagesInner() {
       }
       setAuthLoading(false)
       setLoading(false)
-      } catch (err) {
-        console.error('Messages load error:', err)
-        setAuthLoading(false)
-        setLoading(false)
-      }
+    } catch (err) {
+      console.error('Messages load error:', err)
+      setAuthLoading(false)
+      setLoading(false)
     }
-    init()
-  }, [])
+  }, [router, searchParams])
 
-  // Refetch conversations when tab becomes visible again
+  useEffect(() => {
+    init()
+  }, [init])
+
+  // Refetch conversations when tab becomes visible again.
+  // init is now a stable useCallback ref so this handler can safely reach it.
   useEffect(() => {
     const onVisible = () => { if (document.visibilityState === 'visible') init() }
     document.addEventListener('visibilitychange', onVisible)
     return () => document.removeEventListener('visibilitychange', onVisible)
-  }, [])
+  }, [init])
 
   useEffect(() => {
     if (!activeConvo || !user) return
