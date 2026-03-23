@@ -78,16 +78,15 @@ export default function HomePage() {
   useEffect(() => { fetchListings(true, 0) }, [game, typeFilter, debouncedSearch])
 
   // Re-fetch when tab becomes visible again after being idle/backgrounded.
+  // Listens for rotmarket:tab-visible (dispatched by lib/supabase.js AFTER the
+  // session token is confirmed fresh) instead of raw visibilitychange, preventing
+  // a race where the page re-fetches before the token refresh has resolved.
   // Uses silent=true so existing listings stay visible during the refresh —
   // no loading spinner, no blank page, no false logged-out appearance.
   useEffect(() => {
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        fetchListings(true, 0, true)
-      }
-    }
-    document.addEventListener('visibilitychange', handleVisibility)
-    return () => document.removeEventListener('visibilitychange', handleVisibility)
+    const onVisible = () => fetchListings(true, 0, true)
+    window.addEventListener('rotmarket:tab-visible', onVisible)
+    return () => window.removeEventListener('rotmarket:tab-visible', onVisible)
   }, [fetchListings])
 
   // Load next page

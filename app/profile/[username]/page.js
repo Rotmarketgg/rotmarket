@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import Navbar from '@/components/Navbar'
@@ -81,11 +81,14 @@ export default function ProfilePage() {
 
   useEffect(() => { load() }, [load])
 
-  // Silent refresh on tab return — keeps existing profile visible while data updates
+  // Silent refresh on tab return — keeps existing profile visible while data updates.
+  // Listens for rotmarket:tab-visible (dispatched by lib/supabase.js AFTER the token
+  // is confirmed fresh) instead of raw visibilitychange, so getSessionUser() never
+  // races against an in-progress token refresh and returns null.
   useEffect(() => {
-    const onVisible = () => { if (document.visibilityState === 'visible') load(true) }
-    document.addEventListener('visibilitychange', onVisible)
-    return () => document.removeEventListener('visibilitychange', onVisible)
+    const onVisible = () => load(true)
+    window.addEventListener('rotmarket:tab-visible', onVisible)
+    return () => window.removeEventListener('rotmarket:tab-visible', onVisible)
   }, [load])
 
   const isOwn = currentUser?.id === profile?.id

@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import Navbar from '@/components/Navbar'
-import { supabase, getSessionUser } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase'
 import { getInitial, withTimeout } from '@/lib/utils'
 import { BADGE_META, BADGE_HIERARCHY, getPrimaryBadge } from '@/lib/constants'
 
@@ -16,43 +16,44 @@ export default function LeaderboardPage() {
   const [traders, setTraders] = useState([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('trades')
-  const [authChecked, setAuthChecked] = useState(false)
 
-  useEffect(() => {
-    getSessionUser().then(() => setAuthChecked(true))
-  }, [])
-
-  useEffect(() => {
+  // Hoisted as useCallback so the visibilitychange handler can reference it
+  // without a stale closure. Previously load() was defined inside a useEffect,
+  // making it invisible to the separate visibility useEffect — causing a
+  // ReferenceError crash when returning to the tab from another page.
+  const load = useCallback(async () => {
     setLoading(true)
-    async function load() {
-      try {
-        const baseQuery = supabase
-          .from('profiles')
-          .select('id, username, trade_count, rating, review_count, badge, badges, avatar_url')
-          .not('username', 'is', null)
+    try {
+      const baseQuery = supabase
+        .from('profiles')
+        .select('id, username, trade_count, rating, review_count, badge, badges, avatar_url')
+        .not('username', 'is', null)
 
-        const query = tab === 'trades'
-          ? baseQuery.gt('trade_count', 0).order('trade_count', { ascending: false }).limit(10)
-          : baseQuery.gt('review_count', 0).order('rating', { ascending: false }).order('review_count', { ascending: false }).limit(10)
+      const query = tab === 'trades'
+        ? baseQuery.gt('trade_count', 0).order('trade_count', { ascending: false }).limit(10)
+        : baseQuery.gt('review_count', 0).order('rating', { ascending: false }).order('review_count', { ascending: false }).limit(10)
 
-        const { data, error } = await withTimeout(query)
-        if (error) throw error
-        setTraders(data || [])
-      } catch (err) {
-        console.error('Leaderboard error:', err)
-      } finally {
-        setLoading(false)
-      }
+      const { data, error } = await withTimeout(query)
+      if (error) throw error
+      setTraders(data || [])
+    } catch (err) {
+      console.error('Leaderboard error:', err)
+    } finally {
+      setLoading(false)
     }
-    load()
-  }, [tab, authChecked])
-
-  // Refetch when tab becomes visible again
-  useEffect(() => {
-    const onVisible = () => { if (document.visibilityState === 'visible') load() }
-    document.addEventListener('visibilitychange', onVisible)
-    return () => document.removeEventListener('visibilitychange', onVisible)
   }, [tab])
+
+  // Run whenever tab filter changes
+  useEffect(() => { load() }, [load])
+
+  // Refetch when tab becomes visible again.
+  // Listens for rotmarket:tab-visible (dispatched by lib/supabase.js AFTER the
+  // session token is confirmed fresh) instead of raw visibilitychange.
+  useEffect(() => {
+    const onVisible = () => load()
+    window.addEventListener('rotmarket:tab-visible', onVisible)
+    return () => window.removeEventListener('rotmarket:tab-visible', onVisible)
+  }, [load])
 
   const getValue = (trader) => tab === 'trades' ? trader.trade_count : trader.rating
   const getLabel = () => tab === 'trades' ? 'trades' : 'avg rating'

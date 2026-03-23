@@ -96,6 +96,27 @@ export default function AdminPage() {
     init()
   }, [])
 
+  // Re-validate auth when the tab becomes visible again.
+  // Without this, returning from another tab would find a stale/expired session
+  // and the page would redirect to /auth/login or show "unauthorized".
+  // Listens for rotmarket:tab-visible which is dispatched by lib/supabase.js
+  // AFTER the token has been confirmed fresh — so getSessionUser() is reliable.
+  useEffect(() => {
+    const onVisible = async () => {
+      const u = await getSessionUser()
+      if (!u) { router.push('/auth/login'); return }
+      const p = await getProfile(u.id)
+      const pBadges = p?.badges?.length ? p.badges : p?.badge ? [p.badge] : []
+      if (!p || !['Owner', 'Moderator'].some(b => pBadges.includes(b))) {
+        setUnauthorized(true); return
+      }
+      setUser(u)
+      setProfile(p)
+    }
+    window.addEventListener('rotmarket:tab-visible', onVisible)
+    return () => window.removeEventListener('rotmarket:tab-visible', onVisible)
+  }, [router])
+
   useEffect(() => {
     if (tab === 'users' && isOwner) loadUsers('')
     if (tab === 'reviews' && isOwner) loadReviews('')

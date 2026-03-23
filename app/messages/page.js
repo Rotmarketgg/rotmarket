@@ -80,11 +80,13 @@ function MessagesInner() {
   }, [activeConvo, user])
 
   // Refetch conversations when tab becomes visible again.
-  // init is now a stable useCallback ref so this handler can safely reach it.
+  // Listens for rotmarket:tab-visible (dispatched by lib/supabase.js AFTER the
+  // session token is confirmed fresh) instead of raw visibilitychange.
+  // init is a stable useCallback ref so this handler can safely reach it.
   useEffect(() => {
-    const onVisible = () => { if (document.visibilityState === 'visible') init() }
-    document.addEventListener('visibilitychange', onVisible)
-    return () => document.removeEventListener('visibilitychange', onVisible)
+    const onVisible = () => init()
+    window.addEventListener('rotmarket:tab-visible', onVisible)
+    return () => window.removeEventListener('rotmarket:tab-visible', onVisible)
   }, [init])
 
   useEffect(() => {
