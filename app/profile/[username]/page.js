@@ -31,14 +31,18 @@ export default function ProfilePage() {
   const [notFound, setNotFound] = useState(false)
   const [listingOffers, setListingOffers] = useState({}) // listingId -> pending offer count
 
-  useEffect(() => {
-    async function load() {
-      try {
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
+    try {
       const [p, u] = await Promise.all([
         withTimeout(getProfileByUsername(decodeURIComponent(username))),
         getSessionUser(),
       ])
-      if (!p) { setNotFound(true); setLoading(false); return }
+      if (!p) {
+        // Only show not-found on initial load, not on silent tab-return refresh
+        if (!silent) { setNotFound(true); setLoading(false) }
+        return
+      }
       setCurrentUser(u)
       const [listingsData, reviewsData] = await withTimeout(Promise.all([
         getUserListings(p.id),
@@ -52,7 +56,6 @@ export default function ProfilePage() {
       setListings(listingsData || [])
       setReviews(reviewsData || [])
 
-      // If viewing own profile, fetch pending offer counts per listing
       if (u && u.id === p.id && listingsData?.length > 0) {
         const activeIds = listingsData.filter(l => l.status === 'active').map(l => l.id)
         if (activeIds.length > 0) {
@@ -68,24 +71,22 @@ export default function ProfilePage() {
           }
         }
       }
-
       setLoading(false)
-      } catch (err) {
-        console.error('Profile load error:', err)
-        // Show not-found for actual missing profiles; show retry for timeouts/network errors
-        setNotFound(true)
-        setLoading(false)
-      }
+    } catch (err) {
+      console.error('Profile load error:', err)
+      // On silent refresh, keep showing existing data — don't wipe to not-found on timeout
+      if (!silent) { setNotFound(true); setLoading(false) }
     }
-    load()
   }, [username])
 
-  // Refetch when tab becomes visible again after browser throttled the connection
+  useEffect(() => { load() }, [load])
+
+  // Silent refresh on tab return — keeps existing profile visible while data updates
   useEffect(() => {
-    const onVisible = () => { if (document.visibilityState === 'visible') load() }
+    const onVisible = () => { if (document.visibilityState === 'visible') load(true) }
     document.addEventListener('visibilitychange', onVisible)
     return () => document.removeEventListener('visibilitychange', onVisible)
-  }, [username])
+  }, [load])
 
   const isOwn = currentUser?.id === profile?.id
   // Support both legacy badge and new badges array

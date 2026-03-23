@@ -40,10 +40,10 @@ export default function HomePage() {
     return () => clearTimeout(debounceTimer.current)
   }, [search])
 
-  const fetchListings = useCallback(async (reset = false, pageNum = 0) => {
+  const fetchListings = useCallback(async (reset = false, pageNum = 0, silent = false) => {
     const isFirst = reset || pageNum === 0
-    if (isFirst) setLoading(true)
-    else setLoadingMore(true)
+    if (isFirst && !silent) setLoading(true)
+    else if (!isFirst) setLoadingMore(true)
 
     try {
       const { data, total: t } = await withTimeout(getListings({
@@ -53,9 +53,7 @@ export default function HomePage() {
         search: debouncedSearch || null,
         limit: PAGE_SIZE,
         offset: pageNum * PAGE_SIZE,
-      }))
-
-      if (isFirst) {
+      }))\n\n      if (isFirst) {
         setListings(data)
         setPage(0)
       } else {
@@ -65,9 +63,10 @@ export default function HomePage() {
       setHasMore(data.length === PAGE_SIZE && !debouncedSearch)
     } catch (err) {
       console.error('Listings load error:', err.message)
-      if (isFirst) setListings([]) // clear loading state — never leave it stuck
+      // On silent tab-return refresh, never wipe existing listings on failure —
+      // the user should keep seeing the last good state, not a blank page.
+      if (isFirst && !silent) setListings([])
     } finally {
-      // Always runs — guarantees loading spinner clears no matter what
       setLoading(false)
       setLoadingMore(false)
     }
@@ -77,13 +76,12 @@ export default function HomePage() {
   useEffect(() => { fetchListings(true, 0) }, [game, typeFilter, debouncedSearch])
 
   // Re-fetch when tab becomes visible again after being idle/backgrounded.
-  // Browsers throttle/suspend network when a tab is hidden — when the user
-  // comes back the Supabase connection may be stale and queries hang silently.
-  // visibilitychange fires the moment the tab is foregrounded again.
+  // Uses silent=true so existing listings stay visible during the refresh —
+  // no loading spinner, no blank page, no false logged-out appearance.
   useEffect(() => {
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
-        fetchListings(true, 0)
+        fetchListings(true, 0, true)
       }
     }
     document.addEventListener('visibilitychange', handleVisibility)

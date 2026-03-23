@@ -107,43 +107,44 @@ export default function ListingPage() {
   const [reviewLoading, setReviewLoading] = useState(false)
   const [reviewSuccess, setReviewSuccess] = useState(false)
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const [listingData, currentUser] = await Promise.all([withTimeout(getListing(id)), getSessionUser()])
-        setListing(listingData)
-        setUser(currentUser)
-        const [reviewsData, profileData] = await withTimeout(Promise.all([
-          getReviews(listingData.profiles?.id),
-          currentUser ? getProfile(currentUser.id) : null,
-        ]))
-        setReviews(reviewsData || [])
-        setProfile(profileData)
-        if (currentUser) {
-          const isSellerUser = listingData.profiles?.id === currentUser.id
-          if (isSellerUser) {
-            const offers = await getSellerOffers(id, currentUser.id)
-            setSellerOffers(offers)
-          } else {
-            const tr = await getMyTradeRequest(id, currentUser.id)
-            setMyOffer(tr)
-          }
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
+    try {
+      const [listingData, currentUser] = await Promise.all([withTimeout(getListing(id)), getSessionUser()])
+      setListing(listingData)
+      setUser(currentUser)
+      const [reviewsData, profileData] = await withTimeout(Promise.all([
+        getReviews(listingData.profiles?.id),
+        currentUser ? getProfile(currentUser.id) : null,
+      ]))
+      setReviews(reviewsData || [])
+      setProfile(profileData)
+      if (currentUser) {
+        const isSellerUser = listingData.profiles?.id === currentUser.id
+        if (isSellerUser) {
+          const offers = await getSellerOffers(id, currentUser.id)
+          setSellerOffers(offers)
+        } else {
+          const tr = await getMyTradeRequest(id, currentUser.id)
+          setMyOffer(tr)
         }
-      } catch (err) {
-        setError('Listing not found.')
-      } finally {
-        setLoading(false)
       }
+    } catch (err) {
+      // Only show error on initial load — on silent tab-return refresh keep existing data
+      if (!silent) setError('Listing not found.')
+    } finally {
+      if (!silent) setLoading(false)
     }
-    load()
   }, [id])
 
-  // Refetch when tab becomes visible again after browser throttled the connection
+  useEffect(() => { load() }, [load])
+
+  // Silent refresh on tab return — keeps existing listing visible while data updates
   useEffect(() => {
-    const onVisible = () => { if (document.visibilityState === 'visible') load() }
+    const onVisible = () => { if (document.visibilityState === 'visible') load(true) }
     document.addEventListener('visibilitychange', onVisible)
     return () => document.removeEventListener('visibilitychange', onVisible)
-  }, [id])
+  }, [load])
 
   const rarity = listing ? getRarityStyle(listing.rarity) : getRarityStyle('common')
   const seller = listing?.profiles
