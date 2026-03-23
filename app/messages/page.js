@@ -263,7 +263,7 @@ function MessagesInner() {
                     {inboxTab === 'archived' ? 'No archived conversations' : 'No conversations yet'}
                   </div>
                   {inboxTab === 'active' && (
-                    <Link href="/" style={{ fontSize: 12, color: '#4ade80', textDecoration: 'none', fontWeight: 600 }}>Browse listings →</Link>
+                    <Link href="/browse" style={{ fontSize: 12, color: '#4ade80', textDecoration: 'none', fontWeight: 600 }}>Browse listings →</Link>
                   )}
                 </div>
               ) : filteredConvos.map(c => {
