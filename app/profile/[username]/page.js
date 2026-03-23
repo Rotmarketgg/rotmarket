@@ -82,11 +82,16 @@ export default function ProfilePage() {
   useEffect(() => { load() }, [load])
 
   // Silent refresh on tab return — keeps existing profile visible while data updates.
-  // Listens for rotmarket:tab-visible (dispatched by lib/supabase.js AFTER the token
-  // is confirmed fresh) instead of raw visibilitychange, so getSessionUser() never
-  // races against an in-progress token refresh and returns null.
+  // rotmarket:tab-visible fires after 600ms network-recovery delay (lib/supabase.js).
+  // Retries once after 2s if connection is still waking up.
   useEffect(() => {
-    const onVisible = () => load(true)
+    const onVisible = async () => {
+      try {
+        await load(true)
+      } catch {
+        setTimeout(() => load(true), 2000)
+      }
+    }
     window.addEventListener('rotmarket:tab-visible', onVisible)
     return () => window.removeEventListener('rotmarket:tab-visible', onVisible)
   }, [load])

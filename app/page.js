@@ -46,6 +46,8 @@ export default function HomePage() {
     else if (!isFirst) setLoadingMore(true)
 
     try {
+      // Use 8s timeout on silent tab-return fetches — faster failure = faster
+      // retry, instead of hanging for the full 20s on a still-waking connection
       const { data, total: t } = await withTimeout(getListings({
         game: game === 'all' ? null : game,
         type: typeFilter === 'all' || typeFilter === 'sold' ? null : typeFilter,
@@ -53,7 +55,7 @@ export default function HomePage() {
         search: debouncedSearch || null,
         limit: PAGE_SIZE,
         offset: pageNum * PAGE_SIZE,
-      }))
+      }), silent ? 8000 : 20000)
 
       if (isFirst) {
         setListings(data)
@@ -78,13 +80,18 @@ export default function HomePage() {
   useEffect(() => { fetchListings(true, 0) }, [game, typeFilter, debouncedSearch])
 
   // Re-fetch when tab becomes visible again after being idle/backgrounded.
-  // Listens for rotmarket:tab-visible (dispatched by lib/supabase.js AFTER the
-  // session token is confirmed fresh) instead of raw visibilitychange, preventing
-  // a race where the page re-fetches before the token refresh has resolved.
-  // Uses silent=true so existing listings stay visible during the refresh —
-  // no loading spinner, no blank page, no false logged-out appearance.
+  // rotmarket:tab-visible fires after a 600ms network-recovery delay (lib/supabase.js).
+  // If the first attempt still times out (very slow connection wakeup), we retry
+  // once after another 2s — the OS has almost always recovered by then.
   useEffect(() => {
-    const onVisible = () => fetchListings(true, 0, true)
+    const onVisible = async () => {
+      try {
+        await fetchListings(true, 0, true)
+      } catch {
+        // First attempt failed (timed out) — wait 2s and try once more
+        setTimeout(() => fetchListings(true, 0, true), 2000)
+      }
+    }
     window.addEventListener('rotmarket:tab-visible', onVisible)
     return () => window.removeEventListener('rotmarket:tab-visible', onVisible)
   }, [fetchListings])

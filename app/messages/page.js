@@ -80,11 +80,16 @@ function MessagesInner() {
   }, [activeConvo, user])
 
   // Refetch conversations when tab becomes visible again.
-  // Listens for rotmarket:tab-visible (dispatched by lib/supabase.js AFTER the
-  // session token is confirmed fresh) instead of raw visibilitychange.
-  // init is a stable useCallback ref so this handler can safely reach it.
+  // rotmarket:tab-visible fires after 600ms network-recovery delay (lib/supabase.js).
+  // Retries once after 2s if connection is still waking up.
   useEffect(() => {
-    const onVisible = () => init()
+    const onVisible = async () => {
+      try {
+        await init()
+      } catch {
+        setTimeout(() => init(), 2000)
+      }
+    }
     window.addEventListener('rotmarket:tab-visible', onVisible)
     return () => window.removeEventListener('rotmarket:tab-visible', onVisible)
   }, [init])
