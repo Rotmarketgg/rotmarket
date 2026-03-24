@@ -1,10 +1,20 @@
 import { createClient } from '@supabase/supabase-js'
 
-// Use service role key for cron — bypasses RLS
-// Add SUPABASE_SERVICE_ROLE_KEY to Vercel env vars (keep secret, never NEXT_PUBLIC_)
+// Cron jobs MUST run with the service role key — they call daily_maintenance
+// which bypasses RLS. If the key is missing, fail loudly at startup rather than
+// silently running with the anon key and having RLS block everything.
+if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  // This surfaces as a build/runtime error in Vercel logs and Vercel alerts
+  throw new Error(
+    '[RotMarket Cron] SUPABASE_SERVICE_ROLE_KEY is not set. ' +
+    'Add it to Vercel Environment Variables (never prefix with NEXT_PUBLIC_). ' +
+    'The daily maintenance cron will NOT run without it.'
+  )
+}
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  process.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
 export async function GET(request) {
