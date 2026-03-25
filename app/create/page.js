@@ -61,21 +61,20 @@ export default function CreateListingPage() {
   }
 
   const handleImages = (files) => {
-    // Use the module-level MAX_IMAGE_SIZE_BYTES constant — no local duplicate
-    const rejected = []
-    const valid = Array.from(files).filter(f => {
-      if (!f.type.startsWith('image/')) return false
-      if (f.size > MAX_IMAGE_SIZE_BYTES) { rejected.push(f.name); return false }
-      return true
-    })
-    if (rejected.length > 0) alert(`These files exceed the 10MB limit and were not added:\n${rejected.join('\n')}`)
-    const slots = 4 - images.length
-    const toAdd = valid.slice(0, slots)
-    toAdd.forEach(file => {
-      const reader = new FileReader()
-      reader.onload = e => setImages(prev => [...prev, { file, preview: e.target.result }].slice(0, 4))
-      reader.readAsDataURL(file)
-    })
+    // Only allow 1 image per listing
+    if (images.length >= 1) {
+      alert('Only one image is allowed per listing. Remove the current image first.')
+      return
+    }
+    const file = Array.from(files).find(f => f.type.startsWith('image/'))
+    if (!file) return
+    if (file.size > MAX_IMAGE_SIZE_BYTES) {
+      alert(`File too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximum size is 10 MB.`)
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = e => setImages([{ file, preview: e.target.result }])
+    reader.readAsDataURL(file)
   }
 
   const removeImage = (i) => setImages(prev => prev.filter((_, idx) => idx !== i))
@@ -86,11 +85,21 @@ export default function CreateListingPage() {
     const descErr = validateClean(form.description, 'Description')
     if (titleErr) errs.title = titleErr
     if (descErr) errs.description = descErr
+    // Image is required
+    if (images.length === 0) {
+      errs.images = 'An image is required for your listing.'
+    }
     if (Object.keys(errs).length > 0) { setErrors(errs); return }
-    const rl = checkRateLimit('listing')
-    if (rl) { alert(rl); return }
-    const rlDay = checkRateLimit('listing_daily')
-    if (rlDay) { alert(rlDay); return }
+
+    // Rate limit is bypassed for VIP, Owner, and Admin/Moderator users
+    const profileBadges = profile?.badges?.length ? profile.badges : profile?.badge ? [profile.badge] : []
+    const isPrivileged = profileBadges.some(b => ['Owner', 'VIP', 'Moderator'].includes(b))
+    if (!isPrivileged) {
+      const rl = checkRateLimit('listing')
+      if (rl) { alert(rl); return }
+      const rlDay = checkRateLimit('listing_daily')
+      if (rlDay) { alert(rlDay); return }
+    }
     setErrors({})
     setLoading(true)
 
@@ -331,24 +340,26 @@ export default function CreateListingPage() {
           </Section>
 
           {/* Images */}
-          <Section title="Images" hint="Up to 4 images. First image is the main display.">
-            <div
-              onClick={() => fileInputRef.current?.click()}
-              onDragOver={e => e.preventDefault()}
-              onDrop={e => { e.preventDefault(); handleImages(e.dataTransfer.files) }}
-              style={{
-                border: '2px dashed #2d2d3f', borderRadius: 12, padding: 24,
-                textAlign: 'center', cursor: 'pointer', transition: 'border-color 0.15s',
-                marginBottom: images.length > 0 ? 12 : 0,
-              }}
-              onMouseEnter={e => e.currentTarget.style.borderColor = '#4ade80'}
-              onMouseLeave={e => e.currentTarget.style.borderColor = '#2d2d3f'}
-            >
-              <div style={{ fontSize: 28, marginBottom: 8 }}>📸</div>
-              <div style={{ fontSize: 13, color: '#6b7280' }}>Click or drag images here</div>
-              <div style={{ fontSize: 11, color: '#4b5563', marginTop: 4 }}>PNG, JPG, GIF up to 10MB each</div>
-              <input ref={fileInputRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={e => handleImages(e.target.files)} />
-            </div>
+          <Section title="Image" required hint="1 image required. Max 10MB." error={errors.images}>
+            {images.length === 0 && (
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                onDragOver={e => e.preventDefault()}
+                onDrop={e => { e.preventDefault(); handleImages(e.dataTransfer.files) }}
+                style={{
+                  border: '2px dashed #2d2d3f', borderRadius: 12, padding: 24,
+                  textAlign: 'center', cursor: 'pointer', transition: 'border-color 0.15s',
+                  marginBottom: 0,
+                }}
+                onMouseEnter={e => e.currentTarget.style.borderColor = '#4ade80'}
+                onMouseLeave={e => e.currentTarget.style.borderColor = '#2d2d3f'}
+              >
+                <div style={{ fontSize: 28, marginBottom: 8 }}>📸</div>
+                <div style={{ fontSize: 13, color: '#6b7280' }}>Click or drag an image here</div>
+                <div style={{ fontSize: 11, color: '#4b5563', marginTop: 4 }}>PNG, JPG, WebP, GIF · max 10 MB</div>
+                <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => handleImages(e.target.files)} />
+              </div>
+            )}
 
             {images.length > 0 && (
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
