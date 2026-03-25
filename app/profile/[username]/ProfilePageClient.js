@@ -483,7 +483,7 @@ export default function ProfilePageClient({ username: usernameProp, initialProfi
                       const days = daysUntilExpiry(l)
                       const expiringSoon = days !== null && days <= 5
                       return (
-                        <div key={l.id} style={{ position: 'relative' }}>
+                        <div key={l.id} style={{ position: 'relative', height: '100%' }}>
                           <ListingCard listing={l} />
                           {/* Pending offer badge */}
                           {isOwn && listingOffers[l.id] > 0 && (
@@ -525,7 +525,7 @@ export default function ProfilePageClient({ username: usernameProp, initialProfi
                 ? <EmptyState icon="🏷️" title="No sales yet" message="Completed trades will appear here." />
                 : <div className="listing-grid">
                     {soldListings.map(l => (
-                      <div key={l.id} style={{ opacity: 0.65 }}>
+                      <div key={l.id} style={{ opacity: 0.65, height: '100%' }}>
                         <ListingCard listing={l} />
                       </div>
                     ))}
@@ -543,8 +543,8 @@ export default function ProfilePageClient({ username: usernameProp, initialProfi
                     </div>
                     <div className="listing-grid">
                       {expiredListings.map(l => (
-                        <div key={l.id}>
-                          <div style={{ opacity: 0.65 }}>
+                        <div key={l.id} style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                          <div style={{ opacity: 0.65, flex: 1 }}>
                             <ListingCard listing={l} />
                           </div>
                           <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>

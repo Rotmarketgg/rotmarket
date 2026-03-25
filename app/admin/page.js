@@ -745,7 +745,7 @@ function UserRow({ user, onUpdateBadge, onToggleBan, onDelete }) {
     <div style={{ background: '#111118', border: user.banned ? '1px solid rgba(239,68,68,0.25)' : '1px solid #1f2937', borderRadius: 10, padding: '12px 16px', opacity: user.banned ? 0.8 : 1 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         {/* Avatar */}
-        <div style={{ width: 40, height: 40, borderRadius: '50%', flexShrink: 0, overflow: 'hidden', background: user.avatar_url ? 'transparent' : 'linear-gradient(135deg, #4ade80, #22c55e)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 900, color: '#0a0a0f' }}>
+        <div style={{ width: 40, height: 40, borderRadius: '50%', flexShrink: 0, overflow: 'hidden', background: user.avatar_url ? 'transparent' : 'linear-gradient(135deg, #4ade80, #22c55e)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 900, color: '#0a0a0f', position: 'relative' }}>
           {user.avatar_url ? <Image src={user.avatar_url} alt="" fill sizes="32px" style={{ objectFit: 'cover' }} /> : getInitial(user.username)}
         </div>
 
