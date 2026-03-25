@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import Image from 'next/image'
 import Navbar from '@/components/Navbar'
 import { getSessionUser, getConversations, getMessagesPaginated, sendMessage, getProfile, supabase } from '@/lib/supabase'
 import { timeAgo, getInitial, checkRateLimit, withTimeout } from '@/lib/utils'
@@ -313,7 +312,7 @@ function MessagesInner() {
                         fontSize: 16, fontWeight: 900, color: '#0a0a0f', position: 'relative',
                       }}>
                         {other?.avatar_url
-                          ? <Image src={other.avatar_url} alt="" fill sizes="36px" style={{ objectFit: 'cover' }} />
+                          ? <img src={other.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           : getInitial(other?.username || '?')
                         }
                         {isUnread && (
@@ -402,7 +401,7 @@ function MessagesInner() {
                         fontSize: 15, fontWeight: 900, color: '#0a0a0f',
                       }}>
                         {otherUser?.avatar_url
-                          ? <Image src={otherUser.avatar_url} alt="" fill sizes="36px" style={{ objectFit: 'cover' }} />
+                          ? <img src={otherUser.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           : getInitial(otherUser?.username || '?')
                         }
                       </div>
@@ -539,7 +538,7 @@ function MessagesInner() {
                                 visibility: isLast ? 'visible' : 'hidden',
                               }}>
                                 {otherUser?.avatar_url
-                                  ? <Image src={otherUser.avatar_url} alt="" fill sizes="36px" style={{ objectFit: 'cover' }} />
+                                  ? <img src={otherUser.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                   : getInitial(otherUser?.username || '?')
                                 }
                               </div>

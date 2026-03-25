@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
 import Navbar from '@/components/Navbar'
 import { supabase } from '@/lib/supabase'
 import { getInitial, withTimeout } from '@/lib/utils'
@@ -155,7 +154,7 @@ export default function LeaderboardPage() {
                           border: `2px solid ${MEDAL_COLORS[rank]}40`,
                         }}>
                           {trader.avatar_url
-                            ? <Image src={trader.avatar_url} alt="" fill sizes="64px" style={{ objectFit: 'cover' }} />
+                            ? <img src={trader.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                             : getInitial(trader.username)
                           }
                         </div>
@@ -215,7 +214,7 @@ export default function LeaderboardPage() {
                         fontSize: 15, fontWeight: 900, color: '#0a0a0f',
                       }}>
                         {trader.avatar_url
-                          ? <Image src={trader.avatar_url} alt="" fill sizes="40px" style={{ objectFit: 'cover' }} />
+                          ? <img src={trader.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           : getInitial(trader.username)
                         }
                       </div>

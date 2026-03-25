@@ -1,11 +1,12 @@
 // ─── SERVER COMPONENT ────────────────────────────────────────────
-// Generates per-profile metadata AND pre-fetches the profile so
-// ProfilePageClient gets data on first render with no double-fetch.
+// No 'use client' — generates per-profile metadata so Google, Discord,
+// and Twitter show real names, bios, and stats when a profile link is shared.
+// Interactive profile UI lives in ProfilePageClient.js.
 
 import { createClient } from '@supabase/supabase-js'
 import ProfilePageClient from './ProfilePageClient'
 
-async function getProfileData(username) {
+async function getProfileMeta(username) {
   if (!username) return null
   try {
     const supabase = createClient(
@@ -15,13 +16,7 @@ async function getProfileData(username) {
     )
     const { data } = await supabase
       .from('profiles')
-      .select(`
-        id, username, avatar_url, bio, badge, badges,
-        trade_count, rating, review_count, banned, ban_reason,
-        epic_username, roblox_username, profile_url,
-        paypal_email, cashapp_handle, venmo_handle,
-        created_at
-      `)
+      .select('username, bio, badge, badges, trade_count, rating, review_count, avatar_url')
       .eq('username', username)
       .single()
     return data
@@ -32,7 +27,7 @@ async function getProfileData(username) {
 
 export async function generateMetadata({ params }) {
   const { username } = await params
-  const profile = await getProfileData(username)
+  const profile = await getProfileMeta(username)
 
   if (!profile) {
     return {
@@ -68,7 +63,7 @@ export async function generateMetadata({ params }) {
       ...(image ? { images: [{ url: image, width: 256, height: 256, alt: profile.username }] } : {}),
     },
     twitter: {
-      card: 'summary',
+      card: image ? 'summary' : 'summary',
       title,
       description,
       ...(image ? { images: [image] } : {}),
@@ -76,9 +71,7 @@ export async function generateMetadata({ params }) {
   }
 }
 
-// Pre-fetch profile server-side and pass as prop — eliminates double-fetch
 export default async function ProfilePage({ params }) {
   const { username } = await params
-  const initialProfile = await getProfileData(username)
-  return <ProfilePageClient username={username} initialProfile={initialProfile} />
+  return <ProfilePageClient username={username} />
 }

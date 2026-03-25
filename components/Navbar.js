@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
 import { useRouter, usePathname } from 'next/navigation'
 import { supabase, getProfile, getUnreadCount } from '@/lib/supabase'
 import { getInitial, withTimeout } from '@/lib/utils'
@@ -49,8 +48,6 @@ export default function Navbar() {
   const [pendingOffers, setPendingOffers] = useState(0)
   const [menuOpen, setMenuOpen] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [notifOpen, setNotifOpen] = useState(false)
-  const notifRef = useRef(null)
 
   const fetchPendingOffers = async (userId) => {
     try {
@@ -210,7 +207,6 @@ export default function Navbar() {
     function handleClick(e) {
       if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false)
       if (mobileMenuRef.current && !mobileMenuRef.current.contains(e.target)) setMobileOpen(false)
-      if (notifRef.current && !notifRef.current.contains(e.target)) setNotifOpen(false)
     }
     document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
@@ -306,6 +302,24 @@ export default function Navbar() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
             {user ? (
               <>
+                {/* Pending offers — mobile: just icon */}
+                {pendingOffers > 0 && (
+                  <Link href={profile?.username ? `/profile/${profile.username}` : '/'} style={{ textDecoration: 'none' }}>
+                    <div style={{
+                      height: 38, borderRadius: 8, padding: '0 10px',
+                      background: 'rgba(245,158,11,0.12)',
+                      border: '1px solid rgba(245,158,11,0.4)',
+                      display: 'flex', alignItems: 'center', gap: 5,
+                      animation: 'pulse-offer 2s infinite',
+                    }}>
+                      <span style={{ fontSize: 15 }}>📨</span>
+                      <span className="desktop-nav" style={{ fontSize: 12, fontWeight: 700, color: '#f59e0b' }}>
+                        {pendingOffers}
+                      </span>
+                    </div>
+                  </Link>
+                )}
+
                 {/* Inbox */}
                 <Link href="/messages" style={{ position: 'relative', textDecoration: 'none' }}>
                   <div style={{
@@ -315,6 +329,7 @@ export default function Navbar() {
                     display: 'flex', alignItems: 'center', gap: 5,
                     transition: 'all 0.15s',
                   }}>
+                    <span style={{ fontSize: 16 }}>💬</span>
                     <span className="desktop-nav" style={{ fontSize: 13, fontWeight: 700, color: isActive('/messages') ? '#4ade80' : '#d1d5db' }}>Inbox</span>
                   </div>
                   {unread > 0 && (
@@ -329,77 +344,6 @@ export default function Navbar() {
                   )}
                 </Link>
 
-                {/* Notification Bell */}
-                <div style={{ position: 'relative' }} ref={notifRef}>
-                  <button
-                    onClick={() => { setNotifOpen(!notifOpen); setMenuOpen(false); setMobileOpen(false) }}
-                    style={{
-                      width: 38, height: 38, borderRadius: 8,
-                      background: notifOpen ? 'rgba(245,158,11,0.12)' : '#111118',
-                      border: `1px solid ${notifOpen ? 'rgba(245,158,11,0.4)' : '#2d2d3f'}`,
-                      cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      position: 'relative', transition: 'all 0.15s', flexShrink: 0,
-                    }}
-                    aria-label="Notifications"
-                  >
-                    <span style={{ fontSize: 16 }}>🔔</span>
-                    {pendingOffers > 0 && (
-                      <span style={{
-                        position: 'absolute', top: -4, right: -4,
-                        background: '#f59e0b', color: '#000',
-                        fontSize: 9, fontWeight: 800, borderRadius: 10,
-                        minWidth: 16, height: 16, padding: '0 3px',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        boxShadow: '0 0 0 2px #0a0a0f',
-                      }}>{pendingOffers > 9 ? '9+' : pendingOffers}</span>
-                    )}
-                  </button>
-
-                  {notifOpen && (
-                    <div style={{
-                      position: 'absolute', right: 0, top: 46,
-                      background: '#111118', border: '1px solid #2d2d3f',
-                      borderRadius: 12, padding: 8, minWidth: 260,
-                      boxShadow: '0 12px 40px rgba(0,0,0,0.6)', zIndex: 100,
-                    }}>
-                      <div style={{ padding: '8px 12px 10px', borderBottom: '1px solid #1f2937', marginBottom: 6 }}>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: '#9ca3af', letterSpacing: '0.05em' }}>NOTIFICATIONS</span>
-                      </div>
-                      {pendingOffers > 0 ? (
-                        <Link
-                          href={profile?.username ? `/profile/${profile.username}` : '/'}
-                          onClick={() => setNotifOpen(false)}
-                          style={{ textDecoration: 'none', display: 'block' }}
-                        >
-                          <div style={{
-                            display: 'flex', alignItems: 'center', gap: 10,
-                            padding: '10px 12px', borderRadius: 8, cursor: 'pointer',
-                            background: 'rgba(245,158,11,0.06)',
-                            border: '1px solid rgba(245,158,11,0.2)', marginBottom: 4,
-                            transition: 'background 0.1s',
-                          }}
-                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(245,158,11,0.12)'}
-                            onMouseLeave={e => e.currentTarget.style.background = 'rgba(245,158,11,0.06)'}
-                          >
-                            <span style={{ fontSize: 20 }}>📨</span>
-                            <div>
-                              <div style={{ fontSize: 13, fontWeight: 600, color: '#f59e0b' }}>
-                                {pendingOffers} pending trade offer{pendingOffers !== 1 ? 's' : ''}
-                              </div>
-                              <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>Tap to view your profile</div>
-                            </div>
-                          </div>
-                        </Link>
-                      ) : (
-                        <div style={{ padding: '20px 12px', textAlign: 'center' }}>
-                          <div style={{ fontSize: 24, marginBottom: 8 }}>🔕</div>
-                          <div style={{ fontSize: 12, color: '#4b5563' }}>No new notifications</div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
                 {/* Avatar dropdown */}
                 <div style={{ position: 'relative' }} ref={menuRef}>
                   <button onClick={() => { setMenuOpen(!menuOpen); setMobileOpen(false) }} style={{
@@ -413,7 +357,7 @@ export default function Navbar() {
                     transition: 'border-color 0.15s', flexShrink: 0,
                   }}>
                     {profile?.avatar_url
-                      ? <Image src={profile.avatar_url} alt="avatar" fill sizes="42px" style={{ objectFit: 'cover' }} />
+                      ? <img src={profile.avatar_url} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       : getInitial(profile?.username || user.email)
                     }
                   </button>
@@ -434,7 +378,7 @@ export default function Navbar() {
                             fontSize: 13, fontWeight: 900, color: '#0a0a0f',
                           }}>
                             {profile?.avatar_url
-                              ? <Image src={profile.avatar_url} alt="" fill sizes="34px" style={{ objectFit: 'cover' }} />
+                              ? <img src={profile.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                               : getInitial(profile?.username || user.email)
                             }
                           </div>
@@ -450,6 +394,7 @@ export default function Navbar() {
                         </div>
                       </div>
                       <MenuItem href={profile?.username ? `/profile/${profile.username}` : '/settings'} label="My Profile" emoji="👤" onClick={() => setMenuOpen(false)} />
+                      <MenuItem href="/create" label="Post Listing" emoji="➕" onClick={() => setMenuOpen(false)} />
                       <MenuItem href="/messages" label="Messages" emoji="💬" badge={unread} onClick={() => setMenuOpen(false)} />
                       <MenuItem href="/settings" label="Settings" emoji="⚙️" onClick={() => setMenuOpen(false)} />
                       {(() => {

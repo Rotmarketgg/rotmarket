@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import Image from 'next/image'
 import Navbar from '@/components/Navbar'
 import ListingCard from '@/components/ListingCard'
 import StarRating from '@/components/StarRating'
@@ -21,23 +20,23 @@ const BADGE_CONFIG = {
   'Verified Trader': { ...BADGE_META['Verified Trader'], desc: 'Trusted trader — 25 five-star reviews' },
 }
 
-export default function ProfilePageClient({ username: usernameProp, initialProfile = null }) {
+export default function ProfilePageClient({ username: usernameProp }) {
   const params = useParams()
   const username = usernameProp ?? params?.username
-  const [profile, setProfile] = useState(initialProfile)
+  const [profile, setProfile] = useState(null)
   const [listings, setListings] = useState([])
   const [reviews, setReviews] = useState([])
   const [currentUser, setCurrentUser] = useState(null)
-  const [loading, setLoading] = useState(initialProfile === null)
+  const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('listings')
   const [notFound, setNotFound] = useState(false)
   const [listingOffers, setListingOffers] = useState({}) // listingId -> pending offer count
 
-  const load = useCallback(async (silent = false, skipProfileFetch = false) => {
+  const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
     try {
       const [p, u] = await Promise.all([
-        skipProfileFetch ? Promise.resolve(profile) : withTimeout(getProfileByUsername(decodeURIComponent(username))),
+        withTimeout(getProfileByUsername(decodeURIComponent(username))),
         getSessionUser(),
       ])
       if (!p) {
@@ -90,7 +89,7 @@ export default function ProfilePageClient({ username: usernameProp, initialProfi
     }
   }, [username])
 
-  useEffect(() => { load(false, initialProfile !== null) }, [load])  // skip profile re-fetch if server pre-loaded it
+  useEffect(() => { load() }, [load])
 
   // Silent refresh on tab return — keeps existing profile visible while data updates.
   // rotmarket:tab-visible fires after 600ms network-recovery delay (lib/supabase.js).
@@ -229,7 +228,7 @@ export default function ProfilePageClient({ username: usernameProp, initialProfi
                   boxShadow: `0 0 24px ${accentColor}30`,
                 }}>
                   {profile.avatar_url
-                    ? <Image src={profile.avatar_url} alt={profile.username} fill sizes="96px" style={{ objectFit: 'cover' }} />
+                    ? <img src={profile.avatar_url} alt={profile.username} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     : getInitial(profile.username)
                   }
                 </div>
@@ -589,7 +588,7 @@ export default function ProfilePageClient({ username: usernameProp, initialProfi
                             fontSize: 13, fontWeight: 900, color: '#0a0a0f',
                           }}>
                             {r.reviewer?.avatar_url
-                              ? <Image src={r.reviewer.avatar_url} alt="" fill sizes="32px" style={{ objectFit: 'cover' }} />
+                              ? <img src={r.reviewer.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                               : getInitial(r.reviewer?.username || '?')
                             }
                           </div>

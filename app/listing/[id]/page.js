@@ -1,12 +1,14 @@
 // ─── SERVER COMPONENT ────────────────────────────────────────────
-// Runs on the server to generate per-listing <title> and OG tags.
-// Also fetches the full listing and passes it as a prop to the client
-// component — eliminating the double-fetch (server for meta + client on mount).
+// This file has NO 'use client' — it runs on the server so Next.js can
+// generate per-listing <title> and Open Graph tags before sending HTML.
+// Google, Discord, and Twitter all read these tags from the raw HTML.
+//
+// The interactive UI lives in ListingPageClient.js ('use client').
 
 import { createClient } from '@supabase/supabase-js'
 import ListingPageClient from './ListingPageClient'
 
-async function getListing(id) {
+async function getListingMeta(id) {
   if (!id || id === 'undefined') return null
   try {
     const supabase = createClient(
@@ -16,14 +18,7 @@ async function getListing(id) {
     )
     const { data } = await supabase
       .from('listings')
-      .select(`
-        *,
-        profiles (
-          id, username, epic_username, roblox_username,
-          paypal_email, cashapp_handle, venmo_handle,
-          trade_count, rating, review_count, badge, badges, avatar_url, bio
-        )
-      `)
+      .select('title, game, rarity, type, price, images, profiles(username)')
       .eq('id', id)
       .neq('status', 'deleted')
       .single()
@@ -35,7 +30,7 @@ async function getListing(id) {
 
 export async function generateMetadata({ params }) {
   const { id } = await params
-  const listing = await getListing(id)
+  const listing = await getListingMeta(id)
 
   if (!listing) {
     return {
@@ -76,10 +71,9 @@ export async function generateMetadata({ params }) {
   }
 }
 
-// Pass id AND the pre-fetched listing as props — client component uses the
-// prefetched data on first render and only re-fetches on tab-return / updates.
+// Pass the id as a prop so the client component can read it without
+// useParams() on the first render — avoids a flash of empty state.
 export default async function ListingPage({ params }) {
   const { id } = await params
-  const initialListing = await getListing(id)
-  return <ListingPageClient id={id} initialListing={initialListing} />
+  return <ListingPageClient id={id} />
 }
