@@ -1,13 +1,14 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { getRarityStyle, timeAgo, formatPrice, getInitial } from '@/lib/utils'
 import { BADGE_HIERARCHY, BADGE_META, getPrimaryBadge } from '@/lib/constants'
 
 const TYPE_CONFIG = {
   sale:  { label: 'FOR SALE',  bg: 'rgba(22,163,74,0.9)',  border: '#16a34a', color: '#fff' },
   trade: { label: 'FOR TRADE', bg: 'rgba(37,99,235,0.9)',  border: '#2563eb', color: '#fff' },
-  sold:  { label: 'SOLD',  bg: 'rgba(239,68,68,0.85)', border: '#ef4444', color: '#fff' },
+  sold:  { label: 'SOLD',      bg: 'rgba(239,68,68,0.85)', border: '#ef4444', color: '#fff' },
 }
 
 export default function ListingCard({ listing }) {
@@ -21,8 +22,8 @@ export default function ListingCard({ listing }) {
 
   const primaryBadge = getPrimaryBadge(badges)
   const primaryMeta = primaryBadge ? BADGE_META[primaryBadge] : null
+  // VIP glow: Owner or VIP badge → gold outline on card
   const isVip = primaryBadge === 'VIP' || primaryBadge === 'Owner'
-  const isVerified = badges.includes('Verified Trader')
 
   const typeKey = listing.status === 'sold' ? 'sold' : listing.type
   const typeConf = TYPE_CONFIG[typeKey] || TYPE_CONFIG.sale
@@ -32,6 +33,28 @@ export default function ListingCard({ listing }) {
     : null
   const expiringSoon = daysLeft !== null && daysLeft <= 3 && daysLeft > 0
   const hasImage = !!listing.images?.[0]
+
+  // Border/glow logic:
+  // promoted → blue glow (⚡ Featured)
+  // VIP/Owner seller → gold outline
+  // else → rarity border
+  const cardOutline = listing.promoted
+    ? '2px solid rgba(96,165,250,0.7)'
+    : isVip
+    ? '2px solid rgba(245,158,11,0.5)'
+    : `1px solid ${rarity.border}44`
+
+  const cardShadow = listing.promoted
+    ? '0 0 20px rgba(96,165,250,0.25), inset 0 0 0 1px rgba(96,165,250,0.1)'
+    : isVip
+    ? '0 0 16px rgba(245,158,11,0.15)'
+    : '0 2px 8px rgba(0,0,0,0.4)'
+
+  const hoverShadow = listing.promoted
+    ? '0 12px 32px rgba(96,165,250,0.35), inset 0 0 0 1px rgba(96,165,250,0.2)'
+    : isVip
+    ? '0 12px 28px rgba(245,158,11,0.2), 0 0 0 2px rgba(245,158,11,0.4)'
+    : `0 12px 28px rgba(0,0,0,0.5), 0 0 0 1px ${rarity.border}66`
 
   return (
     <Link href={`/listing/${listing.id}`} style={{ textDecoration: 'none', display: 'block', height: '100%' }}>
@@ -45,50 +68,55 @@ export default function ListingCard({ listing }) {
           position: 'relative',
           display: 'flex',
           flexDirection: 'column',
+          // Fixed height so all cards are the same size regardless of title length
           height: '100%',
+          minHeight: 290,
           opacity: listing.status === 'sold' ? 0.5 : 1,
-          outline: listing.promoted
-            ? '2px solid rgba(245,158,11,0.7)'
-            : isVip
-            ? '1px solid rgba(245,158,11,0.2)'
-            : `1px solid ${rarity.border}44`,
-          boxShadow: listing.promoted
-            ? `0 0 20px rgba(245,158,11,0.25), inset 0 0 0 1px rgba(245,158,11,0.15)`
-            : `0 2px 8px rgba(0,0,0,0.4)`,
+          outline: cardOutline,
+          boxShadow: cardShadow,
         }}
         onMouseEnter={e => {
           e.currentTarget.style.transform = 'translateY(-4px) scale(1.01)'
-          e.currentTarget.style.boxShadow = listing.promoted
-            ? `0 12px 32px rgba(245,158,11,0.4), inset 0 0 0 1px rgba(245,158,11,0.2)`
-            : `0 12px 28px rgba(0,0,0,0.5), 0 0 0 1px ${rarity.border}66`
+          e.currentTarget.style.boxShadow = hoverShadow
         }}
         onMouseLeave={e => {
           e.currentTarget.style.transform = 'translateY(0) scale(1)'
-          e.currentTarget.style.boxShadow = listing.promoted
-            ? `0 0 20px rgba(245,158,11,0.25), inset 0 0 0 1px rgba(245,158,11,0.15)`
-            : `0 2px 8px rgba(0,0,0,0.4)`
+          e.currentTarget.style.boxShadow = cardShadow
         }}
       >
         {/* Rarity accent bar */}
         <div style={{ height: 3, background: `linear-gradient(90deg, ${rarity.border}, ${rarity.border}88, transparent)`, flexShrink: 0 }} />
 
-        {/* Image area */}
+        {/* Image area — fixed height so titles don't push content around */}
         <div style={{
           position: 'relative', height: 160,
           background: hasImage ? 'transparent' : `radial-gradient(ellipse at 50% 30%, ${rarity.bg} 0%, #080810 75%)`,
           flexShrink: 0, overflow: 'hidden',
         }}>
-          {hasImage
-            ? <img src={listing.images[0]} alt={listing.title} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-            : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 56, opacity: 0.7 }}>🎮</div>
-          }
+          {hasImage ? (
+            <Image
+              src={listing.images[0]}
+              alt={listing.title}
+              fill
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+              style={{ objectFit: 'cover' }}
+              loading="lazy"
+            />
+          ) : (
+            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 56, opacity: 0.7 }}>🎮</div>
+          )}
 
           {/* Gradient overlay */}
           <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 48, background: 'linear-gradient(to top, #0f0f18 0%, transparent 100%)', pointerEvents: 'none' }} />
 
-          {/* Promoted badge */}
+          {/* Promoted badge — now blue */}
           {listing.promoted && (
-            <div style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)', border: '1px solid rgba(245,158,11,0.6)', color: '#f59e0b', fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', borderRadius: 4, padding: '3px 7px' }}>⚡ PROMOTED</div>
+            <div style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)', border: '1px solid rgba(96,165,250,0.6)', color: '#60a5fa', fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', borderRadius: 4, padding: '3px 7px' }}>⚡ FEATURED</div>
+          )}
+
+          {/* VIP badge on card image */}
+          {isVip && !listing.promoted && (
+            <div style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)', border: '1px solid rgba(245,158,11,0.5)', color: '#f59e0b', fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', borderRadius: 4, padding: '3px 7px' }}>⭐ VIP</div>
           )}
 
           {/* Type badge */}
@@ -114,11 +142,13 @@ export default function ListingCard({ listing }) {
         {/* Content */}
         <div style={{ padding: '10px 12px 12px', display: 'flex', flexDirection: 'column', flex: 1, gap: 6 }}>
 
-          {/* Title — explicit DM Sans, not condensed */}
+          {/* Title — fixed 2-line clamp so all cards are same height */}
           <div style={{
             fontSize: 13, fontWeight: 700, color: '#f1f5f9',
             fontFamily: '"DM Sans", system-ui, -apple-system, sans-serif',
             lineHeight: 1.4,
+            // Always reserve 2-line height so price stays at same vertical position
+            minHeight: '2.8em',
             display: '-webkit-box',
             WebkitLineClamp: 2,
             WebkitBoxOrient: 'vertical',
@@ -147,17 +177,25 @@ export default function ListingCard({ listing }) {
               {/* Avatar */}
               <div style={{
                 width: 22, height: 22, borderRadius: '50%',
-                overflow: 'hidden', flexShrink: 0,
+                overflow: 'hidden', flexShrink: 0, position: 'relative',
                 background: profile?.avatar_url ? 'transparent' : `linear-gradient(135deg, ${rarity.border}, ${rarity.bg})`,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 9, fontWeight: 900, color: '#fff',
                 outline: primaryMeta ? `1.5px solid ${primaryMeta.color}` : 'none',
                 outlineOffset: '1px',
               }}>
-                {profile?.avatar_url
-                  ? <img src={profile.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  : getInitial(profile?.username)
-                }
+                {profile?.avatar_url ? (
+                  <Image
+                    src={profile.avatar_url}
+                    alt=""
+                    fill
+                    sizes="22px"
+                    style={{ objectFit: 'cover' }}
+                    loading="lazy"
+                  />
+                ) : (
+                  getInitial(profile?.username)
+                )}
               </div>
 
               {/* Username */}
@@ -185,7 +223,7 @@ export default function ListingCard({ listing }) {
 
 export function ListingCardSkeleton() {
   return (
-    <div style={{ background: '#0f0f18', borderRadius: 12, overflow: 'hidden', height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ background: '#0f0f18', borderRadius: 12, overflow: 'hidden', minHeight: 290, display: 'flex', flexDirection: 'column' }}>
       <div style={{ height: 3, background: '#1f2937' }} />
       <div className="skeleton" style={{ height: 160, flexShrink: 0 }} />
       <div style={{ padding: '10px 12px 12px', display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>

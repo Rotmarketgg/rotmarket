@@ -1,14 +1,12 @@
 // ─── SERVER COMPONENT ────────────────────────────────────────────
-// This file has NO 'use client' — it runs on the server so Next.js can
-// generate per-listing <title> and Open Graph tags before sending HTML.
-// Google, Discord, and Twitter all read these tags from the raw HTML.
-//
-// The interactive UI lives in ListingPageClient.js ('use client').
+// Runs on the server to generate per-listing <title> and OG tags.
+// Also fetches the full listing and passes it as a prop to the client
+// component — eliminating the double-fetch (server for meta + client on mount).
 
 import { createClient } from '@supabase/supabase-js'
 import ListingPageClient from './ListingPageClient'
 
-async function getListingMeta(id) {
+async function getListing(id) {
   if (!id || id === 'undefined') return null
   try {
     const supabase = createClient(
@@ -18,7 +16,14 @@ async function getListingMeta(id) {
     )
     const { data } = await supabase
       .from('listings')
-      .select('title, game, rarity, type, price, images, profiles(username)')
+      .select(`
+        *,
+        profiles (
+          id, username, epic_username, roblox_username,
+          paypal_email, cashapp_handle, venmo_handle,
+          trade_count, rating, review_count, badge, badges, avatar_url, bio
+        )
+      `)
       .eq('id', id)
       .neq('status', 'deleted')
       .single()
@@ -30,7 +35,7 @@ async function getListingMeta(id) {
 
 export async function generateMetadata({ params }) {
   const { id } = await params
-  const listing = await getListingMeta(id)
+  const listing = await getListing(id)
 
   if (!listing) {
     return {
@@ -71,9 +76,10 @@ export async function generateMetadata({ params }) {
   }
 }
 
-// Pass the id as a prop so the client component can read it without
-// useParams() on the first render — avoids a flash of empty state.
+// Pass id AND the pre-fetched listing as props — client component uses the
+// prefetched data on first render and only re-fetches on tab-return / updates.
 export default async function ListingPage({ params }) {
   const { id } = await params
-  return <ListingPageClient id={id} />
+  const initialListing = await getListing(id)
+  return <ListingPageClient id={id} initialListing={initialListing} />
 }

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import Navbar from '@/components/Navbar'
 import { getSessionUser, getProfile, supabase } from '@/lib/supabase'
 import { withTimeout, timeAgo, getInitial } from '@/lib/utils'
@@ -745,7 +746,7 @@ function UserRow({ user, onUpdateBadge, onToggleBan, onDelete }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         {/* Avatar */}
         <div style={{ width: 40, height: 40, borderRadius: '50%', flexShrink: 0, overflow: 'hidden', background: user.avatar_url ? 'transparent' : 'linear-gradient(135deg, #4ade80, #22c55e)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 900, color: '#0a0a0f' }}>
-          {user.avatar_url ? <img src={user.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : getInitial(user.username)}
+          {user.avatar_url ? <Image src={user.avatar_url} alt="" fill sizes="32px" style={{ objectFit: 'cover' }} /> : getInitial(user.username)}
         </div>
 
         {/* Info */}

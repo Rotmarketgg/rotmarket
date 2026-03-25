@@ -7,7 +7,7 @@ import ListingCard, { ListingCardSkeleton } from '@/components/ListingCard'
 import { getListings } from '@/lib/supabase'
 import Link from 'next/link'
 
-const PAGE_SIZE = 24
+const PAGE_SIZE = 20
 
 export default function HomePage() {
   const [listings, setListings] = useState([])
