@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import Image from 'next/image'
 import Navbar from '@/components/Navbar'
 import StarRating from '@/components/StarRating'
 import ReportButton from '@/components/ReportButton'
@@ -107,7 +106,7 @@ function SellerOfferCard({ offer, onUpdate, onSetListing }) {
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 12, fontWeight: 900, color: '#0a0a0f',
         }}>
-          {buyer?.avatar_url ? <Image src={buyer.avatar_url} alt="" fill sizes="32px" style={{ objectFit: 'cover' }} /> : getInitial(buyer?.username)}
+          {buyer?.avatar_url ? <img src={buyer.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : getInitial(buyer?.username)}
         </div>
         <div style={{ flex: 1 }}>
           <Link href={`/profile/${buyer?.username}`} style={{ fontSize: 13, fontWeight: 700, color: '#f9fafb', textDecoration: 'none' }}>
@@ -258,19 +257,19 @@ function BuyerTradePanel({ myOffer, listing, seller, listingId, copiedId, setCop
 
 // id prop is passed from the server wrapper (page.js) — avoids an extra
 // useParams() call and ensures the id is available on the very first render.
-export default function ListingPageClient({ id: idProp, initialListing = null }) {
+export default function ListingPageClient({ id: idProp }) {
   const params = useParams()
   const id = idProp ?? params?.id
   const router = useRouter()
 
-  const [listing, setListing] = useState(initialListing)
+  const [listing, setListing] = useState(null)
   const [reviews, setReviews] = useState([])
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
   const [myOffer, setMyOffer] = useState(null)         // buyer's own offer
   const [sellerOffers, setSellerOffers] = useState([]) // seller's incoming offers
   const [tab, setTab] = useState('details')
-  const [loading, setLoading] = useState(initialListing === null)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [copiedId, setCopiedId] = useState(false)
   const [selectedImage, setSelectedImage] = useState(0)
@@ -286,15 +285,10 @@ export default function ListingPageClient({ id: idProp, initialListing = null })
   const [reviewLoading, setReviewLoading] = useState(false)
   const [reviewSuccess, setReviewSuccess] = useState(false)
 
-  const load = useCallback(async (silent = false, skipListingFetch = false) => {
+  const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
     try {
-      // On the very first render, the server already fetched the listing — skip re-fetch.
-      // On tab-return or manual refresh, always re-fetch to get latest data.
-      const [listingData, currentUser] = await Promise.all([
-        skipListingFetch ? Promise.resolve(listing) : withTimeout(getListing(id)),
-        getSessionUser(),
-      ])
+      const [listingData, currentUser] = await Promise.all([withTimeout(getListing(id)), getSessionUser()])
       setListing(listingData)
       setUser(currentUser)
       const [reviewsData, profileData] = await withTimeout(Promise.all([
@@ -321,7 +315,7 @@ export default function ListingPageClient({ id: idProp, initialListing = null })
     }
   }, [id])
 
-  useEffect(() => { load(false, initialListing !== null) }, [load])  // skip listing re-fetch if server pre-loaded it
+  useEffect(() => { load() }, [load])
 
   // Silent refresh on tab return — fires after rotmarket:tab-visible (600ms delay)
   // so the Supabase client has been verified healthy before we hit the DB.
@@ -441,8 +435,8 @@ export default function ListingPageClient({ id: idProp, initialListing = null })
           display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, cursor: 'zoom-out',
         }}>
           <div style={{ position: 'relative', maxWidth: '90vw', maxHeight: '90vh' }} onClick={e => e.stopPropagation()}>
-            <Image src={listing.images[selectedImage]} alt={listing.title} fill sizes="90vw"
-              style={{ maxWidth: '100%', maxHeight: '85vh', objectFit: 'contain', borderRadius: 12, boxShadow: `0 0 60px ${rarity.glow}` }} />
+            <img src={listing.images[selectedImage]} alt={listing.title}
+              style={{ maxWidth: '100%', maxHeight: '85vh', objectFit: 'contain', borderRadius: 12, boxShadow: `0 0 60px ${rarity.glow}`, pointerEvents: 'none' }} />
             <button onClick={() => setLightboxOpen(false)} style={{
               position: 'absolute', top: -14, right: -14, width: 32, height: 32, borderRadius: '50%',
               background: '#1f2937', border: '1px solid #2d2d3f', color: '#fff', fontSize: 16,
@@ -455,7 +449,7 @@ export default function ListingPageClient({ id: idProp, initialListing = null })
                     width: 48, height: 48, borderRadius: 6, overflow: 'hidden',
                     border: `2px solid ${selectedImage === i ? rarity.border : '#2d2d3f'}`, cursor: 'pointer',
                   }}>
-                    <Image src={img} alt="" fill sizes="48px" style={{ objectFit: 'cover' }} />
+                    <img src={img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }} />
                   </div>
                 ))}
               </div>
@@ -512,7 +506,7 @@ export default function ListingPageClient({ id: idProp, initialListing = null })
                 outline: `1px solid ${rarity.border}55`,
               }}>
                 {listing.images?.[selectedImage]
-                  ? <Image src={listing.images[selectedImage]} alt={listing.title} fill sizes="(max-width:768px) 100vw, 480px" style={{ objectFit: 'cover' }} />
+                  ? <img src={listing.images[selectedImage]} alt={listing.title} style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }} />
                   : '🎮'
                 }
                 {/* Bottom gradient fade */}
@@ -527,7 +521,7 @@ export default function ListingPageClient({ id: idProp, initialListing = null })
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center' }}>
                   {listing.images.map((img, i) => (
                     <div key={i} onClick={() => setSelectedImage(i)} style={{ width: 36, height: 36, borderRadius: 6, overflow: 'hidden', border: `2px solid ${selectedImage === i ? rarity.border : '#2d2d3f'}`, cursor: 'pointer' }}>
-                      <Image src={img} alt="" fill sizes="36px" style={{ objectFit: 'cover' }} />
+                      <img src={img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }} />
                     </div>
                   ))}
                 </div>
@@ -703,7 +697,7 @@ export default function ListingPageClient({ id: idProp, initialListing = null })
                       >
                         {/* Avatar */}
                         <div style={{ width: 52, height: 52, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, background: seller.avatar_url ? 'transparent' : 'linear-gradient(135deg, #4ade80, #22c55e)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 700, color: '#0a0a0f', fontFamily: '"DM Sans", system-ui, sans-serif' }}>
-                          {seller.avatar_url ? <Image src={seller.avatar_url} alt={seller.username} fill sizes="40px" style={{ objectFit: 'cover' }} /> : getInitial(seller.username)}
+                          {seller.avatar_url ? <img src={seller.avatar_url} alt={seller.username} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : getInitial(seller.username)}
                         </div>
 
                         {/* Name + game usernames */}
