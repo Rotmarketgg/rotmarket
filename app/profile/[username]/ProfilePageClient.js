@@ -227,6 +227,7 @@ export default function ProfilePageClient({ username: usernameProp, initialProfi
                   fontSize: 36, fontWeight: 900, color: '#0a0a0f',
                   fontFamily: 'var(--font-display)', overflow: 'hidden',
                   boxShadow: `0 0 24px ${accentColor}30`,
+                  position: 'relative',
                 }}>
                   {profile.avatar_url
                     ? <Image src={profile.avatar_url} alt={profile.username} fill sizes="96px" style={{ objectFit: 'cover' }} />
@@ -587,6 +588,7 @@ export default function ProfilePageClient({ username: usernameProp, initialProfi
                             background: r.reviewer?.avatar_url ? 'transparent' : 'linear-gradient(135deg, #4ade80, #22c55e)',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             fontSize: 13, fontWeight: 900, color: '#0a0a0f',
+                            position: 'relative',
                           }}>
                             {r.reviewer?.avatar_url
                               ? <Image src={r.reviewer.avatar_url} alt="" fill sizes="32px" style={{ objectFit: 'cover' }} />

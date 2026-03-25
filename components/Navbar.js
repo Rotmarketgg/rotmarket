@@ -336,7 +336,6 @@ export default function Navbar() {
                     display: 'flex', alignItems: 'center', gap: 5,
                     transition: 'all 0.15s',
                   }}>
-                    <span style={{ fontSize: 16 }}>💬</span>
                     <span className="desktop-nav" style={{ fontSize: 13, fontWeight: 700, color: isActive('/messages') ? '#4ade80' : '#d1d5db' }}>Inbox</span>
                   </div>
                   {unread > 0 && (
@@ -401,7 +400,6 @@ export default function Navbar() {
                         </div>
                       </div>
                       <MenuItem href={profile?.username ? `/profile/${profile.username}` : '/settings'} label="My Profile" emoji="👤" onClick={() => setMenuOpen(false)} />
-                      <MenuItem href="/create" label="Post Listing" emoji="➕" onClick={() => setMenuOpen(false)} />
                       <MenuItem href="/messages" label="Messages" emoji="💬" badge={unread} onClick={() => setMenuOpen(false)} />
                       <MenuItem href="/settings" label="Settings" emoji="⚙️" onClick={() => setMenuOpen(false)} />
                       {(() => {
