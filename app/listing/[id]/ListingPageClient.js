@@ -173,7 +173,7 @@ function SellerOfferCard({ offer, onUpdate, onSetListing }) {
   )
 }
 
-function BuyerTradePanel({ myOffer, listing, seller, listingId, copiedId, setCopiedId, handleBuyerConfirm, setMyOffer, setOfferSent, setOfferMessage, setOfferPrice }) {
+function BuyerTradePanel({ myOffer, listing, seller, listingId, copiedId, setCopiedId, handleBuyerConfirm, setMyOffer, setOfferSent, setOfferMessage, setOfferPrice, confirmError, setConfirmError }) {
   if (!myOffer) return null
   const isTradeType = listing?.type === 'trade'
 
@@ -237,10 +237,15 @@ function BuyerTradePanel({ myOffer, listing, seller, listingId, copiedId, setCop
         </div>
       )}
 
-      <button onClick={handleBuyerConfirm} disabled={myOffer.buyer_confirmed}
+      <button onClick={() => { setConfirmError && setConfirmError(''); handleBuyerConfirm() }} disabled={myOffer.buyer_confirmed}
         style={{ width: '100%', padding: '9px 0', borderRadius: 8, border: 'none', cursor: myOffer.buyer_confirmed ? 'default' : 'pointer', background: myOffer.buyer_confirmed ? 'rgba(74,222,128,0.15)' : '#16a34a', color: myOffer.buyer_confirmed ? '#4ade80' : '#fff', fontSize: 12, fontWeight: 700 }}>
         {myOffer.buyer_confirmed ? '✓ You Confirmed' : isTradeType ? '🔄 I Received My Item' : '📦 I Received My Item'}
       </button>
+      {confirmError && (
+        <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#f87171', marginTop: 8 }}>
+          ⚠️ {confirmError}
+        </div>
+      )}
     </div>
   )
 
@@ -279,11 +284,14 @@ export default function ListingPageClient({ id: idProp }) {
   const [offerPrice, setOfferPrice] = useState('')
   const [offerLoading, setOfferLoading] = useState(false)
   const [offerSent, setOfferSent] = useState(false)
+  const [offerError, setOfferError] = useState('')
 
   const [reviewRating, setReviewRating] = useState(5)
   const [reviewComment, setReviewComment] = useState('')
   const [reviewLoading, setReviewLoading] = useState(false)
   const [reviewSuccess, setReviewSuccess] = useState(false)
+  const [reviewError, setReviewError] = useState('')
+  const [confirmError, setConfirmError] = useState('')
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
@@ -332,6 +340,12 @@ export default function ListingPageClient({ id: idProp }) {
   const rarity = listing ? getRarityStyle(listing.rarity) : getRarityStyle('common')
   const seller = listing?.profiles
   const isSeller = user && seller && user.id === seller.id
+
+  // VIP / Owner glow — mirrors ListingCard behaviour
+  const sellerBadgesForGlow = seller?.badges?.length ? seller.badges
+    : seller?.badge ? [seller.badge]
+    : []
+  const isVip = sellerBadgesForGlow.includes('VIP') || sellerBadgesForGlow.includes('Owner')
   // Allow reviewing the same seller multiple times (different listings)
   // but not the same listing twice
   const alreadyReviewedThisListing = reviews.some(r => r.reviewer_id === user?.id)
@@ -341,9 +355,10 @@ export default function ListingPageClient({ id: idProp }) {
   const handleSendOffer = async () => {
     if (!user) { router.push('/auth/login'); return }
     if (!offerMessage.trim()) return
-    if (!isClean(offerMessage)) { alert('Your message contains inappropriate language.'); return }
+    if (!isClean(offerMessage)) { setOfferError('Your message contains inappropriate language.'); return }
     const rl = checkRateLimit('offer')
-    if (rl) { alert(rl); return }
+    if (rl) { setOfferError(rl); return }
+    setOfferError('')
     setOfferLoading(true)
     try {
       const tr = await createTradeRequest({
@@ -354,8 +369,8 @@ export default function ListingPageClient({ id: idProp }) {
       setMyOffer(tr)
       setOfferSent(true)
     } catch (err) {
-      if (err.message?.includes('unique')) alert('You already have an active offer on this listing.')
-      else alert('Failed to send offer. Please try again.')
+      if (err.message?.includes('unique')) setOfferError('You already have an active offer on this listing.')
+      else setOfferError('Failed to send offer. Please try again.')
     } finally {
       setOfferLoading(false)
     }
@@ -363,7 +378,8 @@ export default function ListingPageClient({ id: idProp }) {
 
   const handleReview = async () => {
     if (!user) { router.push('/auth/login'); return }
-    if (!isClean(reviewComment)) { alert('Your review contains inappropriate language.'); return }
+    if (!isClean(reviewComment)) { setReviewError('Your review contains inappropriate language.'); return }
+    setReviewError('')
     setReviewLoading(true)
     try {
       await createReview({ reviewerId: user.id, sellerId: seller.id, listingId: id, rating: reviewRating, comment: reviewComment })
@@ -372,7 +388,7 @@ export default function ListingPageClient({ id: idProp }) {
       setReviews(refreshedReviews)
       setListing(refreshedListing)
     } catch (err) {
-      alert(err.message || 'Failed to post review.')
+      setReviewError(err.message || 'Failed to post review.')
     } finally {
       setReviewLoading(false)
     }
@@ -392,7 +408,7 @@ export default function ListingPageClient({ id: idProp }) {
         })
       }
       setMyOffer(updated)
-    } catch { alert('Failed to confirm.') }
+    } catch { setConfirmError('Failed to confirm trade. Please refresh and try again.') }
   }
 
 
@@ -471,7 +487,21 @@ export default function ListingPageClient({ id: idProp }) {
           </div>
         )}
 
-        <div style={{ background: '#0f0f18', border: `1px solid ${rarity.border}44`, borderRadius: 16, overflow: 'hidden', boxShadow: `0 0 40px ${rarity.glow}66, 0 20px 60px rgba(0,0,0,0.5)` }}>
+        <div style={{
+            background: '#0f0f18',
+            border: listing?.promoted
+              ? '2px solid rgba(59,130,246,0.7)'
+              : isVip
+              ? '2px solid rgba(245,158,11,0.6)'
+              : `1px solid ${rarity.border}44`,
+            borderRadius: 16,
+            overflow: 'hidden',
+            boxShadow: listing?.promoted
+              ? `0 0 40px rgba(59,130,246,0.35), 0 20px 60px rgba(0,0,0,0.5)`
+              : isVip
+              ? `0 0 40px rgba(245,158,11,0.3), inset 0 0 0 1px rgba(245,158,11,0.1), 0 20px 60px rgba(0,0,0,0.5)`
+              : `0 0 40px ${rarity.glow}66, 0 20px 60px rgba(0,0,0,0.5)`,
+          }}>
 
           {/* Rarity accent bar — matches card design */}
           <div style={{ height: 4, background: `linear-gradient(90deg, ${rarity.border}, ${rarity.border}88, transparent)` }} />
@@ -627,7 +657,7 @@ export default function ListingPageClient({ id: idProp }) {
                     )}
 
                     {/* BUYER: show their offer status */}
-                    {!isSeller && <BuyerTradePanel myOffer={myOffer} listing={listing} seller={seller} listingId={id} copiedId={copiedId} setCopiedId={setCopiedId} handleBuyerConfirm={handleBuyerConfirm} setMyOffer={setMyOffer} setOfferSent={setOfferSent} setOfferMessage={setOfferMessage} setOfferPrice={setOfferPrice} />}
+                    {!isSeller && <BuyerTradePanel myOffer={myOffer} listing={listing} seller={seller} listingId={id} copiedId={copiedId} setCopiedId={setCopiedId} handleBuyerConfirm={handleBuyerConfirm} setMyOffer={setMyOffer} setOfferSent={setOfferSent} setOfferMessage={setOfferMessage} setOfferPrice={setOfferPrice} confirmError={confirmError} setConfirmError={setConfirmError} />}
 
                     {/* REVIEW FORM — shows in details tab after completed trade */}
                     {!isSeller && user && myOffer?.status === 'completed' && (
@@ -636,7 +666,12 @@ export default function ListingPageClient({ id: idProp }) {
                           <div style={{ background: 'rgba(74,222,128,0.05)', border: '1px solid rgba(74,222,128,0.15)', borderRadius: 10, padding: 14 }}>
                             <div style={{ fontSize: 13, fontWeight: 700, color: '#9ca3af', marginBottom: 10 }}>⭐ Leave a Review for {seller?.username}</div>
                             <div style={{ marginBottom: 10 }}><StarRating rating={reviewRating} size={24} interactive onChange={setReviewRating} /></div>
-                            <textarea rows={3} placeholder="How was the trade? Other buyers will see this." value={reviewComment} onChange={e => setReviewComment(e.target.value)} style={{ marginBottom: 10, resize: 'vertical' }} />
+                            <textarea rows={3} placeholder="How was the trade? Other buyers will see this." value={reviewComment} onChange={e => { setReviewComment(e.target.value); setReviewError('') }} style={{ marginBottom: reviewError ? 8 : 10, resize: 'vertical' }} />
+                            {reviewError && (
+                              <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#f87171', marginBottom: 10 }}>
+                                ⚠️ {reviewError}
+                              </div>
+                            )}
                             <button onClick={handleReview} disabled={reviewLoading} className="btn-primary" style={{ fontSize: 13, padding: '10px 20px' }}>
                               {reviewLoading ? 'Posting...' : 'Post Review'}
                             </button>
@@ -676,7 +711,12 @@ export default function ListingPageClient({ id: idProp }) {
                                 </div>
                               </div>
                             )}
-                            <textarea rows={3} placeholder={listing.type === 'trade' ? 'What are you offering to trade?' : "Hi! I'd like to buy this..."} value={offerMessage} onChange={e => setOfferMessage(e.target.value)} style={{ marginBottom: 10, resize: 'vertical' }} />
+                            <textarea rows={3} placeholder={listing.type === 'trade' ? 'What are you offering to trade?' : "Hi! I'd like to buy this..."} value={offerMessage} onChange={e => { setOfferMessage(e.target.value); setOfferError('') }} style={{ marginBottom: offerError ? 8 : 10, resize: 'vertical' }} />
+                            {offerError && (
+                              <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#f87171', marginBottom: 10 }}>
+                                ⚠️ {offerError}
+                              </div>
+                            )}
                             <button onClick={handleSendOffer} disabled={offerLoading || !offerMessage.trim()} className="btn-primary" style={{ width: '100%' }}>
                               {offerLoading ? 'Sending...' : listing.type === 'trade' ? '🔄 Send Trade Offer' : '💰 Send Offer'}
                             </button>

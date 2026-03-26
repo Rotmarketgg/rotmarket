@@ -22,11 +22,13 @@ function MessagesInner() {
   const [newMsg, setNewMsg] = useState('')
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
+  const [sendError, setSendError] = useState('')
   const [inboxTab, setInboxTab] = useState('active')
   const [disputeOpen, setDisputeOpen] = useState(false)
   const [disputeForm, setDisputeForm] = useState({ reason: '', details: '' })
   const [disputeLoading, setDisputeLoading] = useState(false)
   const [disputeSuccess, setDisputeSuccess] = useState(false)
+  const [disputeError, setDisputeError] = useState('')
   const [mobileView, setMobileView] = useState('list') // 'list' | 'chat'
   const [msgHasMore, setMsgHasMore] = useState(false)
   const [msgCursor, setMsgCursor] = useState(null)
@@ -160,7 +162,8 @@ function MessagesInner() {
 
   const handleSend = async () => {
     if (!newMsg.trim() || !activeConvo || !user || sending) return
-    if (!isClean(newMsg)) { alert('Your message contains inappropriate language.'); return }
+    if (!isClean(newMsg)) { setSendError('Your message contains inappropriate language.'); return }
+    setSendError('')
     setSending(true)
     const otherId = activeConvo.sender_id === user.id ? activeConvo.receiver_id : activeConvo.sender_id
     try {
@@ -171,7 +174,7 @@ function MessagesInner() {
       setMessages(prev => [...prev, msg])
       setNewMsg('')
       scrollToBottom()
-    } catch { alert('Failed to send message.') }
+    } catch { setSendError('Failed to send message. Please try again.') }
     finally { setSending(false) }
   }
 
@@ -195,9 +198,10 @@ function MessagesInner() {
   }
 
   const handleOpenDispute = async () => {
-    if (!disputeForm.reason) { alert('Please select a reason.'); return }
+    if (!disputeForm.reason) { setDisputeError('Please select a reason.'); return }
     const rl = checkRateLimit('dispute')
-    if (rl) { alert(rl); return }
+    if (rl) { setDisputeError(rl); return }
+    setDisputeError('')
     setDisputeLoading(true)
     try {
       const otherId = activeConvo.sender_id === user.id ? activeConvo.receiver_id : activeConvo.sender_id
@@ -211,7 +215,7 @@ function MessagesInner() {
       setDisputeSuccess(true)
       setDisputeOpen(false)
       setDisputeForm({ reason: '', details: '' })
-    } catch (err) { alert('Failed to open dispute: ' + err.message) }
+    } catch (err) { setDisputeError('Failed to open dispute: ' + (err.message || 'Please try again.')) }
     finally { setDisputeLoading(false) }
   }
 
@@ -473,8 +477,13 @@ function MessagesInner() {
                     </div>
                     <textarea rows={2} placeholder="Describe the issue in detail (screenshots, dates, what happened)..."
                       value={disputeForm.details}
-                      onChange={e => setDisputeForm(f => ({ ...f, details: e.target.value }))}
+                      onChange={e => { setDisputeForm(f => ({ ...f, details: e.target.value })); setDisputeError('') }}
                       style={{ marginBottom: 8, resize: 'vertical', fontSize: 12 }} />
+                    {disputeError && (
+                      <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 6, padding: '7px 10px', fontSize: 12, color: '#f87171', marginBottom: 8 }}>
+                        ⚠️ {disputeError}
+                      </div>
+                    )}
                     <div style={{ display: 'flex', gap: 8 }}>
                       <button onClick={handleOpenDispute} disabled={disputeLoading || !disputeForm.reason} style={{
                         padding: '7px 16px', borderRadius: 6, border: 'none', cursor: 'pointer',
@@ -482,7 +491,7 @@ function MessagesInner() {
                         color: !disputeForm.reason ? '#6b7280' : '#fff',
                         fontSize: 12, fontWeight: 700,
                       }}>{disputeLoading ? 'Submitting...' : 'Submit Dispute'}</button>
-                      <button onClick={() => { setDisputeOpen(false); setDisputeForm({ reason: '', details: '' }) }} style={{ padding: '7px 14px', borderRadius: 6, border: '1px solid #2d2d3f', background: 'transparent', color: '#9ca3af', fontSize: 12, cursor: 'pointer' }}>Cancel</button>
+                      <button onClick={() => { setDisputeOpen(false); setDisputeForm({ reason: '', details: '' }); setDisputeError('') }} style={{ padding: '7px 14px', borderRadius: 6, border: '1px solid #2d2d3f', background: 'transparent', color: '#9ca3af', fontSize: 12, cursor: 'pointer' }}>Cancel</button>
                     </div>
                   </div>
                 )}
@@ -582,19 +591,28 @@ function MessagesInner() {
                 </div>
 
                 {/* Input */}
-                <div style={{ padding: '12px 16px', borderTop: '1px solid #1f2937', background: '#0d0d14', display: 'flex', gap: 10 }}>
-                  <input
-                    ref={inputRef}
-                    type="text"
-                    placeholder="Type a message..."
-                    value={newMsg}
-                    onChange={e => setNewMsg(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
-                    style={{ flex: 1, background: '#111118', fontSize: 14 }}
-                  />
-                  <button onClick={handleSend} disabled={!newMsg.trim() || sending} className="btn-primary" style={{ padding: '10px 20px', fontSize: 13, flexShrink: 0 }}>
-                    {sending ? '...' : 'Send'}
-                  </button>
+                <div style={{ borderTop: '1px solid #1f2937', background: '#0d0d14' }}>
+                  {sendError && (
+                    <div style={{ padding: '8px 16px 0', fontSize: 12, color: '#f87171', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span>⚠️</span>
+                      <span>{sendError}</span>
+                      <button onClick={() => setSendError('')} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: 14, lineHeight: 1 }}>×</button>
+                    </div>
+                  )}
+                  <div style={{ padding: '12px 16px', display: 'flex', gap: 10 }}>
+                    <input
+                      ref={inputRef}
+                      type="text"
+                      placeholder="Type a message..."
+                      value={newMsg}
+                      onChange={e => { setNewMsg(e.target.value); if (sendError) setSendError('') }}
+                      onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
+                      style={{ flex: 1, background: '#111118', fontSize: 14 }}
+                    />
+                    <button onClick={handleSend} disabled={!newMsg.trim() || sending} className="btn-primary" style={{ padding: '10px 20px', fontSize: 13, flexShrink: 0 }}>
+                      {sending ? '...' : 'Send'}
+                    </button>
+                  </div>
                 </div>
               </>
             )}

@@ -63,13 +63,13 @@ export default function CreateListingPage() {
   const handleImages = (files) => {
     // Only allow 1 image per listing
     if (images.length >= 1) {
-      alert('Only one image is allowed per listing. Remove the current image first.')
+      setErrors(e => ({ ...e, images: 'Only one image is allowed. Remove the current image first.' }))
       return
     }
     const file = Array.from(files).find(f => f.type.startsWith('image/'))
     if (!file) return
     if (file.size > MAX_IMAGE_SIZE_BYTES) {
-      alert(`File too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximum size is 10 MB.`)
+      setErrors(e => ({ ...e, images: `File too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximum size is 10 MB.` }))
       return
     }
     const reader = new FileReader()
@@ -91,14 +91,20 @@ export default function CreateListingPage() {
     }
     if (Object.keys(errs).length > 0) { setErrors(errs); return }
 
-    // Rate limit is bypassed for VIP, Owner, and Admin/Moderator users
+    // Wait for profile if it hasn't loaded yet (e.g. direct navigation)
+    if (!profile && user) {
+      setErrors({ general: 'Profile still loading — please try again in a moment.' })
+      return
+    }
+
+    // Rate limit is bypassed for VIP, Owner, Admin, and Moderator users
     const profileBadges = profile?.badges?.length ? profile.badges : profile?.badge ? [profile.badge] : []
-    const isPrivileged = profileBadges.some(b => ['Owner', 'VIP', 'Moderator'].includes(b))
+    const isPrivileged = profileBadges.some(b => ['Owner', 'VIP', 'Moderator', 'Admin'].includes(b))
     if (!isPrivileged) {
       const rl = checkRateLimit('listing')
-      if (rl) { alert(rl); return }
+      if (rl) { setErrors({ general: rl }); return }
       const rlDay = checkRateLimit('listing_daily')
-      if (rlDay) { alert(rlDay); return }
+      if (rlDay) { setErrors({ general: rlDay }); return }
     }
     setErrors({})
     setLoading(true)
@@ -139,7 +145,7 @@ export default function CreateListingPage() {
       setSuccess(true)
       setTimeout(() => router.push(`/listing/${listing.id}`), 1200)
     } catch (err) {
-      alert(err.message || 'Failed to create listing. Please try again.')
+      setErrors(e => ({ ...e, general: err.message || 'Failed to create listing. Please try again.' }))
     } finally {
       setLoading(false)
     }
@@ -389,6 +395,13 @@ export default function CreateListingPage() {
           }}>
             ⚠️ By posting, you agree to RotMarket's Terms of Service. Do not list stolen items or misrepresent your item. Violations result in permanent bans.
           </div>
+
+          {/* General / rate-limit errors */}
+          {errors.general && (
+            <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 10, padding: '12px 16px', fontSize: 13, color: '#f87171', fontWeight: 600 }}>
+              ⚠️ {errors.general}
+            </div>
+          )}
 
           {/* Submit */}
           <button

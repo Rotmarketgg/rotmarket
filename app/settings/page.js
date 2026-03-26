@@ -25,6 +25,7 @@ function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
+  const [passwordMsg, setPasswordMsg] = useState({ type: '', text: '' })
   const [avatarPreview, setAvatarPreview] = useState(null)
   const [avatarFile, setAvatarFile] = useState(null)
   const [avatarUploading, setAvatarUploading] = useState(false)
@@ -148,11 +149,15 @@ function SettingsPage() {
   }
 
   const handlePasswordChange = async () => {
+    setPasswordMsg({ type: '', text: '' })
     const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
       redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || window.location.origin}/auth/update-password`,
     })
-    if (!error) alert('Password reset email sent!')
-    else alert('Failed to send reset email.')
+    if (!error) {
+      setPasswordMsg({ type: 'success', text: `Reset link sent to ${user.email} — check your inbox.` })
+    } else {
+      setPasswordMsg({ type: 'error', text: 'Failed to send reset email. Please try again.' })
+    }
   }
 
 
@@ -283,6 +288,17 @@ function SettingsPage() {
                 Send Reset Email
               </button>
             </div>
+            {passwordMsg.text && (
+              <div style={{
+                background: passwordMsg.type === 'success' ? 'rgba(74,222,128,0.1)' : 'rgba(239,68,68,0.1)',
+                border: `1px solid ${passwordMsg.type === 'success' ? 'rgba(74,222,128,0.3)' : 'rgba(239,68,68,0.3)'}`,
+                borderRadius: 8, padding: '10px 14px', fontSize: 13,
+                color: passwordMsg.type === 'success' ? '#4ade80' : '#f87171',
+                marginTop: 4,
+              }}>
+                {passwordMsg.type === 'success' ? '✓' : '⚠️'} {passwordMsg.text}
+              </div>
+            )}
           </Section>
 
           {error && (

@@ -32,6 +32,7 @@ export default function ProfilePageClient({ username: usernameProp, initialProfi
   const [tab, setTab] = useState('listings')
   const [notFound, setNotFound] = useState(false)
   const [listingOffers, setListingOffers] = useState({}) // listingId -> pending offer count
+  const [renewError, setRenewError] = useState('')
 
   const load = useCallback(async (silent = false, skipProfileFetch = false) => {
     if (!silent) setLoading(true)
@@ -146,7 +147,7 @@ export default function ProfilePageClient({ username: usernameProp, initialProfi
         : l
       ))
     } catch (err) {
-      alert('Failed to renew: ' + err.message)
+      setRenewError('Failed to renew listing: ' + (err.message || 'Please try again.'))
     }
   }
 
@@ -541,6 +542,12 @@ export default function ProfilePageClient({ username: usernameProp, initialProfi
                       ⏰ These listings have expired. Renew them to make them active again for another{' '}
                       {primaryBadgeName === 'VIP' || primaryBadgeName === 'Owner' ? '30' : primaryBadgeName === 'Verified Trader' ? '14' : '7'} days.
                     </div>
+                    {renewError && (
+                      <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#f87171', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span>⚠️ {renewError}</span>
+                        <button onClick={() => setRenewError('')} style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: '0 4px' }}>×</button>
+                      </div>
+                    )}
                     <div className="listing-grid">
                       {expiredListings.map(l => (
                         <div key={l.id} style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
