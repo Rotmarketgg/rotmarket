@@ -21,7 +21,7 @@ export default function ListingCard({ listing }) {
 
   const primaryBadge = getPrimaryBadge(badges)
   const primaryMeta = primaryBadge ? BADGE_META[primaryBadge] : null
-  const isVip = primaryBadge === 'VIP' || primaryBadge === 'Owner'
+  const isVip = badges.includes('VIP') || badges.includes('Owner')
   const isVerified = badges.includes('Verified Trader')
 
   const typeKey = listing.status === 'sold' ? 'sold' : listing.type

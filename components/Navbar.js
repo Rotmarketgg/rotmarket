@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
 import { supabase, getProfile, getUnreadCount } from '@/lib/supabase'
 import { getInitial, withTimeout } from '@/lib/utils'
+import { BADGE_META, getPrimaryBadge } from '@/lib/constants'
 
 // Cache profile in sessionStorage to avoid re-fetching on every page load
 // This prevents the avatar from re-fetching its URL on every navigation
@@ -336,6 +337,7 @@ export default function Navbar() {
                     display: 'flex', alignItems: 'center', gap: 5,
                     transition: 'all 0.15s',
                   }}>
+                    <span className="mobile-only" style={{ fontSize: 16 }}>💬</span>
                     <span className="desktop-nav" style={{ fontSize: 13, fontWeight: 700, color: isActive('/messages') ? '#4ade80' : '#d1d5db' }}>Inbox</span>
                   </div>
                   {unread > 0 && (
@@ -394,7 +396,10 @@ export default function Navbar() {
                             </div>
                             <div style={{ fontSize: 10, color: '#6b7280', marginTop: 1 }}>
                               {profile?.trade_count || 0} trades
-                              {profile?.badge && <span style={{ marginLeft: 6, color: '#4ade80' }}>· {profile.badge}</span>}
+                              {(() => {
+                                const b = profile?.badges?.length ? getPrimaryBadge(profile.badges) : profile?.badge
+                                return b ? <span style={{ marginLeft: 6, color: '#4ade80' }}>· {b}</span> : null
+                              })()}
                             </div>
                           </div>
                         </div>

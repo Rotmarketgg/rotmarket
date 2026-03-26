@@ -32,9 +32,13 @@ export default function HomePage() {
 
   useEffect(() => { fetchListings() }, [fetchListings])
 
-  // Silent refresh on tab return
+  // Silent refresh on tab return — debounced to 30s to avoid hammering storage CDN
   useEffect(() => {
+    let lastRefresh = 0
     const onVisible = async () => {
+      const now = Date.now()
+      if (now - lastRefresh < 30000) return
+      lastRefresh = now
       try { await fetchListings(true) }
       catch { setTimeout(() => fetchListings(true), 2000) }
     }
