@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import Navbar from '@/components/Navbar'
 import { getSessionUser, getConversations, getMessagesPaginated, sendMessage, getProfile, getUnreadCount, supabase } from '@/lib/supabase'
 import { timeAgo, getInitial, checkRateLimit, withTimeout } from '@/lib/utils'
@@ -320,7 +321,7 @@ function MessagesInner() {
                         fontSize: 16, fontWeight: 900, color: '#0a0a0f', position: 'relative',
                       }}>
                         {other?.avatar_url
-                          ? <img src={other.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }} />
+                          ? <Image src={other.avatar_url} alt="" fill sizes="42px" style={{ objectFit: 'cover', pointerEvents: 'none' }} />
                           : getInitial(other?.username || '?')
                         }
                         {isUnread && (
@@ -407,9 +408,10 @@ function MessagesInner() {
                         background: otherUser?.avatar_url ? 'transparent' : 'linear-gradient(135deg, #4ade80, #22c55e)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         fontSize: 15, fontWeight: 900, color: '#0a0a0f',
+                        position: 'relative',
                       }}>
                         {otherUser?.avatar_url
-                          ? <img src={otherUser.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }} />
+                          ? <Image src={otherUser.avatar_url} alt="" fill sizes="38px" style={{ objectFit: 'cover', pointerEvents: 'none' }} />
                           : getInitial(otherUser?.username || '?')
                         }
                       </div>
@@ -549,9 +551,10 @@ function MessagesInner() {
                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                                 fontSize: 11, fontWeight: 900, color: '#0a0a0f',
                                 visibility: isLast ? 'visible' : 'hidden',
+                                position: 'relative',
                               }}>
                                 {otherUser?.avatar_url
-                                  ? <img src={otherUser.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }} />
+                                  ? <Image src={otherUser.avatar_url} alt="" fill sizes="28px" style={{ objectFit: 'cover', pointerEvents: 'none' }} />
                                   : getInitial(otherUser?.username || '?')
                                 }
                               </div>

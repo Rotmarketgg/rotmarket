@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import Navbar from '@/components/Navbar'
 import StarRating from '@/components/StarRating'
 import ReportButton from '@/components/ReportButton'
@@ -105,8 +106,9 @@ function SellerOfferCard({ offer, onUpdate, onSetListing }) {
           background: buyer?.avatar_url ? 'transparent' : 'linear-gradient(135deg, #4ade80, #22c55e)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 12, fontWeight: 900, color: '#0a0a0f',
+          position: 'relative',
         }}>
-          {buyer?.avatar_url ? <img src={buyer.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : getInitial(buyer?.username)}
+          {buyer?.avatar_url ? <Image src={buyer.avatar_url} alt="" fill sizes="30px" style={{ objectFit: 'cover' }} /> : getInitial(buyer?.username)}
         </div>
         <div style={{ flex: 1 }}>
           <Link href={`/profile/${buyer?.username}`} style={{ fontSize: 13, fontWeight: 700, color: '#f9fafb', textDecoration: 'none' }}>
@@ -451,8 +453,8 @@ export default function ListingPageClient({ id: idProp }) {
           display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, cursor: 'zoom-out',
         }}>
           <div style={{ position: 'relative', maxWidth: '90vw', maxHeight: '90vh' }} onClick={e => e.stopPropagation()}>
-            <img src={listing.images[selectedImage]} alt={listing.title}
-              style={{ maxWidth: '100%', maxHeight: '85vh', objectFit: 'contain', borderRadius: 12, boxShadow: `0 0 60px ${rarity.glow}`, pointerEvents: 'none' }} />
+            <Image src={listing.images[selectedImage]} alt={listing.title} width={1200} height={1200} sizes="90vw"
+              style={{ maxWidth: '100%', maxHeight: '85vh', width: 'auto', height: 'auto', objectFit: 'contain', borderRadius: 12, boxShadow: `0 0 60px ${rarity.glow}`, pointerEvents: 'none' }} />
             <button onClick={() => setLightboxOpen(false)} style={{
               position: 'absolute', top: -14, right: -14, width: 32, height: 32, borderRadius: '50%',
               background: '#1f2937', border: '1px solid #2d2d3f', color: '#fff', fontSize: 16,
@@ -464,8 +466,9 @@ export default function ListingPageClient({ id: idProp }) {
                   <div key={i} onClick={() => setSelectedImage(i)} style={{
                     width: 48, height: 48, borderRadius: 6, overflow: 'hidden',
                     border: `2px solid ${selectedImage === i ? rarity.border : '#2d2d3f'}`, cursor: 'pointer',
+                    position: 'relative',
                   }}>
-                    <img src={img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }} />
+                    <Image src={img} alt="" fill sizes="48px" style={{ objectFit: 'cover', pointerEvents: 'none' }} />
                   </div>
                 ))}
               </div>
@@ -536,7 +539,7 @@ export default function ListingPageClient({ id: idProp }) {
                 outline: `1px solid ${rarity.border}55`,
               }}>
                 {listing.images?.[selectedImage]
-                  ? <img src={listing.images[selectedImage]} alt={listing.title} style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }} />
+                  ? <Image src={listing.images[selectedImage]} alt={listing.title} fill sizes="(max-width: 768px) 100vw, 240px" style={{ objectFit: 'cover', pointerEvents: 'none' }} />
                   : '🎮'
                 }
                 {/* Bottom gradient fade */}
@@ -550,8 +553,8 @@ export default function ListingPageClient({ id: idProp }) {
               {listing.images?.length > 1 && (
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center' }}>
                   {listing.images.map((img, i) => (
-                    <div key={i} onClick={() => setSelectedImage(i)} style={{ width: 36, height: 36, borderRadius: 6, overflow: 'hidden', border: `2px solid ${selectedImage === i ? rarity.border : '#2d2d3f'}`, cursor: 'pointer' }}>
-                      <img src={img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }} />
+                    <div key={i} onClick={() => setSelectedImage(i)} style={{ width: 36, height: 36, borderRadius: 6, overflow: 'hidden', border: `2px solid ${selectedImage === i ? rarity.border : '#2d2d3f'}`, cursor: 'pointer', position: 'relative' }}>
+                      <Image src={img} alt="" fill sizes="36px" style={{ objectFit: 'cover', pointerEvents: 'none' }} />
                     </div>
                   ))}
                 </div>
@@ -736,8 +739,8 @@ export default function ListingPageClient({ id: idProp }) {
                         onMouseLeave={e => e.currentTarget.style.borderColor = '#1f2937'}
                       >
                         {/* Avatar */}
-                        <div style={{ width: 52, height: 52, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, background: seller.avatar_url ? 'transparent' : 'linear-gradient(135deg, #4ade80, #22c55e)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 700, color: '#0a0a0f', fontFamily: '"DM Sans", system-ui, sans-serif' }}>
-                          {seller.avatar_url ? <img src={seller.avatar_url} alt={seller.username} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : getInitial(seller.username)}
+                        <div style={{ width: 52, height: 52, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, background: seller.avatar_url ? 'transparent' : 'linear-gradient(135deg, #4ade80, #22c55e)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 700, color: '#0a0a0f', fontFamily: '"DM Sans", system-ui, sans-serif', position: 'relative' }}>
+                          {seller.avatar_url ? <Image src={seller.avatar_url} alt={seller.username} fill sizes="52px" style={{ objectFit: 'cover' }} /> : getInitial(seller.username)}
                         </div>
 
                         {/* Name + game usernames */}

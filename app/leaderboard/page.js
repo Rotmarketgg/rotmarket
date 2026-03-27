@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import Navbar from '@/components/Navbar'
 import { supabase } from '@/lib/supabase'
 import { getInitial, withTimeout } from '@/lib/utils'
@@ -152,9 +153,10 @@ export default function LeaderboardPage() {
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           fontSize: 20, fontWeight: 900, color: MEDAL_COLORS[rank],
                           border: `2px solid ${MEDAL_COLORS[rank]}40`,
+                          position: 'relative',
                         }}>
                           {trader.avatar_url
-                            ? <img src={trader.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }} />
+                            ? <Image src={trader.avatar_url} alt="" fill sizes="52px" style={{ objectFit: 'cover', pointerEvents: 'none' }} />
                             : getInitial(trader.username)
                           }
                         </div>
@@ -212,9 +214,10 @@ export default function LeaderboardPage() {
                         background: trader.avatar_url ? 'transparent' : 'linear-gradient(135deg, #4ade80, #22c55e)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         fontSize: 15, fontWeight: 900, color: '#0a0a0f',
+                        position: 'relative',
                       }}>
                         {trader.avatar_url
-                          ? <img src={trader.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }} />
+                          ? <Image src={trader.avatar_url} alt="" fill sizes="38px" style={{ objectFit: 'cover', pointerEvents: 'none' }} />
                           : getInitial(trader.username)
                         }
                       </div>

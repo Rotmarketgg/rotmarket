@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { useRouter, usePathname } from 'next/navigation'
 import { supabase, getProfile, getUnreadCount } from '@/lib/supabase'
 import { getInitial, withTimeout } from '@/lib/utils'
@@ -363,9 +364,10 @@ export default function Navbar() {
                     fontSize: 18, fontWeight: 900, color: '#0a0a0f',
                     fontFamily: 'var(--font-display)', padding: 0,
                     transition: 'border-color 0.15s', flexShrink: 0,
+                    position: 'relative',
                   }}>
                     {profile?.avatar_url
-                      ? <img src={profile.avatar_url} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }} />
+                      ? <Image src={profile.avatar_url} alt="avatar" fill sizes="42px" style={{ objectFit: 'cover', pointerEvents: 'none' }} />
                       : getInitial(profile?.username || user.email)
                     }
                   </button>
@@ -384,9 +386,10 @@ export default function Navbar() {
                             background: profile?.avatar_url ? 'transparent' : 'linear-gradient(135deg, #4ade80, #22c55e)',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             fontSize: 13, fontWeight: 900, color: '#0a0a0f',
+                            position: 'relative',
                           }}>
                             {profile?.avatar_url
-                              ? <img src={profile.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }} />
+                              ? <Image src={profile.avatar_url} alt="" fill sizes="34px" style={{ objectFit: 'cover', pointerEvents: 'none' }} />
                               : getInitial(profile?.username || user.email)
                             }
                           </div>

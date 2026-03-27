@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { getRarityStyle, timeAgo, formatPrice, getInitial } from '@/lib/utils'
 import { BADGE_META, getPrimaryBadge } from '@/lib/constants'
 
@@ -86,7 +87,7 @@ export default function ListingCard({ listing }) {
           flexShrink: 0, overflow: 'hidden',
         }}>
           {hasImage
-            ? <img src={listing.images[0]} alt={listing.title} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+            ? <Image src={listing.images[0]} alt={listing.title} fill sizes="(max-width: 768px) 100vw, 400px" style={{ objectFit: 'cover', display: 'block' }} />
             : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 56, opacity: 0.7 }}>🎮</div>
           }
 
@@ -161,9 +162,10 @@ export default function ListingCard({ listing }) {
                 fontSize: 9, fontWeight: 900, color: '#fff',
                 outline: primaryMeta ? `1.5px solid ${primaryMeta.color}` : 'none',
                 outlineOffset: '1px',
+                position: 'relative',
               }}>
                 {profile?.avatar_url
-                  ? <img src={profile.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ? <Image src={profile.avatar_url} alt="" fill sizes="22px" style={{ objectFit: 'cover' }} />
                   : getInitial(profile?.username)
                 }
               </div>
