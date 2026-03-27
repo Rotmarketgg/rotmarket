@@ -4,8 +4,7 @@ import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import Navbar from '@/components/Navbar'
-import { getSessionUser, getConversations, getMessagesPaginated, sendMessage, getProfile, getUnreadCount, supabase } from '@/lib/supabase'
+import { getSessionUser, getConversations, getMessagesPaginated, sendMessage, getUnreadCount, supabase } from '@/lib/supabase'
 import { timeAgo, getInitial, checkRateLimit, withTimeout } from '@/lib/utils'
 import { isClean } from '@/lib/profanity'
 
@@ -16,7 +15,6 @@ function MessagesInner() {
   const inputRef = useRef(null)
 
   const [user, setUser] = useState(null)
-  const [profile, setProfile] = useState(null)
   const [conversations, setConversations] = useState([])
   const [activeConvo, setActiveConvo] = useState(null)
   const [messages, setMessages] = useState([])
@@ -43,11 +41,7 @@ function MessagesInner() {
       const u = await getSessionUser()
       if (!u) { router.push('/auth/login'); return }
       setUser(u)
-      const [p, convos] = await withTimeout(Promise.all([
-        getProfile(u.id),
-        getConversations(u.id),
-      ]))
-      setProfile(p)
+      const convos = await withTimeout(getConversations(u.id))
       setConversations(convos || [])
       const targetUsername = searchParams.get('user')
       if (targetUsername && convos?.length > 0) {
@@ -251,7 +245,6 @@ function MessagesInner() {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <Navbar />
       <div style={{ flex: 1, maxWidth: 1100, width: '100%', margin: '0 auto', padding: '20px 16px 32px', display: 'flex', flexDirection: 'column' }}>
 
         <div style={{

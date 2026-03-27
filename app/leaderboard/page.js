@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import Navbar from '@/components/Navbar'
 import { supabase } from '@/lib/supabase'
 import { getInitial, withTimeout } from '@/lib/utils'
 import { BADGE_META, BADGE_HIERARCHY, getPrimaryBadge } from '@/lib/constants'
@@ -78,7 +77,6 @@ export default function LeaderboardPage() {
 
   return (
     <div style={{ minHeight: '100vh' }}>
-      <Navbar />
 
       <div style={{
         background: 'linear-gradient(180deg, rgba(245,158,11,0.06) 0%, transparent 100%)',

@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import Navbar from '@/components/Navbar'
 import StarRating from '@/components/StarRating'
 import ReportButton from '@/components/ReportButton'
 import { getListing, getReviews, getSessionUser, createReview, supabase } from '@/lib/supabase'
@@ -424,7 +423,7 @@ export default function ListingPageClient({ id: idProp, initialListing = null })
   // ─── LOADING / ERROR ─────────────────────────────────────────
 
   if (loading) return (
-    <div style={{ minHeight: '100vh' }}><Navbar />
+    <div style={{ minHeight: '100vh' }}>
       <div style={{ maxWidth: 900, margin: '40px auto', padding: '0 16px' }}>
         <div className="skeleton" style={{ height: 500, borderRadius: 16 }} />
       </div>
@@ -432,7 +431,7 @@ export default function ListingPageClient({ id: idProp, initialListing = null })
   )
 
   if (error || !listing) return (
-    <div style={{ minHeight: '100vh' }}><Navbar />
+    <div style={{ minHeight: '100vh' }}>
       <div style={{ textAlign: 'center', padding: '100px 24px' }}>
         <div style={{ fontSize: 48, marginBottom: 16 }}>😵</div>
         <h2 style={{ color: '#f9fafb', marginBottom: 8 }}>Listing Not Found</h2>
@@ -445,7 +444,6 @@ export default function ListingPageClient({ id: idProp, initialListing = null })
 
   return (
     <div style={{ minHeight: '100vh' }}>
-      <Navbar />
 
       {/* Lightbox */}
       {lightboxOpen && listing.images?.[selectedImage] && (

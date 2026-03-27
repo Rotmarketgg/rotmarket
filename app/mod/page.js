@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import Navbar from '@/components/Navbar'
 import { getSessionUser, getProfile, supabase } from '@/lib/supabase'
 import { timeAgo, getInitial } from '@/lib/utils'
 
@@ -325,7 +324,6 @@ export default function ModPage() {
 
   if (loading) return (
     <div style={S.page}>
-      <Navbar />
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{ width: 40, height: 40, border: '3px solid #1f2937', borderTopColor: '#60a5fa', borderRadius: '50%', margin: '0 auto 16px', animation: 'spin 0.8s linear infinite' }} />
@@ -338,7 +336,6 @@ export default function ModPage() {
 
   if (unauthorized) return (
     <div style={S.page}>
-      <Navbar />
       <div style={{ textAlign: 'center', padding: '100px 24px' }}>
         <div style={{ fontSize: 52, marginBottom: 16 }}>🚫</div>
         <h2 style={{ color: '#f87171', marginBottom: 8, fontSize: 22 }}>Access Denied</h2>
@@ -356,7 +353,6 @@ export default function ModPage() {
 
   return (
     <div style={S.page}>
-      <Navbar />
 
       {/* Toast */}
       {toast && (

@@ -1,4 +1,3 @@
-import Navbar from '@/components/Navbar'
 
 export const metadata = { title: 'Privacy Policy — RotMarket' }
 
@@ -40,7 +39,6 @@ export default function PrivacyPage() {
 
   return (
     <div style={{ minHeight: '100vh' }}>
-      <Navbar />
       <div style={{ maxWidth: 700, margin: '0 auto', padding: '40px 16px' }}>
         <h1 style={{ margin: '0 0 4px', fontSize: 32, fontWeight: 900, color: '#f9fafb', fontFamily: 'var(--font-display)' }}>
           Privacy Policy

@@ -2,6 +2,7 @@ import { Barlow_Condensed, DM_Sans } from 'next/font/google'
 import './globals.css'
 import BanGate from '@/components/BanGate'
 import Footer from '@/components/Footer'
+import NavbarGate from '@/components/NavbarGate'
 
 const displayFont = Barlow_Condensed({
   subsets: ['latin'],
@@ -52,6 +53,7 @@ export default function RootLayout({ children }) {
         <link rel="dns-prefetch" href={`https://${supabaseHost}`} />
       </head>
       <body className="bg-rot-dark text-white font-body antialiased min-h-screen">
+        <NavbarGate />
         <BanGate>{children}</BanGate>
         <Footer />
       </body>

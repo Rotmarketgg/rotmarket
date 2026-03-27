@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Navbar from '@/components/Navbar'
 import Link from 'next/link'
 
 const TOPICS = [
@@ -44,7 +43,6 @@ export default function ContactPage() {
 
   if (submitted) return (
     <div style={{ minHeight: '100vh' }}>
-      <Navbar />
       <div style={{ maxWidth: 520, margin: '80px auto', padding: '0 16px', textAlign: 'center' }}>
         <div style={{
           background: '#111118', border: '1px solid rgba(74,222,128,0.3)',
@@ -70,7 +68,6 @@ export default function ContactPage() {
 
   return (
     <div style={{ minHeight: '100vh' }}>
-      <Navbar />
       <div style={{ maxWidth: 600, margin: '0 auto', padding: '40px 16px 60px' }}>
 
         {/* Header */}

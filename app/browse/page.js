@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import Navbar from '@/components/Navbar'
 import ListingCard, { ListingCardSkeleton } from '@/components/ListingCard'
 import { getListings } from '@/lib/supabase'
 import { withTimeout } from '@/lib/utils'
@@ -151,7 +150,6 @@ function BrowsePage() {
 
   return (
     <div className="noise" style={{ minHeight: '100vh' }}>
-      <Navbar />
 
       {/* Header */}
       <div style={{

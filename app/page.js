@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { withTimeout } from '@/lib/utils'
-import Navbar from '@/components/Navbar'
 import ListingCard, { ListingCardSkeleton } from '@/components/ListingCard'
 import { getListings } from '@/lib/supabase'
 import Link from 'next/link'
@@ -48,7 +47,6 @@ export default function HomePage() {
 
   return (
     <div className="noise" style={{ minHeight: '100vh' }}>
-      <Navbar />
 
       {/* Hero */}
       <div style={{

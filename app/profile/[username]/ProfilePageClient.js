@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import Navbar from '@/components/Navbar'
 import ListingCard from '@/components/ListingCard'
 import StarRating from '@/components/StarRating'
 import ReportButton from '@/components/ReportButton'
@@ -180,7 +179,6 @@ export default function ProfilePageClient({ username: usernameProp, initialProfi
 
   if (loading) return (
     <div style={{ minHeight: '100vh' }}>
-      <Navbar />
       <div style={{ maxWidth: 1040, margin: '32px auto', padding: '0 16px', display: 'flex', gap: 24, flexWrap: 'wrap' }}>
         <div className="skeleton" style={{ width: 280, height: 480, borderRadius: 16, flexShrink: 0 }} />
         <div style={{ flex: 1, minWidth: 300 }}>
@@ -195,7 +193,6 @@ export default function ProfilePageClient({ username: usernameProp, initialProfi
 
   if (notFound) return (
     <div style={{ minHeight: '100vh' }}>
-      <Navbar />
       <div style={{ textAlign: 'center', padding: '100px 24px' }}>
         <div style={{ fontSize: 56, marginBottom: 16 }}>👤</div>
         <h2 style={{ color: '#f9fafb', margin: '0 0 8px' }}>User Not Found</h2>
@@ -214,7 +211,6 @@ export default function ProfilePageClient({ username: usernameProp, initialProfi
 
   return (
     <div style={{ minHeight: '100vh' }}>
-      <Navbar />
       <div style={{ maxWidth: 1040, margin: '0 auto', padding: '28px 16px 60px' }}>
         <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', flexWrap: 'wrap' }}>
 

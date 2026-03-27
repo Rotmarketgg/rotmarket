@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import Navbar from '@/components/Navbar'
 import { getSessionUser, getProfile } from '@/lib/supabase'
 import { withTimeout } from '@/lib/utils'
 import { getPrimaryBadge } from '@/lib/constants'
@@ -60,7 +59,6 @@ export default function VIPPage() {
 
   return (
     <div style={{ minHeight: '100vh' }}>
-      <Navbar />
 
       {/* Hero */}
       <div style={{

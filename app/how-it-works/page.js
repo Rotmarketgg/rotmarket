@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Navbar from '@/components/Navbar'
 import Link from 'next/link'
 import { getSessionUser } from '@/lib/supabase'
 
@@ -92,7 +91,6 @@ export default function HowItWorksPage() {
 
   return (
     <div style={{ minHeight: '100vh' }}>
-      <Navbar />
 
       {/* Hero */}
       <div style={{

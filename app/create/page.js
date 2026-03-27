@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import Navbar from '@/components/Navbar'
 import { getSessionUser, getProfile, createListing, updateListing, uploadListingImage, supabase } from '@/lib/supabase'
 import { GAMES, RARITIES, PAYMENT_METHODS, LISTING_TYPES } from '@/lib/constants'
 import { validateListing, checkRateLimit, withTimeout } from '@/lib/utils'
@@ -164,7 +163,6 @@ export default function CreateListingPage() {
 
   if (success) return (
     <div style={{ minHeight: '100vh' }}>
-      <Navbar />
       <div style={{ textAlign: 'center', padding: 100 }}>
         <div style={{ fontSize: 64, marginBottom: 16 }}>🎉</div>
         <h2 style={{ color: '#4ade80', margin: '0 0 8px' }}>Listing Created!</h2>
@@ -175,7 +173,6 @@ export default function CreateListingPage() {
 
   return (
     <div style={{ minHeight: '100vh' }}>
-      <Navbar />
       <div style={{ maxWidth: 680, margin: '0 auto', padding: '32px 16px' }}>
 
         <div style={{ marginBottom: 24 }}>

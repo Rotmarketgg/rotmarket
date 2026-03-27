@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
-import Navbar, { clearProfileCache } from '@/components/Navbar'
+import { clearProfileCache } from '@/components/Navbar'
 import { getSessionUser, getProfile, updateProfile, supabase } from '@/lib/supabase'
 import { withTimeout, getInitial } from '@/lib/utils'
 import { validateClean } from '@/lib/profanity'
@@ -163,14 +163,12 @@ function SettingsPage() {
 
   if (loading) return (
     <div style={{ minHeight: '100vh' }}>
-      <Navbar />
       <div style={{ textAlign: 'center', padding: 80, color: '#6b7280' }}>Loading...</div>
     </div>
   )
 
   return (
     <div style={{ minHeight: '100vh' }}>
-      <Navbar />
       <div style={{ maxWidth: 600, margin: '0 auto', padding: '32px 16px 60px' }}>
 
         <div style={{ marginBottom: 28 }}>
