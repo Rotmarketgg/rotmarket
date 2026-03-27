@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -42,9 +42,9 @@ const STATUS_COLORS = {
 }
 
 const DISPUTE_REASON_LABELS = {
-  item_not_received: "📦 Item Not Received",
+  item_not_received: '📦 Item Not Received',
   item_not_as_described: '❌ Not As Described',
-  payment_not_received: "💸 Payment Not Received",
+  payment_not_received: '💸 Payment Not Received',
   fraud: '🚨 Fraud / Scam',
   other: '💬 Other',
 }
@@ -56,7 +56,6 @@ const DISPUTE_STATUS_COLORS = {
   dismissed: '#6b7280',
 }
 
-// VIP duration options
 const VIP_DURATIONS = [
   { label: '1 Month', days: 30 },
   { label: '3 Months', days: 90 },
@@ -82,12 +81,6 @@ const S = {
   card: {
     background: '#111118',
     border: '1px solid #1f2937',
-    borderRadius: 12,
-    padding: '16px 18px',
-  },
-  cardAlert: {
-    background: 'rgba(245,158,11,0.05)',
-    border: '1px solid rgba(245,158,11,0.25)',
     borderRadius: 12,
     padding: '16px 18px',
   },
@@ -193,7 +186,6 @@ export default function AdminPage() {
   const [stats, setStats] = useState({})
   const [toast, setToast] = useState(null)
 
-  // Tab states
   const [disputes, setDisputes] = useState([])
   const [disputesLoading, setDisputesLoading] = useState(false)
   const [reports, setReports] = useState([])
@@ -202,6 +194,9 @@ export default function AdminPage() {
   const [users, setUsers] = useState([])
   const [usersLoading, setUsersLoading] = useState(false)
   const [userSearch, setUserSearch] = useState('')
+  const [showEmails, setShowEmails] = useState(false)
+  const [userEmails, setUserEmails] = useState({}) // { userId: email }
+  const [emailsLoading, setEmailsLoading] = useState(false)
   const [reviews, setReviews] = useState([])
   const [reviewsLoading, setReviewsLoading] = useState(false)
   const [reviewSearch, setReviewSearch] = useState('')
@@ -211,17 +206,16 @@ export default function AdminPage() {
   const [promotionsLoading, setPromotionsLoading] = useState(false)
   const [promoFilter, setPromoFilter] = useState('all')
 
-  // Modals
   const [createModal, setCreateModal] = useState(false)
   const [createForm, setCreateForm] = useState({ email: '', password: '', username: '' })
   const [creating, setCreating] = useState(false)
-  const [promoteModal, setPromoteModal] = useState(null) // { user }
+  const [promoteModal, setPromoteModal] = useState(null)
   const [promoteForm, setPromoteForm] = useState({ role: 'VIP', duration: 30, note: '' })
   const [promoting, setPromoting] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState(null) // { userId, username }
 
   const profileBadges = profile?.badges?.length ? profile.badges : profile?.badge ? [profile.badge] : []
   const isOwner = profileBadges.includes('Owner')
-  const isMod = profileBadges.includes('Moderator')
 
   const showToast = useCallback((msg, type = 'success') => {
     setToast({ msg, type })
@@ -237,7 +231,8 @@ export default function AdminPage() {
         if (!u) { router.push('/auth/login'); return }
         const p = await getProfile(u.id)
         const pBadges = p?.badges?.length ? p.badges : p?.badge ? [p.badge] : []
-        if (!p || !['Owner', 'Moderator'].some(b => pBadges.includes(b))) {
+        // Admin panel = Owner ONLY. Mods get the /mod panel instead.
+        if (!p || !pBadges.includes('Owner')) {
           setUnauthorized(true); setLoading(false); return
         }
         setUser(u)
@@ -259,7 +254,7 @@ export default function AdminPage() {
       if (!u) { router.push('/auth/login'); return }
       const p = await getProfile(u.id)
       const pBadges = p?.badges?.length ? p.badges : p?.badge ? [p.badge] : []
-      if (!p || !['Owner', 'Moderator'].some(b => pBadges.includes(b))) {
+      if (!p || !pBadges.includes('Owner')) {
         setUnauthorized(true); return
       }
       setUser(u)
@@ -270,11 +265,11 @@ export default function AdminPage() {
   }, [router])
 
   useEffect(() => {
-    if (tab === 'users' && isOwner) loadUsers('')
-    if (tab === 'reviews' && isOwner) loadReviews('')
-    if (tab === 'listings' && isOwner) loadListings()
+    if (tab === 'users') loadUsers('')
+    if (tab === 'reviews') loadReviews('')
+    if (tab === 'listings') loadListings()
     if (tab === 'disputes') loadDisputes()
-    if (tab === 'promotions' && isOwner) loadPromotions()
+    if (tab === 'promotions') loadPromotions()
   }, [tab])
 
   // ─── LOADERS ─────────────────────────────────────────────────────
@@ -332,10 +327,33 @@ export default function AdminPage() {
       const { data, error } = await q
       if (error) throw error
       setUsers(data || [])
+      // Clear cached emails when user list refreshes
+      if (!showEmails) setUserEmails({})
     } catch (err) {
       showToast('Error loading users: ' + err.message, 'error')
     } finally {
       setUsersLoading(false)
+    }
+  }
+
+  // Loads email addresses via SECURITY DEFINER RPC (Owner only)
+  async function loadEmails(search) {
+    setEmailsLoading(true)
+    try {
+      const { data, error } = await supabase.rpc('admin_get_users_with_email', {
+        search_term: search || null
+      })
+      if (error) throw error
+      const map = {}
+      for (const row of data || []) {
+        map[row.id] = { email: row.email, lastSignIn: row.last_sign_in_at, confirmed: row.confirmed_at }
+      }
+      setUserEmails(map)
+      setShowEmails(true)
+    } catch (err) {
+      showToast('Failed to load emails: ' + err.message + ' — Run SQL migration #4 in SUPABASE_SQL.md', 'error')
+    } finally {
+      setEmailsLoading(false)
     }
   }
 
@@ -397,14 +415,15 @@ export default function AdminPage() {
     }
   }
 
-  // Load promotions — reads from user_promotions table
-  // Schema expected: id, user_id, role ('VIP'|'Moderator'|'Verified Trader'), granted_by, granted_at, expires_at, active, note, profiles(username, avatar_url)
+  // FIX: use named FK hint to resolve the ambiguous relationship error
+  // user_promotions has 3 FK columns → profiles (user_id, granted_by, revoked_by)
+  // PostgREST needs explicit hint: profiles!user_promotions_user_id_fkey
   async function loadPromotions() {
     setPromotionsLoading(true)
     try {
       const { data, error } = await supabase
         .from('user_promotions')
-        .select(`*, profiles(id, username, avatar_url, badges)`)
+        .select(`*, user:profiles!user_promotions_user_id_fkey(id, username, avatar_url, badges)`)
         .order('granted_at', { ascending: false })
         .limit(200)
       if (error) throw error
@@ -459,9 +478,15 @@ export default function AdminPage() {
     }
   }
 
-  async function deleteUser(userId, username) {
+  async function confirmDeleteUser(userId, username) {
     if (userId === user?.id) { showToast('Cannot delete your own account.', 'error'); return }
-    if (!confirm(`Permanently delete @${username}? This cannot be undone.`)) return
+    setDeleteConfirm({ userId, username })
+  }
+
+  async function executeDeleteUser() {
+    if (!deleteConfirm) return
+    const { userId, username } = deleteConfirm
+    setDeleteConfirm(null)
     try {
       const { error } = await supabase.rpc('admin_delete_user', { target_id: userId })
       if (error) throw error
@@ -539,7 +564,7 @@ export default function AdminPage() {
     }
   }
 
-  // Grant a promotion: writes to user_promotions AND updates badges
+  // FIX: use admin_grant_promotion RPC to bypass RLS permission denied error
   async function grantPromotion() {
     if (!promoteModal) return
     setPromoting(true)
@@ -548,19 +573,16 @@ export default function AdminPage() {
       const expiresAt = duration ? addDays(duration) : null
       const targetUser = promoteModal.user
 
-      // Insert into user_promotions table
-      const { error: promoError } = await supabase.from('user_promotions').insert({
-        user_id: targetUser.id,
-        role,
-        granted_by: user.id,
-        granted_at: new Date().toISOString(),
-        expires_at: expiresAt,
-        active: true,
-        note: note || null,
+      // Use SECURITY DEFINER RPC to bypass RLS (fixes "permission denied for table user_promotions")
+      const { error: promoError } = await supabase.rpc('admin_grant_promotion', {
+        p_user_id: targetUser.id,
+        p_role: role,
+        p_expires_at: expiresAt,
+        p_note: note || null,
       })
       if (promoError) throw promoError
 
-      // Also update the user's badges
+      // Update the user's badges array
       const currentBadges = targetUser.badges?.length ? targetUser.badges : targetUser.badge ? [targetUser.badge] : []
       const newBadges = currentBadges.includes(role) ? currentBadges : [...currentBadges, role]
       const { error: badgeError } = await supabase.rpc('admin_update_profile', {
@@ -579,23 +601,23 @@ export default function AdminPage() {
     }
   }
 
-  // Revoke a promotion: sets active=false and removes badge
+  // FIX: use admin_revoke_promotion RPC
   async function revokePromotion(promo) {
-    if (!confirm(`Revoke ${promo.role} from @${promo.profiles?.username}?`)) return
+    if (!confirm(`Revoke ${promo.role} from @${promo.user?.username}?`)) return
     try {
-      const { error: updateError } = await supabase.from('user_promotions')
-        .update({ active: false, revoked_at: new Date().toISOString(), revoked_by: user.id })
-        .eq('id', promo.id)
-      if (updateError) throw updateError
+      const { error: rpcError } = await supabase.rpc('admin_revoke_promotion', {
+        p_promo_id: promo.id
+      })
+      if (rpcError) throw rpcError
 
       // Remove badge from user
-      const currentBadges = promo.profiles?.badges?.length ? promo.profiles.badges : []
+      const currentBadges = promo.user?.badges?.length ? promo.user.badges : []
       const newBadges = currentBadges.filter(b => b !== promo.role)
       await supabase.rpc('admin_update_profile', {
         target_id: promo.user_id, new_badges: newBadges, new_banned: null, new_ban_reason: null,
       })
 
-      showToast(`${promo.role} revoked from @${promo.profiles?.username}`)
+      showToast(`${promo.role} revoked from @${promo.user?.username}`)
       loadPromotions(); loadStats()
     } catch (err) {
       showToast('Failed: ' + err.message, 'error')
@@ -623,21 +645,24 @@ export default function AdminPage() {
       <div style={{ textAlign: 'center', padding: '100px 24px' }}>
         <div style={{ fontSize: 52, marginBottom: 16 }}>🚫</div>
         <h2 style={{ color: '#f87171', marginBottom: 8, fontSize: 22 }}>Access Denied</h2>
-        <p style={{ color: '#6b7280', marginBottom: 20 }}>Owner or Moderator role required.</p>
+        <p style={{ color: '#6b7280', marginBottom: 10 }}>Owner role required for the Admin Panel.</p>
+        <p style={{ color: '#6b7280', marginBottom: 20, fontSize: 13 }}>
+          Moderators — use the <Link href="/mod" style={{ color: '#60a5fa' }}>Moderator Panel</Link> instead.
+        </p>
         <Link href="/" style={{ color: '#4ade80', fontWeight: 700 }}>← Back to Home</Link>
       </div>
     </div>
   )
 
   const TABS = [
-    { id: 'dashboard', label: '📊 Dashboard', ownerOnly: false },
-    { id: 'reports', label: `🚩 Reports${stats.pendingReports > 0 ? ` (${stats.pendingReports})` : ''}`, ownerOnly: false },
-    { id: 'disputes', label: `⚖️ Disputes${stats.openDisputes > 0 ? ` (${stats.openDisputes})` : ''}`, ownerOnly: false },
-    { id: 'users', label: '👥 Users', ownerOnly: true },
-    { id: 'promotions', label: `🎖️ Promotions${stats.activePromotions > 0 ? ` (${stats.activePromotions})` : ''}`, ownerOnly: true },
-    { id: 'reviews', label: '⭐ Reviews', ownerOnly: true },
-    { id: 'listings', label: '📋 Listings', ownerOnly: true },
-  ].filter(t => !t.ownerOnly || isOwner)
+    { id: 'dashboard', label: '📊 Dashboard' },
+    { id: 'reports', label: `🚩 Reports${stats.pendingReports > 0 ? ` (${stats.pendingReports})` : ''}` },
+    { id: 'disputes', label: `⚖️ Disputes${stats.openDisputes > 0 ? ` (${stats.openDisputes})` : ''}` },
+    { id: 'users', label: '👥 Users' },
+    { id: 'promotions', label: `🎖️ Promotions${stats.activePromotions > 0 ? ` (${stats.activePromotions})` : ''}` },
+    { id: 'reviews', label: '⭐ Reviews' },
+    { id: 'listings', label: '📋 Listings' },
+  ]
 
   const filteredPromotions = promotions.filter(p => {
     if (promoFilter === 'all') return true
@@ -659,10 +684,35 @@ export default function AdminPage() {
           color: toast.type === 'error' ? '#f87171' : '#4ade80',
           borderRadius: 10, padding: '12px 18px', fontSize: 13, fontWeight: 600,
           backdropFilter: 'blur(8px)', boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
-          animation: 'slideIn 0.2s ease',
+          animation: 'slideIn 0.2s ease', maxWidth: 380,
         }}>
           {toast.type === 'error' ? '✕' : '✓'} {toast.msg}
         </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <Modal title="Delete User" onClose={() => setDeleteConfirm(null)}>
+          <div style={{ textAlign: 'center', padding: '8px 0 20px' }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>⚠️</div>
+            <p style={{ color: '#f9fafb', fontSize: 14, marginBottom: 6 }}>
+              Permanently delete <strong style={{ color: '#f87171' }}>@{deleteConfirm.username}</strong>?
+            </p>
+            <p style={{ color: '#6b7280', fontSize: 12, marginBottom: 20 }}>
+              This deletes their profile and all listings. This cannot be undone.
+            </p>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setDeleteConfirm(null)} style={{
+                flex: 1, padding: '11px', borderRadius: 8, border: '1px solid #2d2d3f',
+                background: 'transparent', color: '#9ca3af', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              }}>Cancel</button>
+              <button onClick={executeDeleteUser} style={{
+                flex: 1, padding: '11px', borderRadius: 8, border: 'none',
+                background: '#ef4444', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              }}>Delete Forever</button>
+            </div>
+          </div>
+        </Modal>
       )}
 
       {/* Create Account Modal */}
@@ -680,7 +730,7 @@ export default function AdminPage() {
                 style={S.input} />
             </div>
           ))}
-          <button onClick={createAccount} disabled={creating} className="btn-primary" style={{ width: '100%', marginTop: 4, padding: '11px', fontSize: 13, fontWeight: 700, borderRadius: 8, border: 'none', background: creating ? '#1f2937' : '#16a34a', color: creating ? '#6b7280' : '#fff', cursor: creating ? 'default' : 'pointer' }}>
+          <button onClick={createAccount} disabled={creating} style={{ width: '100%', marginTop: 4, padding: '11px', fontSize: 13, fontWeight: 700, borderRadius: 8, border: 'none', background: creating ? '#1f2937' : '#16a34a', color: creating ? '#6b7280' : '#fff', cursor: creating ? 'default' : 'pointer' }}>
             {creating ? 'Creating...' : 'Create Account'}
           </button>
         </Modal>
@@ -751,24 +801,24 @@ export default function AdminPage() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
           <div>
             <h1 style={{ margin: '0 0 3px', fontSize: 24, fontWeight: 900, color: '#f9fafb', letterSpacing: '-0.02em' }}>
-              Admin Panel
+              👑 Admin Panel
             </h1>
             <div style={{ fontSize: 12, color: '#6b7280' }}>
               Signed in as{' '}
-              <strong style={{ color: BADGE_COLORS[profileBadges[0]] || '#f9fafb' }}>{profile?.username}</strong>
+              <strong style={{ color: '#ef4444' }}>{profile?.username}</strong>
               {' · '}
-              <span style={{ color: BADGE_COLORS[profileBadges[0]] || '#6b7280' }}>{profileBadges[0] || profile?.badge}</span>
+              <span style={{ color: '#ef4444' }}>Owner</span>
+              {' · '}
+              <Link href="/mod" style={{ color: '#60a5fa', fontSize: 11 }}>→ Mod Panel</Link>
             </div>
           </div>
-          {isOwner && (
-            <button onClick={() => setCreateModal(true)} style={{
-              padding: '9px 16px', borderRadius: 8, border: 'none', background: 'rgba(74,222,128,0.15)',
-              color: '#4ade80', fontSize: 12, fontWeight: 700, cursor: 'pointer',
-              boxShadow: '0 0 0 1px rgba(74,222,128,0.3)',
-            }}>
-              ➕ Create Account
-            </button>
-          )}
+          <button onClick={() => setCreateModal(true)} style={{
+            padding: '9px 16px', borderRadius: 8, border: 'none', background: 'rgba(74,222,128,0.15)',
+            color: '#4ade80', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+            boxShadow: '0 0 0 1px rgba(74,222,128,0.3)',
+          }}>
+            ➕ Create Account
+          </button>
         </div>
 
         {/* ─── Tabs ─── */}
@@ -810,18 +860,34 @@ export default function AdminPage() {
         )}
 
         {/* ─── USERS TAB ─── */}
-        {tab === 'users' && isOwner && (
+        {tab === 'users' && (
           <div>
-            <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
               <input type="text" placeholder="Search username..." value={userSearch}
                 onChange={e => setUserSearch(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && loadUsers(userSearch)}
-                style={{ ...S.input, maxWidth: 320 }} />
+                style={{ ...S.input, maxWidth: 280 }} />
               <button onClick={() => loadUsers(userSearch)} style={{
                 padding: '10px 16px', borderRadius: 8, border: 'none', background: 'rgba(74,222,128,0.15)',
                 color: '#4ade80', fontSize: 12, fontWeight: 700, cursor: 'pointer',
               }}>Search</button>
+
+              {/* Email toggle */}
+              <button
+                onClick={() => showEmails ? setShowEmails(false) : loadEmails(userSearch)}
+                disabled={emailsLoading}
+                style={{
+                  padding: '10px 16px', borderRadius: 8, border: 'none',
+                  background: showEmails ? 'rgba(96,165,250,0.2)' : 'rgba(96,165,250,0.1)',
+                  color: '#60a5fa', fontSize: 12, fontWeight: 700, cursor: emailsLoading ? 'default' : 'pointer',
+                  boxShadow: showEmails ? '0 0 0 1px rgba(96,165,250,0.4)' : 'none',
+                }}>
+                {emailsLoading ? '...' : showEmails ? '🔒 Hide Emails' : '📧 Show Emails'}
+              </button>
+
+              <span style={{ fontSize: 11, color: '#4b5563', marginLeft: 'auto' }}>{users.length} users</span>
             </div>
+
             {usersLoading
               ? <Loader />
               : users.length === 0
@@ -829,9 +895,10 @@ export default function AdminPage() {
               : <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {users.map(u => (
                     <UserRow key={u.id} user={u}
+                      emailData={showEmails ? userEmails[u.id] : null}
                       onUpdateBadge={updateBadge}
                       onToggleBan={toggleBan}
-                      onDelete={deleteUser}
+                      onDelete={confirmDeleteUser}
                       onPromote={(u) => { setPromoteModal({ user: u }); setPromoteForm({ role: 'VIP', duration: 30, note: '' }) }}
                     />
                   ))}
@@ -841,7 +908,7 @@ export default function AdminPage() {
         )}
 
         {/* ─── PROMOTIONS TAB ─── */}
-        {tab === 'promotions' && isOwner && (
+        {tab === 'promotions' && (
           <div>
             <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -868,7 +935,7 @@ export default function AdminPage() {
         )}
 
         {/* ─── REVIEWS TAB ─── */}
-        {tab === 'reviews' && isOwner && (
+        {tab === 'reviews' && (
           <div>
             <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
               <input type="text" placeholder="Search by username..." value={reviewSearch}
@@ -902,7 +969,7 @@ export default function AdminPage() {
         )}
 
         {/* ─── LISTINGS TAB ─── */}
-        {tab === 'listings' && isOwner && (
+        {tab === 'listings' && (
           <div>
             {listingsLoading
               ? <Loader />
@@ -1038,6 +1105,8 @@ function DashboardTab({ stats, onTabSwitch }) {
 // ─── PROMOTION ROW ────────────────────────────────────────────────────────────
 
 function PromotionRow({ promo, onRevoke }) {
+  // FIX: use promo.user (renamed from promo.profiles to match the new query hint)
+  const user = promo.user || promo.profiles
   const color = BADGE_COLORS[promo.role] || '#9ca3af'
   const daysLeft = daysUntil(promo.expires_at)
   const isExpired = promo.expires_at && new Date(promo.expires_at) < new Date()
@@ -1052,31 +1121,27 @@ function PromotionRow({ promo, onRevoke }) {
       opacity: isActive ? 1 : 0.65,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        {/* User info */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 160 }}>
           <div style={{
             width: 34, height: 34, borderRadius: '50%', flexShrink: 0,
-            background: promo.profiles?.avatar_url ? 'transparent' : `${color}22`,
+            background: user?.avatar_url ? 'transparent' : `${color}22`,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 13, fontWeight: 900, color, overflow: 'hidden', position: 'relative',
           }}>
-            {promo.profiles?.avatar_url
-              ? <Image src={promo.profiles.avatar_url} alt="" fill sizes="34px" style={{ objectFit: 'cover' }} />
-              : getInitial(promo.profiles?.username)}
+            {user?.avatar_url
+              ? <Image src={user.avatar_url} alt="" fill sizes="34px" style={{ objectFit: 'cover' }} />
+              : getInitial(user?.username)}
           </div>
           <div>
-            <Link href={`/profile/${promo.profiles?.username}`} style={{ fontSize: 13, fontWeight: 700, color: '#f9fafb', textDecoration: 'none' }}>
-              @{promo.profiles?.username || 'Unknown'}
+            <Link href={`/profile/${user?.username}`} style={{ fontSize: 13, fontWeight: 700, color: '#f9fafb', textDecoration: 'none' }}>
+              @{user?.username || 'Unknown'}
             </Link>
             <div style={{ fontSize: 10, color: '#6b7280', marginTop: 1 }}>Granted {timeAgo(promo.granted_at)}</div>
           </div>
         </div>
 
-        {/* Role badge */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={S.badge(color)}>{BADGE_ICONS[promo.role]} {promo.role}</span>
-
-          {/* Duration info */}
           <div style={{ fontSize: 11, minWidth: 100 }}>
             {!promo.active || promo.revoked_at ? (
               <span style={{ color: '#6b7280' }}>Revoked {timeAgo(promo.revoked_at)}</span>
@@ -1093,14 +1158,12 @@ function PromotionRow({ promo, onRevoke }) {
           </div>
         </div>
 
-        {/* Note */}
         {promo.note && (
           <span style={{ fontSize: 11, color: '#6b7280', fontStyle: 'italic', flex: 1, minWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             "{promo.note}"
           </span>
         )}
 
-        {/* Revoke button */}
         {isActive && (
           <button onClick={() => onRevoke(promo)} style={S.actionBtn('#f87171')}>
             ✕ Revoke
@@ -1115,7 +1178,7 @@ function PromotionRow({ promo, onRevoke }) {
 
 const ALL_BADGES = BADGE_HIERARCHY
 
-function UserRow({ user, onUpdateBadge, onToggleBan, onDelete, onPromote }) {
+function UserRow({ user, emailData, onUpdateBadge, onToggleBan, onDelete, onPromote }) {
   const initialBadges = user.badges?.length ? user.badges : user.badge ? [user.badge] : []
   const [selectedBadges, setSelectedBadges] = useState(initialBadges)
   const [saving, setSaving] = useState(false)
@@ -1163,6 +1226,18 @@ function UserRow({ user, onUpdateBadge, onToggleBan, onDelete, onPromote }) {
             {user.trade_count || 0} trades · ⭐{user.rating || 0} · {user.review_count || 0} reviews
             {user.ban_reason && <span style={{ marginLeft: 8, color: '#f87171' }}>Ban: {user.ban_reason}</span>}
           </div>
+          {/* Email row — only shown when Show Emails is active */}
+          {emailData && (
+            <div style={{ fontSize: 11, marginTop: 3, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              <span style={{ color: '#60a5fa' }}>📧 {emailData.email || '—'}</span>
+              {emailData.lastSignIn && (
+                <span style={{ color: '#4b5563' }}>Last login: {timeAgo(emailData.lastSignIn)}</span>
+              )}
+              {!emailData.confirmed && (
+                <span style={{ color: '#f59e0b' }}>⚠ Unconfirmed</span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Actions */}
@@ -1174,6 +1249,9 @@ function UserRow({ user, onUpdateBadge, onToggleBan, onDelete, onPromote }) {
           }}>🏷 Badges</button>
           <button onClick={() => onToggleBan(user.id, user.banned, user.username)} style={S.actionBtn(user.banned ? '#4ade80' : '#f87171')}>
             {user.banned ? '✓ Unban' : '🚫 Ban'}
+          </button>
+          <button onClick={() => onDelete(user.id, user.username)} style={S.actionBtn('#ef4444')}>
+            🗑 Delete
           </button>
         </div>
       </div>
@@ -1417,9 +1495,7 @@ function ChatAndActivity({ chatLogs, userActivity, username }) {
                     <span style={{ color: '#4b5563', whiteSpace: 'nowrap', minWidth: 60 }}>
                       {new Date(t.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     </span>
-                    <span style={{
-                      ...S.badge(t.status === 'completed' ? '#4ade80' : t.status === 'pending' ? '#f59e0b' : '#6b7280'),
-                    }}>{t.status}</span>
+                    <span style={S.badge(t.status === 'completed' ? '#4ade80' : t.status === 'pending' ? '#f59e0b' : '#6b7280')}>{t.status}</span>
                     <Link href={`/listing/${t.listing_id}`} style={{ color: '#60a5fa', textDecoration: 'none' }}>View →</Link>
                   </div>
                 ))}
