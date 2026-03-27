@@ -422,10 +422,7 @@ export default function ModPage() {
           <span style={{ fontSize: 14 }}>🛡️</span>
           <span>
             <strong style={{ color: '#60a5fa' }}>Moderator scope:</strong> You can review and action reports and disputes.
-            For user bans that need review, user deletion, VIP promotions, or badge changes — escalate to an Owner via{' '}
-            {isOwner
-              ? <Link href="/admin" style={{ color: '#ef4444' }}>Admin Panel</Link>
-              : <span style={{ color: '#6b7280' }}>the Admin Panel</span>}.
+            For user bans that need review, user deletion, VIP promotions, or badge changes — escalate to an Owner.
           </span>
         </div>
 
@@ -595,13 +592,13 @@ function ModOverview({ stats, onTabSwitch, profile }) {
               'You can issue temp bans from report cards below',
               'Always include a clear, specific ban reason',
               'Owners can reverse any mod ban if appealed',
-              'For permanent bans, escalate to Owner/Admin Panel',
+              'For permanent bans, escalate to Owner',
             ]},
             { title: 'Escalation', icon: '📣', color: '#60a5fa', items: [
-              'Never delete users or listings — that\'s Owner-only',
-              'Don\'t grant/revoke VIP or badge changes',
-              'Tag an Owner in Discord for urgent or unclear cases',
-              'Document escalations in admin notes before handing off',
+              'Escalate if a request involves account deletion or irreversible actions',
+              'Route all VIP, badge, or permission changes to Owner review',
+              'Flag unclear, high-risk, or policy-edge cases for Owner input',
+              'Log context, actions taken, and reasoning before escalation',
             ]},
           ].map(section => (
             <div key={section.title}>

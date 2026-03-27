@@ -502,22 +502,24 @@ export default function ProfilePageClient({ username: usernameProp, initialProfi
                       const days = daysUntilExpiry(l)
                       const expiringSoon = days !== null && days <= 5
                       return (
-                        <div key={l.id} style={{ position: 'relative', height: '100%' }}>
-                          <ListingCard listing={l} />
-                          {/* Pending offer badge */}
-                          {isOwn && listingOffers[l.id] > 0 && (
-                            <Link href={`/listing/${l.id}`} style={{
-                              position: 'absolute', top: 8, left: 8,
-                              background: 'linear-gradient(135deg, #f59e0b, #d97706)',
-                              color: '#fff', borderRadius: 20,
-                              padding: '3px 10px', fontSize: 11, fontWeight: 800,
-                              textDecoration: 'none',
-                              boxShadow: '0 2px 8px rgba(245,158,11,0.5)',
-                              display: 'flex', alignItems: 'center', gap: 4,
-                            }}>
-                              📨 {listingOffers[l.id]} offer{listingOffers[l.id] !== 1 ? 's' : ''}
-                            </Link>
-                          )}
+                        <div key={l.id} style={{ display: 'flex', flexDirection: 'column' }}>
+                          <div style={{ flex: 1, position: 'relative' }}>
+                            <ListingCard listing={l} />
+                            {/* Pending offer badge */}
+                            {isOwn && listingOffers[l.id] > 0 && (
+                              <Link href={`/listing/${l.id}`} style={{
+                                position: 'absolute', top: 8, left: 8,
+                                background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                                color: '#fff', borderRadius: 20,
+                                padding: '3px 10px', fontSize: 11, fontWeight: 800,
+                                textDecoration: 'none',
+                                boxShadow: '0 2px 8px rgba(245,158,11,0.5)',
+                                display: 'flex', alignItems: 'center', gap: 4,
+                              }}>
+                                📨 {listingOffers[l.id]} offer{listingOffers[l.id] !== 1 ? 's' : ''}
+                              </Link>
+                            )}
+                          </div>
                           {/* Expiry warning */}
                           {isOwn && expiringSoon && (
                             <div style={{ marginTop: 4, padding: '4px 8px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 6, fontSize: 11, color: '#f87171', textAlign: 'center', fontWeight: 600 }}>

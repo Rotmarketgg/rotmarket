@@ -41,6 +41,13 @@ export default function CreateListingPage() {
         setUser(currentUser)
         const p = await getProfile(currentUser.id)
         setProfile(p)
+        // Clear rate limit entries for privileged users — stale sessionStorage
+        // from before their role was assigned would otherwise block them
+        const badges = p?.badges?.length ? p.badges : p?.badge ? [p.badge] : []
+        if (badges.some(b => ['VIP', 'Owner', 'Admin', 'Moderator'].includes(b))) {
+          sessionStorage.removeItem('rl_listing')
+          sessionStorage.removeItem('rl_listing_day')
+        }
       } catch (err) {
         console.error('Auth check error:', err)
         router.push('/auth/login')

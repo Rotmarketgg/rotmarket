@@ -210,6 +210,8 @@ export default function AdminPage() {
   const [tradeSearch, setTradeSearch] = useState('')
   const [tradeStatusFilter, setTradeStatusFilter] = useState('all')
 
+  const [viewUser, setViewUser] = useState(null)
+
   const [createModal, setCreateModal] = useState(false)
   const [createForm, setCreateForm] = useState({ email: '', password: '', username: '' })
   const [creating, setCreating] = useState(false)
@@ -818,6 +820,63 @@ export default function AdminPage() {
           }}>
             {promoting ? 'Granting...' : `Grant ${promoteForm.role}`}
           </button>
+        </Modal>
+      )}
+
+      {/* Inspect User Modal */}
+      {viewUser && (
+        <Modal title="🔍 Inspect User" onClose={() => setViewUser(null)}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+            <div style={{
+              width: 48, height: 48, borderRadius: '50%', flexShrink: 0, overflow: 'hidden',
+              background: viewUser.avatar_url ? 'transparent' : 'linear-gradient(135deg, #4ade80, #22c55e)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 18, fontWeight: 900, color: '#0a0a0f', position: 'relative',
+            }}>
+              {viewUser.avatar_url
+                ? <Image src={viewUser.avatar_url} alt="" fill sizes="48px" style={{ objectFit: 'cover' }} />
+                : getInitial(viewUser.username)}
+            </div>
+            <div>
+              <Link href={`/profile/${viewUser.username}`} target="_blank"
+                style={{ fontSize: 15, fontWeight: 800, color: '#f9fafb', textDecoration: 'none' }}>
+                {viewUser.username}
+              </Link>
+              {viewUser.banned && <span style={{ marginLeft: 8, ...S.badge('#ef4444') }}>BANNED</span>}
+              <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>
+                {(viewUser.badges?.length ? viewUser.badges : viewUser.badge ? [viewUser.badge] : []).join(', ') || 'No badges'}
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12 }}>
+            {[
+              ['Trades', viewUser.trade_count ?? '—'],
+              ['Rating', `⭐ ${viewUser.rating || 0}`],
+              ['Reviews', viewUser.review_count ?? '—'],
+              ['Banned', viewUser.banned ? `Yes — ${viewUser.ban_reason || 'no reason given'}` : 'No'],
+            ].map(([label, val]) => (
+              <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 10px', background: '#0d0d14', borderRadius: 7, border: '1px solid #1f2937' }}>
+                <span style={{ color: '#6b7280', fontWeight: 600 }}>{label}</span>
+                <span style={{ color: '#f9fafb', fontWeight: 700 }}>{val}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+            <Link href={`/profile/${viewUser.username}`} target="_blank" style={{
+              flex: 1, textAlign: 'center', padding: '8px 0', borderRadius: 7, fontSize: 12, fontWeight: 700,
+              background: 'rgba(96,165,250,0.12)', border: '1px solid rgba(96,165,250,0.3)', color: '#60a5fa',
+              textDecoration: 'none',
+            }}>View Profile ↗</Link>
+            <button
+              onClick={() => { toggleBan(viewUser.id, viewUser.banned, viewUser.username); setViewUser(null) }}
+              style={{
+                flex: 1, padding: '8px 0', borderRadius: 7, border: 'none', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                background: viewUser.banned ? 'rgba(74,222,128,0.12)' : 'rgba(239,68,68,0.12)',
+                color: viewUser.banned ? '#4ade80' : '#f87171',
+              }}>
+              {viewUser.banned ? '✓ Unban' : '🚫 Ban'}
+            </button>
+          </div>
         </Modal>
       )}
 
