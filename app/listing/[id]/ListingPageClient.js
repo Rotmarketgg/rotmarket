@@ -351,7 +351,9 @@ export default function ListingPageClient({ id: idProp, initialListing = null })
   const isVip = sellerBadgesForGlow.includes('VIP') || sellerBadgesForGlow.includes('Owner')
   // Allow reviewing the same seller multiple times (different listings)
   // but not the same listing twice
-  const alreadyReviewedThisListing = reviews.some(r => r.reviewer_id === user?.id)
+  const alreadyReviewedThisListing = reviews.some(
+    r => r.reviewer_id === user?.id && r.listing_id === id
+  )
 
   // ─── HANDLERS ─────────────────────────────────────────────────
 

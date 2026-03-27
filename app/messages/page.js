@@ -33,6 +33,16 @@ function MessagesInner() {
   const [msgCursor, setMsgCursor] = useState(null)
   const [msgLoadingMore, setMsgLoadingMore] = useState(false)
 
+  const getConvoOtherId = useCallback((convo, currentUserId) => {
+    if (!convo || !currentUserId) return null
+    return convo.sender_id === currentUserId ? convo.receiver_id : convo.sender_id
+  }, [])
+
+  const isSameConversation = useCallback((a, b, currentUserId) => {
+    if (!a || !b || !currentUserId) return false
+    return a.listing_id === b.listing_id && getConvoOtherId(a, currentUserId) === getConvoOtherId(b, currentUserId)
+  }, [getConvoOtherId])
+
   // Hoisted to useCallback so the visibilitychange handler below can call it.
   // Previously init() was defined inside the first useEffect, making it
   // unreachable from the second useEffect — causing a ReferenceError crash.
@@ -76,7 +86,7 @@ function MessagesInner() {
     scrollToBottom()
     // Update unread counts in sidebar without refetching entire conversation list
     setConversations(prev => prev.map(c =>
-      c.listing_id === activeConvo.listing_id ? { ...c, read: true } : c
+      isSameConversation(c, activeConvo, user.id) ? { ...c, read: true } : c
     ))
     // Refresh navbar unread badge now that messages are marked read
     getUnreadCount(user.id).then(count => {
@@ -151,7 +161,7 @@ function MessagesInner() {
         })
         // Update sidebar: refresh latest message preview + timestamp
         setConversations(prev => prev.map(c =>
-          c.listing_id === activeConvo.listing_id
+          isSameConversation(c, activeConvo, user.id)
             ? { ...c, content: msg.content, created_at: msg.created_at }
             : c
         ))
@@ -159,7 +169,7 @@ function MessagesInner() {
       })
       .subscribe()
     return () => supabase.removeChannel(channel)
-  }, [activeConvo, loadMessages, user])
+  }, [activeConvo, isSameConversation, loadMessages, user])
 
   const scrollToBottom = () => {
     setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 80)
