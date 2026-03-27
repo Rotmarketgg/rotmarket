@@ -282,7 +282,7 @@ export default function AdminPage() {
       supabase.from('trade_requests').select('id', { count: 'exact', head: true }).eq('status', 'completed'),
       supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('banned', true),
       supabase.from('disputes').select('id', { count: 'exact', head: true }).eq('status', 'open'),
-      supabase.from('user_promotions').select('id', { count: 'exact', head: true }).eq('active', true),
+      supabase.rpc('admin_count_promotions'),
     ])
     setStats({
       totalUsers: r1.count || 0,
@@ -291,7 +291,7 @@ export default function AdminPage() {
       completedTrades: r4.count || 0,
       bannedUsers: r5.count || 0,
       openDisputes: r6.count || 0,
-      activePromotions: r7.count || 0,
+      activePromotions: r7.data || 0,
     })
   }
 
@@ -415,17 +415,11 @@ export default function AdminPage() {
     }
   }
 
-  // FIX: use named FK hint to resolve the ambiguous relationship error
-  // user_promotions has 3 FK columns → profiles (user_id, granted_by, revoked_by)
-  // PostgREST needs explicit hint: profiles!user_promotions_user_id_fkey
+  // All user_promotions reads go through a SECURITY DEFINER RPC so RLS never blocks them.
   async function loadPromotions() {
     setPromotionsLoading(true)
     try {
-      const { data, error } = await supabase
-        .from('user_promotions')
-        .select(`*, user:profiles!user_promotions_user_id_fkey(id, username, avatar_url, badges)`)
-        .order('granted_at', { ascending: false })
-        .limit(200)
+      const { data, error } = await supabase.rpc('admin_list_promotions')
       if (error) throw error
       setPromotions(data || [])
     } catch (err) {
