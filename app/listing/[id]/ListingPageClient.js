@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import Navbar from '@/components/Navbar'
 import StarRating from '@/components/StarRating'
 import ReportButton from '@/components/ReportButton'
-import { getListing, getReviews, getSessionUser, getProfile, createReview, supabase } from '@/lib/supabase'
+import { getListing, getReviews, getSessionUser, createReview, supabase } from '@/lib/supabase'
 import { getRarityStyle, timeAgo, formatPrice, getInitial, checkRateLimit, withTimeout } from '@/lib/utils'
 import { BADGE_HIERARCHY, BADGE_META, getPrimaryBadge, PAYMENT_METHODS } from '@/lib/constants'
 import { isClean } from '@/lib/profanity'
@@ -264,19 +264,18 @@ function BuyerTradePanel({ myOffer, listing, seller, listingId, copiedId, setCop
 
 // id prop is passed from the server wrapper (page.js) — avoids an extra
 // useParams() call and ensures the id is available on the very first render.
-export default function ListingPageClient({ id: idProp }) {
+export default function ListingPageClient({ id: idProp, initialListing = null }) {
   const params = useParams()
   const id = idProp ?? params?.id
   const router = useRouter()
 
-  const [listing, setListing] = useState(null)
+  const [listing, setListing] = useState(initialListing)
   const [reviews, setReviews] = useState([])
   const [user, setUser] = useState(null)
-  const [profile, setProfile] = useState(null)
   const [myOffer, setMyOffer] = useState(null)         // buyer's own offer
   const [sellerOffers, setSellerOffers] = useState([]) // seller's incoming offers
   const [tab, setTab] = useState('details')
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(initialListing === null)
   const [error, setError] = useState(null)
   const [copiedId, setCopiedId] = useState(false)
   const [selectedImage, setSelectedImage] = useState(0)
@@ -294,19 +293,22 @@ export default function ListingPageClient({ id: idProp }) {
   const [reviewSuccess, setReviewSuccess] = useState(false)
   const [reviewError, setReviewError] = useState('')
   const [confirmError, setConfirmError] = useState('')
+  const hydratedFromServerRef = useRef(initialListing !== null)
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
     try {
-      const [listingData, currentUser] = await Promise.all([withTimeout(getListing(id)), getSessionUser()])
+      const shouldUseInitial = !silent && hydratedFromServerRef.current && initialListing?.id === id
+      const [listingData, currentUser] = await Promise.all([
+        shouldUseInitial ? Promise.resolve(initialListing) : withTimeout(getListing(id)),
+        getSessionUser(),
+      ])
+      hydratedFromServerRef.current = false
+      if (!listingData) throw new Error('Listing not found')
       setListing(listingData)
       setUser(currentUser)
-      const [reviewsData, profileData] = await withTimeout(Promise.all([
-        getReviews(listingData.profiles?.id),
-        currentUser ? getProfile(currentUser.id) : null,
-      ]))
+      const reviewsData = await withTimeout(getReviews(listingData.profiles?.id))
       setReviews(reviewsData || [])
-      setProfile(profileData)
       if (currentUser) {
         const isSellerUser = listingData.profiles?.id === currentUser.id
         if (isSellerUser) {

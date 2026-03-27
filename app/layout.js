@@ -16,6 +16,7 @@ const bodyFont = DM_Sans({
 })
 
 export const metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://rotmarket.net'),
   title: 'RotMarket — Brainrot Trading Marketplace',
   description: 'The trusted marketplace to buy, sell, and trade Brainrots in Fortnite Brainrot and Roblox Brainrot. Verified traders, reputation system, safe trades.',
   keywords: 'Fortnite Brainrot, Roblox Brainrot, Brainrot marketplace, Brainrot trade, RotMarket',

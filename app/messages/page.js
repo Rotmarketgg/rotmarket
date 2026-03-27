@@ -125,6 +125,7 @@ function MessagesInner() {
 
   useEffect(() => {
     if (!activeConvo || !user) return
+    const otherId = activeConvo.sender_id === user.id ? activeConvo.receiver_id : activeConvo.sender_id
     loadMessages()
     const channel = supabase
       .channel(`msg-${activeConvo.listing_id}-${user.id}`)
@@ -132,6 +133,15 @@ function MessagesInner() {
         event: 'INSERT', schema: 'public', table: 'messages',
         filter: `listing_id=eq.${activeConvo.listing_id}`,
       }, async (payload) => {
+        const incoming = payload.new
+        const isSameThread =
+          incoming?.listing_id === activeConvo.listing_id &&
+          (
+            (incoming.sender_id === user.id && incoming.receiver_id === otherId) ||
+            (incoming.sender_id === otherId && incoming.receiver_id === user.id)
+          )
+        if (!isSameThread) return
+
         // Raw postgres_changes payload has no joined profile data — fetch the
         // full row with sender profile so avatars and usernames render correctly
         const { data: fullMsg } = await supabase
@@ -155,7 +165,7 @@ function MessagesInner() {
       })
       .subscribe()
     return () => supabase.removeChannel(channel)
-  }, [activeConvo, loadMessages])
+  }, [activeConvo, loadMessages, user])
 
   const scrollToBottom = () => {
     setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 80)

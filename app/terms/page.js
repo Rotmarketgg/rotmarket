@@ -62,7 +62,7 @@ export default function TermsPage() {
         </div>
 
         <div style={{ marginTop: 32, textAlign: 'center', fontSize: 13, color: '#6b7280' }}>
-          Questions? <Link href="/messages" style={{ color: '#4ade80' }}>Contact us</Link>
+          Questions? <Link href="/contact" style={{ color: '#4ade80' }}>Contact us</Link>
         </div>
       </div>
     </div>
