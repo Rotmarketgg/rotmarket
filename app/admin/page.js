@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -9,11 +9,20 @@ import { getSessionUser, getProfile, supabase } from '@/lib/supabase'
 import { withTimeout, timeAgo, getInitial } from '@/lib/utils'
 import { BADGE_HIERARCHY, BADGE_META, getPrimaryBadge } from '@/lib/constants'
 
+// ─── CONSTANTS ────────────────────────────────────────────────────────────────
+
 const BADGE_COLORS = {
   'Verified Trader': '#4ade80',
   'VIP': '#f59e0b',
   'Moderator': '#60a5fa',
   'Owner': '#ef4444',
+}
+
+const BADGE_ICONS = {
+  'Verified Trader': '✓',
+  'VIP': '⭐',
+  'Moderator': '🛡️',
+  'Owner': '👑',
 }
 
 const REASON_LABELS = {
@@ -32,7 +41,147 @@ const STATUS_COLORS = {
   dismissed: '#6b7280',
 }
 
-// ─── MAIN PAGE ────────────────────────────────────────────────────
+const DISPUTE_REASON_LABELS = {
+  item_not_received: "📦 Item Not Received",
+  item_not_as_described: '❌ Not As Described',
+  payment_not_received: "💸 Payment Not Received",
+  fraud: '🚨 Fraud / Scam',
+  other: '💬 Other',
+}
+
+const DISPUTE_STATUS_COLORS = {
+  open: '#f97316',
+  under_review: '#60a5fa',
+  resolved: '#4ade80',
+  dismissed: '#6b7280',
+}
+
+// VIP duration options
+const VIP_DURATIONS = [
+  { label: '1 Month', days: 30 },
+  { label: '3 Months', days: 90 },
+  { label: '6 Months', days: 180 },
+  { label: '1 Year', days: 365 },
+  { label: 'Lifetime', days: null },
+]
+
+// ─── STYLES ───────────────────────────────────────────────────────────────────
+
+const S = {
+  page: {
+    minHeight: '100vh',
+    background: '#0a0a0f',
+    color: '#f9fafb',
+    fontFamily: "'DM Sans', 'Inter', system-ui, sans-serif",
+  },
+  container: {
+    maxWidth: 1200,
+    margin: '0 auto',
+    padding: '28px 16px',
+  },
+  card: {
+    background: '#111118',
+    border: '1px solid #1f2937',
+    borderRadius: 12,
+    padding: '16px 18px',
+  },
+  cardAlert: {
+    background: 'rgba(245,158,11,0.05)',
+    border: '1px solid rgba(245,158,11,0.25)',
+    borderRadius: 12,
+    padding: '16px 18px',
+  },
+  sectionTitle: {
+    fontSize: 11,
+    fontWeight: 800,
+    textTransform: 'uppercase',
+    letterSpacing: '0.1em',
+    color: '#4b5563',
+    marginBottom: 12,
+  },
+  badge: (color) => ({
+    fontSize: 9,
+    fontWeight: 800,
+    color,
+    background: `${color}18`,
+    border: `1px solid ${color}40`,
+    borderRadius: 4,
+    padding: '2px 7px',
+    textTransform: 'uppercase',
+    letterSpacing: '0.06em',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 3,
+  }),
+  pill: (color, active) => ({
+    padding: '5px 14px',
+    borderRadius: 20,
+    border: 'none',
+    cursor: 'pointer',
+    fontSize: 11,
+    fontWeight: 700,
+    textTransform: 'capitalize',
+    background: active ? `${color}18` : '#111118',
+    color: active ? color : '#6b7280',
+    boxShadow: active ? `0 0 0 1px ${color}40` : '0 0 0 1px #2d2d3f',
+    transition: 'all 0.15s',
+  }),
+  actionBtn: (color) => ({
+    padding: '5px 10px',
+    borderRadius: 6,
+    border: 'none',
+    background: `${color}18`,
+    color,
+    fontSize: 11,
+    fontWeight: 700,
+    cursor: 'pointer',
+    transition: 'all 0.15s',
+    whiteSpace: 'nowrap',
+  }),
+  input: {
+    background: '#0d0d14',
+    border: '1px solid #2d2d3f',
+    borderRadius: 8,
+    padding: '9px 12px',
+    color: '#f9fafb',
+    fontSize: 13,
+    outline: 'none',
+    width: '100%',
+    boxSizing: 'border-box',
+  },
+  select: {
+    background: '#0d0d14',
+    border: '1px solid #2d2d3f',
+    borderRadius: 8,
+    padding: '9px 12px',
+    color: '#f9fafb',
+    fontSize: 13,
+    outline: 'none',
+    cursor: 'pointer',
+  },
+}
+
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
+
+function daysUntil(dateStr) {
+  if (!dateStr) return null
+  const diff = new Date(dateStr) - new Date()
+  return Math.ceil(diff / (1000 * 60 * 60 * 24))
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return '—'
+  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function addDays(days) {
+  if (!days) return null
+  const d = new Date()
+  d.setDate(d.getDate() + days)
+  return d.toISOString()
+}
+
+// ─── MAIN PAGE ────────────────────────────────────────────────────────────────
 
 export default function AdminPage() {
   const router = useRouter()
@@ -40,55 +189,62 @@ export default function AdminPage() {
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [unauthorized, setUnauthorized] = useState(false)
-  const [tab, setTab] = useState('reports')
+  const [tab, setTab] = useState('dashboard')
   const [stats, setStats] = useState({})
+  const [toast, setToast] = useState(null)
 
+  // Tab states
   const [disputes, setDisputes] = useState([])
   const [disputesLoading, setDisputesLoading] = useState(false)
+  const [reports, setReports] = useState([])
+  const [reportsLoading, setReportsLoading] = useState(false)
+  const [reportFilter, setReportFilter] = useState('pending')
+  const [users, setUsers] = useState([])
+  const [usersLoading, setUsersLoading] = useState(false)
+  const [userSearch, setUserSearch] = useState('')
+  const [reviews, setReviews] = useState([])
+  const [reviewsLoading, setReviewsLoading] = useState(false)
+  const [reviewSearch, setReviewSearch] = useState('')
+  const [listings, setListings] = useState([])
+  const [listingsLoading, setListingsLoading] = useState(false)
+  const [promotions, setPromotions] = useState([])
+  const [promotionsLoading, setPromotionsLoading] = useState(false)
+  const [promoFilter, setPromoFilter] = useState('all')
+
+  // Modals
+  const [createModal, setCreateModal] = useState(false)
+  const [createForm, setCreateForm] = useState({ email: '', password: '', username: '' })
+  const [creating, setCreating] = useState(false)
+  const [promoteModal, setPromoteModal] = useState(null) // { user }
+  const [promoteForm, setPromoteForm] = useState({ role: 'VIP', duration: 30, note: '' })
+  const [promoting, setPromoting] = useState(false)
 
   const profileBadges = profile?.badges?.length ? profile.badges : profile?.badge ? [profile.badge] : []
   const isOwner = profileBadges.includes('Owner')
   const isMod = profileBadges.includes('Moderator')
 
-  // Reports state
-  const [reports, setReports] = useState([])
-  const [reportsLoading, setReportsLoading] = useState(false)
-  const [reportFilter, setReportFilter] = useState('pending')
+  const showToast = useCallback((msg, type = 'success') => {
+    setToast({ msg, type })
+    setTimeout(() => setToast(null), 3500)
+  }, [])
 
-  // Users state (Owner only)
-  const [users, setUsers] = useState([])
-  const [usersLoading, setUsersLoading] = useState(false)
-  const [userSearch, setUserSearch] = useState('')
-
-  // Reviews state (Owner only)
-  const [reviewSearch, setReviewSearch] = useState('')
-  const [reviews, setReviews] = useState([])
-  const [reviewsLoading, setReviewsLoading] = useState(false)
-
-  // Listings state (Owner only)
-  const [listings, setListings] = useState([])
-  const [listingsLoading, setListingsLoading] = useState(false)
-
-  // Create account modal
-  const [createModal, setCreateModal] = useState(false)
-  const [createForm, setCreateForm] = useState({ email: '', password: '', username: '' })
-  const [creating, setCreating] = useState(false)
+  // ─── AUTH ────────────────────────────────────────────────────────
 
   useEffect(() => {
     async function init() {
       try {
-      const u = await getSessionUser()
-      if (!u) { router.push('/auth/login'); return }
-      const p = await getProfile(u.id)
-      const pBadges = p?.badges?.length ? p.badges : p?.badge ? [p.badge] : []
-      if (!p || !['Owner', 'Moderator'].some(b => pBadges.includes(b))) {
-        setUnauthorized(true); setLoading(false); return
-      }
-      setUser(u)
-      setProfile(p)
-      setLoading(false)
-      loadStats()
-      loadReports('pending')
+        const u = await getSessionUser()
+        if (!u) { router.push('/auth/login'); return }
+        const p = await getProfile(u.id)
+        const pBadges = p?.badges?.length ? p.badges : p?.badge ? [p.badge] : []
+        if (!p || !['Owner', 'Moderator'].some(b => pBadges.includes(b))) {
+          setUnauthorized(true); setLoading(false); return
+        }
+        setUser(u)
+        setProfile(p)
+        setLoading(false)
+        loadStats()
+        loadReports('pending')
       } catch (err) {
         console.error('Admin init error:', err)
         router.push('/auth/login')
@@ -97,11 +253,6 @@ export default function AdminPage() {
     init()
   }, [])
 
-  // Re-validate auth when the tab becomes visible again.
-  // Without this, returning from another tab would find a stale/expired session
-  // and the page would redirect to /auth/login or show "unauthorized".
-  // Listens for rotmarket:tab-visible which is dispatched by lib/supabase.js
-  // AFTER the token has been confirmed fresh — so getSessionUser() is reliable.
   useEffect(() => {
     const onVisible = async () => {
       const u = await getSessionUser()
@@ -123,18 +274,20 @@ export default function AdminPage() {
     if (tab === 'reviews' && isOwner) loadReviews('')
     if (tab === 'listings' && isOwner) loadListings()
     if (tab === 'disputes') loadDisputes()
+    if (tab === 'promotions' && isOwner) loadPromotions()
   }, [tab])
 
-  // ─── LOADERS ────────────────────────────────────────────────
+  // ─── LOADERS ─────────────────────────────────────────────────────
 
   async function loadStats() {
-    const [r1, r2, r3, r4, r5, r6] = await Promise.all([
+    const [r1, r2, r3, r4, r5, r6, r7] = await Promise.all([
       supabase.from('profiles').select('id', { count: 'exact', head: true }).not('username', 'is', null),
       supabase.from('listings').select('id', { count: 'exact', head: true }).eq('status', 'active'),
       supabase.from('reports').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
       supabase.from('trade_requests').select('id', { count: 'exact', head: true }).eq('status', 'completed'),
       supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('banned', true),
       supabase.from('disputes').select('id', { count: 'exact', head: true }).eq('status', 'open'),
+      supabase.from('user_promotions').select('id', { count: 'exact', head: true }).eq('active', true),
     ])
     setStats({
       totalUsers: r1.count || 0,
@@ -143,6 +296,7 @@ export default function AdminPage() {
       completedTrades: r4.count || 0,
       bannedUsers: r5.count || 0,
       openDisputes: r6.count || 0,
+      activePromotions: r7.count || 0,
     })
   }
 
@@ -159,7 +313,7 @@ export default function AdminPage() {
       if (error) throw error
       setReports(data || [])
     } catch (err) {
-      alert('Error loading reports: ' + err.message)
+      showToast('Error loading reports: ' + err.message, 'error')
     } finally {
       setReportsLoading(false)
     }
@@ -179,7 +333,7 @@ export default function AdminPage() {
       if (error) throw error
       setUsers(data || [])
     } catch (err) {
-      alert('Error loading users: ' + err.message)
+      showToast('Error loading users: ' + err.message, 'error')
     } finally {
       setUsersLoading(false)
     }
@@ -196,10 +350,13 @@ export default function AdminPage() {
       const { data, error } = await q
       if (error) throw error
       let filtered = data || []
-      if (search) filtered = filtered.filter(r => r.reviewer?.username?.toLowerCase().includes(search.toLowerCase()) || r.seller?.username?.toLowerCase().includes(search.toLowerCase()))
+      if (search) filtered = filtered.filter(r =>
+        r.reviewer?.username?.toLowerCase().includes(search.toLowerCase()) ||
+        r.seller?.username?.toLowerCase().includes(search.toLowerCase())
+      )
       setReviews(filtered)
     } catch (err) {
-      alert('Error loading reviews: ' + err.message)
+      showToast('Error loading reviews: ' + err.message, 'error')
     } finally {
       setReviewsLoading(false)
     }
@@ -217,50 +374,61 @@ export default function AdminPage() {
       if (error) throw error
       setListings(data || [])
     } catch (err) {
-      alert('Error loading listings: ' + err.message)
+      showToast('Error loading listings: ' + err.message, 'error')
     } finally {
       setListingsLoading(false)
     }
   }
-
-  // ─── ACTIONS ────────────────────────────────────────────────
 
   async function loadDisputes() {
     setDisputesLoading(true)
     try {
       const { data, error } = await supabase
         .from('disputes')
-        .select(`
-          *,
-          opener:profiles!disputes_opened_by_fkey(id, username, avatar_url),
-          against:profiles!disputes_against_user_id_fkey(id, username, avatar_url),
-          listings(id, title)
-        `)
+        .select(`*, opener:profiles!disputes_opened_by_fkey(id, username, avatar_url), against:profiles!disputes_against_user_id_fkey(id, username, avatar_url), listings(id, title)`)
         .order('created_at', { ascending: false })
         .limit(100)
       if (error) throw error
       setDisputes(data || [])
     } catch (err) {
-      alert('Error loading disputes: ' + err.message)
+      showToast('Error loading disputes: ' + err.message, 'error')
     } finally {
       setDisputesLoading(false)
     }
   }
 
+  // Load promotions — reads from user_promotions table
+  // Schema expected: id, user_id, role ('VIP'|'Moderator'|'Verified Trader'), granted_by, granted_at, expires_at, active, note, profiles(username, avatar_url)
+  async function loadPromotions() {
+    setPromotionsLoading(true)
+    try {
+      const { data, error } = await supabase
+        .from('user_promotions')
+        .select(`*, profiles(id, username, avatar_url, badges)`)
+        .order('granted_at', { ascending: false })
+        .limit(200)
+      if (error) throw error
+      setPromotions(data || [])
+    } catch (err) {
+      showToast('Error loading promotions: ' + err.message, 'error')
+    } finally {
+      setPromotionsLoading(false)
+    }
+  }
+
+  // ─── ACTIONS ─────────────────────────────────────────────────────
+
   async function updateDispute(disputeId, status, resolution, notes) {
     try {
       const { error } = await supabase.from('disputes').update({
-        status,
-        resolution: resolution || null,
-        admin_notes: notes || null,
-        reviewed_by: user.id,
-        reviewed_at: new Date().toISOString(),
+        status, resolution: resolution || null, admin_notes: notes || null,
+        reviewed_by: user.id, reviewed_at: new Date().toISOString(),
       }).eq('id', disputeId)
       if (error) throw error
-      loadDisputes()
-      loadStats()
+      loadDisputes(); loadStats()
+      showToast('Dispute updated')
     } catch (err) {
-      alert('Failed: ' + err.message)
+      showToast('Failed: ' + err.message, 'error')
     }
   }
 
@@ -271,67 +439,59 @@ export default function AdminPage() {
         reviewed_by: user.id, reviewed_at: new Date().toISOString(),
       }).eq('id', reportId)
       if (error) throw error
-      loadReports(reportFilter)
-      loadStats()
+      loadReports(reportFilter); loadStats()
+      showToast('Report updated')
     } catch (err) {
-      alert('Failed: ' + err.message)
+      showToast('Failed: ' + err.message, 'error')
     }
   }
 
   async function updateBadge(userId, badges) {
     try {
       const { error } = await supabase.rpc('admin_update_profile', {
-        target_id: userId,
-        new_badges: badges,  // text[] — e.g. ['Owner', 'VIP']
-        new_banned: null,
-        new_ban_reason: null,
+        target_id: userId, new_badges: badges, new_banned: null, new_ban_reason: null,
       })
       if (error) throw error
-      loadUsers(userSearch)
-      loadStats()
+      loadUsers(userSearch); loadStats()
+      showToast('Badges updated')
     } catch (err) {
-      alert('Failed to update badges: ' + err.message)
+      showToast('Failed to update badges: ' + err.message, 'error')
     }
   }
 
   async function deleteUser(userId, username) {
-    if (userId === user?.id) { alert('You cannot delete your own account.'); return }
-    if (!confirm(`Permanently delete @${username}? This will delete all their listings, reviews, messages, and trades. This cannot be undone.`)) return
+    if (userId === user?.id) { showToast('Cannot delete your own account.', 'error'); return }
+    if (!confirm(`Permanently delete @${username}? This cannot be undone.`)) return
     try {
       const { error } = await supabase.rpc('admin_delete_user', { target_id: userId })
       if (error) throw error
-      loadUsers(userSearch)
-      loadStats()
+      loadUsers(userSearch); loadStats()
+      showToast(`@${username} deleted`)
     } catch (err) {
-      alert('Failed: ' + err.message)
+      showToast('Failed: ' + err.message, 'error')
     }
   }
 
   async function toggleBan(userId, currentlyBanned, username) {
-    // Prevent owner from banning themselves
-    if (userId === user?.id) {
-      alert('You cannot ban your own account.')
-      return
-    }
+    if (userId === user?.id) { showToast('Cannot ban your own account.', 'error'); return }
     if (currentlyBanned) {
       if (!confirm(`Unban @${username}?`)) return
       const { error } = await supabase.rpc('admin_update_profile', {
-        target_id: userId, new_badges: null,
-        new_banned: false, new_ban_reason: null,
+        target_id: userId, new_badges: null, new_banned: false, new_ban_reason: null,
       })
-      if (error) { alert('Failed: ' + error.message); return }
+      if (error) { showToast('Failed: ' + error.message, 'error'); return }
+      showToast(`@${username} unbanned`)
     } else {
       const reason = prompt(`Reason for banning @${username}:`)
       if (!reason) return
       const { error } = await supabase.rpc('admin_update_profile', {
-        target_id: userId, new_badges: null,
-        new_banned: true, new_ban_reason: reason,
+        target_id: userId, new_badges: null, new_banned: true, new_ban_reason: reason,
       })
-      if (error) { alert('Failed: ' + error.message); return }
+      if (error) { showToast('Failed: ' + error.message, 'error'); return }
       await supabase.from('listings').update({ status: 'deleted' }).eq('user_id', userId).eq('status', 'active')
+      showToast(`@${username} banned`)
     }
-    loadUsers(userSearch)
-    loadStats()
+    loadUsers(userSearch); loadStats()
   }
 
   async function deleteReview(reviewId) {
@@ -340,8 +500,9 @@ export default function AdminPage() {
       const { error } = await supabase.rpc('admin_delete_review', { review_id: reviewId })
       if (error) throw error
       loadReviews(reviewSearch)
+      showToast('Review deleted')
     } catch (err) {
-      alert('Failed: ' + err.message)
+      showToast('Failed: ' + err.message, 'error')
     }
   }
 
@@ -350,162 +511,295 @@ export default function AdminPage() {
     try {
       const { error } = await supabase.rpc('admin_delete_listing', { listing_id: listingId })
       if (error) throw error
-      loadListings()
-      loadStats()
+      loadListings(); loadStats()
+      showToast('Listing deleted')
     } catch (err) {
-      alert('Failed: ' + err.message)
+      showToast('Failed: ' + err.message, 'error')
     }
   }
 
   async function createAccount() {
     if (!createForm.email || !createForm.password || !createForm.username) {
-      alert('All fields required.'); return
+      showToast('All fields required.', 'error'); return
     }
     setCreating(true)
     try {
       const { error } = await supabase.rpc('admin_create_user', {
-        user_email: createForm.email,
-        user_password: createForm.password,
-        user_username: createForm.username,
+        user_email: createForm.email, user_password: createForm.password, user_username: createForm.username,
       })
       if (error) throw error
-      alert(`Account created for @${createForm.username}`)
+      showToast(`Account created for @${createForm.username}`)
       setCreateModal(false)
       setCreateForm({ email: '', password: '', username: '' })
-      loadUsers(userSearch)
-      loadStats()
+      loadUsers(userSearch); loadStats()
     } catch (err) {
-      alert('Failed: ' + err.message)
+      showToast('Failed: ' + err.message, 'error')
     } finally {
       setCreating(false)
     }
   }
 
-  // ─── RENDER GUARDS ──────────────────────────────────────────
+  // Grant a promotion: writes to user_promotions AND updates badges
+  async function grantPromotion() {
+    if (!promoteModal) return
+    setPromoting(true)
+    try {
+      const { role, duration, note } = promoteForm
+      const expiresAt = duration ? addDays(duration) : null
+      const targetUser = promoteModal.user
 
-  if (loading) return <div style={{ minHeight: '100vh' }}><Navbar /><div style={{ textAlign: 'center', padding: 80, color: '#6b7280' }}>Loading...</div></div>
+      // Insert into user_promotions table
+      const { error: promoError } = await supabase.from('user_promotions').insert({
+        user_id: targetUser.id,
+        role,
+        granted_by: user.id,
+        granted_at: new Date().toISOString(),
+        expires_at: expiresAt,
+        active: true,
+        note: note || null,
+      })
+      if (promoError) throw promoError
+
+      // Also update the user's badges
+      const currentBadges = targetUser.badges?.length ? targetUser.badges : targetUser.badge ? [targetUser.badge] : []
+      const newBadges = currentBadges.includes(role) ? currentBadges : [...currentBadges, role]
+      const { error: badgeError } = await supabase.rpc('admin_update_profile', {
+        target_id: targetUser.id, new_badges: newBadges, new_banned: null, new_ban_reason: null,
+      })
+      if (badgeError) throw badgeError
+
+      showToast(`${role} granted to @${targetUser.username}`)
+      setPromoteModal(null)
+      setPromoteForm({ role: 'VIP', duration: 30, note: '' })
+      loadPromotions(); loadUsers(userSearch)
+    } catch (err) {
+      showToast('Failed: ' + err.message, 'error')
+    } finally {
+      setPromoting(false)
+    }
+  }
+
+  // Revoke a promotion: sets active=false and removes badge
+  async function revokePromotion(promo) {
+    if (!confirm(`Revoke ${promo.role} from @${promo.profiles?.username}?`)) return
+    try {
+      const { error: updateError } = await supabase.from('user_promotions')
+        .update({ active: false, revoked_at: new Date().toISOString(), revoked_by: user.id })
+        .eq('id', promo.id)
+      if (updateError) throw updateError
+
+      // Remove badge from user
+      const currentBadges = promo.profiles?.badges?.length ? promo.profiles.badges : []
+      const newBadges = currentBadges.filter(b => b !== promo.role)
+      await supabase.rpc('admin_update_profile', {
+        target_id: promo.user_id, new_badges: newBadges, new_banned: null, new_ban_reason: null,
+      })
+
+      showToast(`${promo.role} revoked from @${promo.profiles?.username}`)
+      loadPromotions(); loadStats()
+    } catch (err) {
+      showToast('Failed: ' + err.message, 'error')
+    }
+  }
+
+  // ─── RENDER GUARDS ───────────────────────────────────────────────
+
+  if (loading) return (
+    <div style={S.page}>
+      <Navbar />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ width: 40, height: 40, border: '3px solid #1f2937', borderTopColor: '#4ade80', borderRadius: '50%', margin: '0 auto 16px', animation: 'spin 0.8s linear infinite' }} />
+          <div style={{ color: '#6b7280', fontSize: 13 }}>Loading admin panel...</div>
+        </div>
+      </div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+    </div>
+  )
 
   if (unauthorized) return (
-    <div style={{ minHeight: '100vh' }}><Navbar />
+    <div style={S.page}>
+      <Navbar />
       <div style={{ textAlign: 'center', padding: '100px 24px' }}>
-        <div style={{ fontSize: 48, marginBottom: 16 }}>🚫</div>
-        <h2 style={{ color: '#f87171', marginBottom: 8 }}>Access Denied</h2>
-        <p style={{ color: '#6b7280', marginBottom: 16 }}>Owner or Moderator badge required.</p>
-        <Link href="/" style={{ color: '#4ade80' }}>Go home</Link>
+        <div style={{ fontSize: 52, marginBottom: 16 }}>🚫</div>
+        <h2 style={{ color: '#f87171', marginBottom: 8, fontSize: 22 }}>Access Denied</h2>
+        <p style={{ color: '#6b7280', marginBottom: 20 }}>Owner or Moderator role required.</p>
+        <Link href="/" style={{ color: '#4ade80', fontWeight: 700 }}>← Back to Home</Link>
       </div>
     </div>
   )
 
-  const TABS = isOwner
-    ? [
-        { id: 'reports', label: `🚩 Reports${stats.pendingReports > 0 ? ` (${stats.pendingReports})` : ''}` },
-        { id: 'disputes', label: `⚠️ Disputes${stats.openDisputes > 0 ? ` (${stats.openDisputes})` : ''}` },
-        { id: 'users', label: '👥 Users' },
-        { id: 'reviews', label: '⭐ Reviews' },
-        { id: 'listings', label: '📋 Listings' },
-      ]
-    : [
-        { id: 'reports', label: `🚩 Reports${stats.pendingReports > 0 ? ` (${stats.pendingReports})` : ''}` },
-        { id: 'disputes', label: `⚠️ Disputes${stats.openDisputes > 0 ? ` (${stats.openDisputes})` : ''}` },
-      ]
+  const TABS = [
+    { id: 'dashboard', label: '📊 Dashboard', ownerOnly: false },
+    { id: 'reports', label: `🚩 Reports${stats.pendingReports > 0 ? ` (${stats.pendingReports})` : ''}`, ownerOnly: false },
+    { id: 'disputes', label: `⚖️ Disputes${stats.openDisputes > 0 ? ` (${stats.openDisputes})` : ''}`, ownerOnly: false },
+    { id: 'users', label: '👥 Users', ownerOnly: true },
+    { id: 'promotions', label: `🎖️ Promotions${stats.activePromotions > 0 ? ` (${stats.activePromotions})` : ''}`, ownerOnly: true },
+    { id: 'reviews', label: '⭐ Reviews', ownerOnly: true },
+    { id: 'listings', label: '📋 Listings', ownerOnly: true },
+  ].filter(t => !t.ownerOnly || isOwner)
+
+  const filteredPromotions = promotions.filter(p => {
+    if (promoFilter === 'all') return true
+    if (promoFilter === 'active') return p.active
+    if (promoFilter === 'expired') return !p.active || (p.expires_at && new Date(p.expires_at) < new Date())
+    return p.role === promoFilter
+  })
 
   return (
-    <div style={{ minHeight: '100vh' }}>
+    <div style={S.page}>
       <Navbar />
 
-      {/* Create Account Modal */}
-      {createModal && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
-          onClick={e => e.target === e.currentTarget && setCreateModal(false)}>
-          <div style={{ background: '#111118', border: '1px solid #2d2d3f', borderRadius: 16, padding: 28, width: '100%', maxWidth: 400, boxShadow: '0 20px 60px rgba(0,0,0,0.6)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#f9fafb' }}>Create Account</h3>
-              <button onClick={() => setCreateModal(false)} style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: 20 }}>×</button>
-            </div>
-            {[
-              { key: 'username', label: 'Username', type: 'text', placeholder: 'ExampleUser' },
-              { key: 'email', label: 'Email', type: 'email', placeholder: 'user@email.com' },
-              { key: 'password', label: 'Password', type: 'password', placeholder: 'Min. 8 characters' },
-            ].map(f => (
-              <div key={f.key} style={{ marginBottom: 14 }}>
-                <label style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{f.label}</label>
-                <input type={f.type} placeholder={f.placeholder} value={createForm[f.key]}
-                  onChange={e => setCreateForm(p => ({ ...p, [f.key]: e.target.value }))} />
-              </div>
-            ))}
-            <button onClick={createAccount} disabled={creating} className="btn-primary" style={{ width: '100%', marginTop: 4 }}>
-              {creating ? 'Creating...' : 'Create Account'}
-            </button>
-          </div>
+      {/* Toast */}
+      {toast && (
+        <div style={{
+          position: 'fixed', bottom: 24, right: 24, zIndex: 999,
+          background: toast.type === 'error' ? 'rgba(239,68,68,0.15)' : 'rgba(74,222,128,0.15)',
+          border: `1px solid ${toast.type === 'error' ? 'rgba(239,68,68,0.4)' : 'rgba(74,222,128,0.4)'}`,
+          color: toast.type === 'error' ? '#f87171' : '#4ade80',
+          borderRadius: 10, padding: '12px 18px', fontSize: 13, fontWeight: 600,
+          backdropFilter: 'blur(8px)', boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+          animation: 'slideIn 0.2s ease',
+        }}>
+          {toast.type === 'error' ? '✕' : '✓'} {toast.msg}
         </div>
       )}
 
-      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 16px' }}>
+      {/* Create Account Modal */}
+      {createModal && (
+        <Modal title="Create Account" onClose={() => setCreateModal(false)}>
+          {[
+            { key: 'username', label: 'Username', type: 'text', placeholder: 'ExampleUser' },
+            { key: 'email', label: 'Email', type: 'email', placeholder: 'user@email.com' },
+            { key: 'password', label: 'Password', type: 'password', placeholder: 'Min. 8 characters' },
+          ].map(f => (
+            <div key={f.key} style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{f.label}</label>
+              <input type={f.type} placeholder={f.placeholder} value={createForm[f.key]}
+                onChange={e => setCreateForm(p => ({ ...p, [f.key]: e.target.value }))}
+                style={S.input} />
+            </div>
+          ))}
+          <button onClick={createAccount} disabled={creating} className="btn-primary" style={{ width: '100%', marginTop: 4, padding: '11px', fontSize: 13, fontWeight: 700, borderRadius: 8, border: 'none', background: creating ? '#1f2937' : '#16a34a', color: creating ? '#6b7280' : '#fff', cursor: creating ? 'default' : 'pointer' }}>
+            {creating ? 'Creating...' : 'Create Account'}
+          </button>
+        </Modal>
+      )}
 
-        {/* Header */}
+      {/* Promote User Modal */}
+      {promoteModal && (
+        <Modal title={`Promote @${promoteModal.user.username}`} onClose={() => setPromoteModal(null)}>
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Role</label>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {['VIP', 'Moderator', 'Verified Trader'].map(r => (
+                <button key={r} onClick={() => setPromoteForm(p => ({ ...p, role: r, duration: r === 'Moderator' || r === 'Verified Trader' ? null : 30 }))} style={{
+                  padding: '7px 14px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700,
+                  background: promoteForm.role === r ? `${BADGE_COLORS[r]}22` : '#1f2937',
+                  color: promoteForm.role === r ? BADGE_COLORS[r] : '#6b7280',
+                  outline: promoteForm.role === r ? `1px solid ${BADGE_COLORS[r]}66` : 'none',
+                }}>
+                  {BADGE_ICONS[r]} {r}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {(promoteForm.role === 'VIP') && (
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Duration</label>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {VIP_DURATIONS.map(d => (
+                  <button key={d.label} onClick={() => setPromoteForm(p => ({ ...p, duration: d.days }))} style={{
+                    padding: '6px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700,
+                    background: promoteForm.duration === d.days ? 'rgba(245,158,11,0.15)' : '#1f2937',
+                    color: promoteForm.duration === d.days ? '#f59e0b' : '#6b7280',
+                    outline: promoteForm.duration === d.days ? '1px solid rgba(245,158,11,0.4)' : 'none',
+                  }}>
+                    {d.label}
+                  </button>
+                ))}
+              </div>
+              {promoteForm.duration && (
+                <div style={{ marginTop: 6, fontSize: 11, color: '#6b7280' }}>
+                  Expires: <strong style={{ color: '#f9fafb' }}>{formatDate(addDays(promoteForm.duration))}</strong>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Internal Note (optional)</label>
+            <input type="text" placeholder="e.g. Paid via PayPal, annual plan..." value={promoteForm.note}
+              onChange={e => setPromoteForm(p => ({ ...p, note: e.target.value }))}
+              style={S.input} />
+          </div>
+
+          <button onClick={grantPromotion} disabled={promoting} style={{
+            width: '100%', padding: '11px', fontSize: 13, fontWeight: 700, borderRadius: 8, border: 'none',
+            background: promoting ? '#1f2937' : `${BADGE_COLORS[promoteForm.role]}cc`,
+            color: promoting ? '#6b7280' : '#fff', cursor: promoting ? 'default' : 'pointer',
+          }}>
+            {promoting ? 'Granting...' : `Grant ${promoteForm.role}`}
+          </button>
+        </Modal>
+      )}
+
+      <div style={S.container}>
+
+        {/* ─── Header ─── */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
           <div>
-            <h1 style={{ margin: '0 0 4px', fontSize: 26, fontWeight: 900, color: '#f9fafb', fontFamily: 'var(--font-display)' }}>Admin Panel</h1>
-            <div style={{ fontSize: 13, color: '#6b7280' }}>
+            <h1 style={{ margin: '0 0 3px', fontSize: 24, fontWeight: 900, color: '#f9fafb', letterSpacing: '-0.02em' }}>
+              Admin Panel
+            </h1>
+            <div style={{ fontSize: 12, color: '#6b7280' }}>
               Signed in as{' '}
               <strong style={{ color: BADGE_COLORS[profileBadges[0]] || '#f9fafb' }}>{profile?.username}</strong>
-              {' '}— <span style={{ color: BADGE_COLORS[profileBadges[0]] || '#6b7280' }}>{profileBadges[0] || profile?.badge}</span>
+              {' · '}
+              <span style={{ color: BADGE_COLORS[profileBadges[0]] || '#6b7280' }}>{profileBadges[0] || profile?.badge}</span>
             </div>
           </div>
           {isOwner && (
-            <button onClick={() => setCreateModal(true)} className="btn-primary" style={{ fontSize: 13, padding: '9px 18px' }}>
+            <button onClick={() => setCreateModal(true)} style={{
+              padding: '9px 16px', borderRadius: 8, border: 'none', background: 'rgba(74,222,128,0.15)',
+              color: '#4ade80', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+              boxShadow: '0 0 0 1px rgba(74,222,128,0.3)',
+            }}>
               ➕ Create Account
             </button>
           )}
         </div>
 
-        {/* Stats */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10, marginBottom: 24 }}>
-          {[
-            { label: 'Total Users', value: stats.totalUsers || 0, color: '#4ade80', icon: '👥' },
-            { label: 'Active Listings', value: stats.activeListings || 0, color: '#60a5fa', icon: '📋' },
-            { label: 'Pending Reports', value: stats.pendingReports || 0, color: '#f59e0b', icon: '🚩', alert: stats.pendingReports > 0 },
-            { label: 'Completed Trades', value: stats.completedTrades || 0, color: '#a78bfa', icon: '✅' },
-            { label: 'Banned Users', value: stats.bannedUsers || 0, color: '#ef4444', icon: '🚫' },
-            { label: 'Open Disputes', value: stats.openDisputes || 0, color: '#f97316', icon: '⚠️', alert: stats.openDisputes > 0 },
-          ].map(s => (
-            <div key={s.label} style={{ background: s.alert ? 'rgba(245,158,11,0.08)' : '#111118', border: `1px solid ${s.alert ? 'rgba(245,158,11,0.3)' : '#1f2937'}`, borderRadius: 10, padding: '14px 16px', textAlign: 'center' }}>
-              <div style={{ fontSize: 18, marginBottom: 4 }}>{s.icon}</div>
-              <div style={{ fontSize: 22, fontWeight: 900, color: s.color }}>{s.value}</div>
-              <div style={{ fontSize: 10, color: '#6b7280', fontWeight: 600, marginTop: 2 }}>{s.label}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Tabs */}
-        <div style={{ display: 'flex', borderBottom: '1px solid #1f2937', marginBottom: 20 }}>
+        {/* ─── Tabs ─── */}
+        <div style={{ display: 'flex', borderBottom: '1px solid #1f2937', marginBottom: 24, overflowX: 'auto', gap: 0 }}>
           {TABS.map(t => (
             <button key={t.id} onClick={() => setTab(t.id)} style={{
               background: 'none', border: 'none', cursor: 'pointer',
-              padding: '10px 18px', fontSize: 13, fontWeight: 700,
+              padding: '10px 16px', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap',
               color: tab === t.id ? '#4ade80' : '#6b7280',
               borderBottom: tab === t.id ? '2px solid #4ade80' : '2px solid transparent',
-              marginBottom: -1, transition: 'all 0.15s',
+              marginBottom: -1, transition: 'color 0.15s',
             }}>{t.label}</button>
           ))}
         </div>
+
+        {/* ─── DASHBOARD TAB ─── */}
+        {tab === 'dashboard' && (
+          <DashboardTab stats={stats} onTabSwitch={setTab} />
+        )}
 
         {/* ─── REPORTS TAB ─── */}
         {tab === 'reports' && (
           <div>
             <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
               {['pending', 'reviewed', 'resolved', 'dismissed', 'all'].map(s => (
-                <button key={s} onClick={() => { setReportFilter(s); loadReports(s) }} style={{
-                  padding: '6px 14px', borderRadius: 20, border: 'none', cursor: 'pointer',
-                  fontSize: 11, fontWeight: 700, textTransform: 'capitalize',
-                  background: reportFilter === s ? 'rgba(74,222,128,0.15)' : '#111118',
-                  color: reportFilter === s ? '#4ade80' : '#6b7280',
-                  boxShadow: reportFilter === s ? '0 0 0 1px rgba(74,222,128,0.3)' : '0 0 0 1px #2d2d3f',
-                }}>{s}</button>
+                <button key={s} onClick={() => { setReportFilter(s); loadReports(s) }}
+                  style={S.pill('#4ade80', reportFilter === s)}>{s}</button>
               ))}
             </div>
             {reportsLoading
-              ? <div style={{ color: '#6b7280', padding: 20 }}>Loading...</div>
+              ? <Loader />
               : reports.length === 0
               ? <EmptyState icon="✅" message={`No ${reportFilter} reports`} />
               : <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -518,18 +812,55 @@ export default function AdminPage() {
         {/* ─── USERS TAB ─── */}
         {tab === 'users' && isOwner && (
           <div>
-            <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
+            <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
               <input type="text" placeholder="Search username..." value={userSearch}
                 onChange={e => setUserSearch(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && loadUsers(userSearch)}
-                style={{ flex: 1, maxWidth: 320 }} />
-              <button onClick={() => loadUsers(userSearch)} className="btn-primary" style={{ padding: '10px 16px', fontSize: 13 }}>Search</button>
+                style={{ ...S.input, maxWidth: 320 }} />
+              <button onClick={() => loadUsers(userSearch)} style={{
+                padding: '10px 16px', borderRadius: 8, border: 'none', background: 'rgba(74,222,128,0.15)',
+                color: '#4ade80', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+              }}>Search</button>
             </div>
             {usersLoading
-              ? <div style={{ color: '#6b7280', padding: 20 }}>Loading...</div>
+              ? <Loader />
+              : users.length === 0
+              ? <EmptyState icon="👥" message="No users found" />
               : <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {users.map(u => (
-                    <UserRow key={u.id} user={u} onUpdateBadge={updateBadge} onToggleBan={toggleBan} onDelete={deleteUser} />
+                    <UserRow key={u.id} user={u}
+                      onUpdateBadge={updateBadge}
+                      onToggleBan={toggleBan}
+                      onDelete={deleteUser}
+                      onPromote={(u) => { setPromoteModal({ user: u }); setPromoteForm({ role: 'VIP', duration: 30, note: '' }) }}
+                    />
+                  ))}
+                </div>
+            }
+          </div>
+        )}
+
+        {/* ─── PROMOTIONS TAB ─── */}
+        {tab === 'promotions' && isOwner && (
+          <div>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {['all', 'active', 'VIP', 'Moderator', 'Verified Trader', 'expired'].map(f => (
+                  <button key={f} onClick={() => setPromoFilter(f)} style={S.pill(BADGE_COLORS[f] || '#4ade80', promoFilter === f)}>
+                    {f}
+                  </button>
+                ))}
+              </div>
+              <div style={{ fontSize: 11, color: '#6b7280' }}>{filteredPromotions.length} record{filteredPromotions.length !== 1 ? 's' : ''}</div>
+            </div>
+
+            {promotionsLoading
+              ? <Loader />
+              : filteredPromotions.length === 0
+              ? <EmptyState icon="🎖️" message="No promotions found" />
+              : <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {filteredPromotions.map(p => (
+                    <PromotionRow key={p.id} promo={p} onRevoke={revokePromotion} />
                   ))}
                 </div>
             }
@@ -542,27 +873,27 @@ export default function AdminPage() {
             <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
               <input type="text" placeholder="Search by username..." value={reviewSearch}
                 onChange={e => { setReviewSearch(e.target.value); loadReviews(e.target.value) }}
-                style={{ flex: 1, maxWidth: 320 }} />
+                style={{ ...S.input, maxWidth: 320 }} />
             </div>
             {reviewsLoading
-              ? <div style={{ color: '#6b7280', padding: 20 }}>Loading...</div>
+              ? <Loader />
               : reviews.length === 0
               ? <EmptyState icon="⭐" message="No reviews found" />
               : <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {reviews.map(r => (
-                    <div key={r.id} style={{ background: '#111118', border: '1px solid #1f2937', borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 4, fontSize: 12 }}>
-                          <span style={{ color: '#6b7280' }}>From: <Link href={`/profile/${r.reviewer?.username}`} style={{ color: '#4ade80', textDecoration: 'none', fontWeight: 600 }}>{r.reviewer?.username}</Link></span>
-                          <span style={{ color: '#6b7280' }}>To: <Link href={`/profile/${r.seller?.username}`} style={{ color: '#60a5fa', textDecoration: 'none', fontWeight: 600 }}>{r.seller?.username}</Link></span>
-                          <span>{'⭐'.repeat(r.rating)}</span>
-                          <span style={{ color: '#4b5563' }}>{timeAgo(r.created_at)}</span>
+                    <div key={r.id} style={S.card}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 4, fontSize: 12 }}>
+                            <span style={{ color: '#6b7280' }}>From: <Link href={`/profile/${r.reviewer?.username}`} style={{ color: '#4ade80', textDecoration: 'none', fontWeight: 600 }}>{r.reviewer?.username}</Link></span>
+                            <span style={{ color: '#6b7280' }}>To: <Link href={`/profile/${r.seller?.username}`} style={{ color: '#60a5fa', textDecoration: 'none', fontWeight: 600 }}>{r.seller?.username}</Link></span>
+                            <span>{'⭐'.repeat(r.rating)}</span>
+                            <span style={{ color: '#4b5563' }}>{timeAgo(r.created_at)}</span>
+                          </div>
+                          {r.comment && <p style={{ margin: 0, fontSize: 12, color: '#9ca3af' }}>{r.comment}</p>}
                         </div>
-                        {r.comment && <p style={{ margin: 0, fontSize: 12, color: '#9ca3af' }}>{r.comment}</p>}
+                        <button onClick={() => deleteReview(r.id)} style={S.actionBtn('#f87171')}>🗑 Delete</button>
                       </div>
-                      <button onClick={() => deleteReview(r.id)} style={{ padding: '5px 10px', borderRadius: 6, border: 'none', background: 'rgba(239,68,68,0.1)', color: '#f87171', fontSize: 11, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
-                        🗑 Delete
-                      </button>
                     </div>
                   ))}
                 </div>
@@ -574,28 +905,28 @@ export default function AdminPage() {
         {tab === 'listings' && isOwner && (
           <div>
             {listingsLoading
-              ? <div style={{ color: '#6b7280', padding: 20 }}>Loading...</div>
+              ? <Loader />
               : listings.length === 0
               ? <EmptyState icon="📋" message="No listings" />
               : <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {listings.map(l => (
-                    <div key={l.id} style={{ background: '#111118', border: '1px solid #1f2937', borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                          <Link href={`/listing/${l.id}`} style={{ fontSize: 13, fontWeight: 700, color: '#f9fafb', textDecoration: 'none' }}>{l.title}</Link>
-                          <span style={{ fontSize: 10, color: '#6b7280', background: '#1f2937', borderRadius: 3, padding: '1px 6px' }}>{l.rarity}</span>
-                          <span style={{ fontSize: 10, color: l.status === 'active' ? '#4ade80' : '#f87171', background: l.status === 'active' ? 'rgba(74,222,128,0.1)' : 'rgba(239,68,68,0.1)', borderRadius: 3, padding: '1px 6px' }}>{l.status}</span>
+                    <div key={l.id} style={S.card}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                            <Link href={`/listing/${l.id}`} style={{ fontSize: 13, fontWeight: 700, color: '#f9fafb', textDecoration: 'none' }}>{l.title}</Link>
+                            <span style={S.badge('#6b7280')}>{l.rarity}</span>
+                            <span style={S.badge(l.status === 'active' ? '#4ade80' : '#f87171')}>{l.status}</span>
+                          </div>
+                          <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
+                            By <Link href={`/profile/${l.profiles?.username}`} style={{ color: '#9ca3af', textDecoration: 'none' }}>{l.profiles?.username}</Link>
+                            {' · '}{l.game === 'fortnite' ? 'Fortnite' : 'Roblox'}
+                            {l.price && ` · $${l.price}`}
+                            {' · '}{l.views} views{' · '}{timeAgo(l.created_at)}
+                          </div>
                         </div>
-                        <div style={{ fontSize: 11, color: '#6b7280', marginTop: 3 }}>
-                          By <Link href={`/profile/${l.profiles?.username}`} style={{ color: '#9ca3af', textDecoration: 'none' }}>{l.profiles?.username}</Link>
-                          {' '}· {l.game === 'fortnite' ? 'Fortnite' : 'Roblox'}
-                          {l.price && ` · $${l.price}`}
-                          {' '}· {l.views} views · {timeAgo(l.created_at)}
-                        </div>
+                        <button onClick={() => deleteListing(l.id)} style={S.actionBtn('#f87171')}>🗑 Delete</button>
                       </div>
-                      <button onClick={() => deleteListing(l.id)} style={{ padding: '5px 10px', borderRadius: 6, border: 'none', background: 'rgba(239,68,68,0.1)', color: '#f87171', fontSize: 11, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
-                        🗑 Delete
-                      </button>
                     </div>
                   ))}
                 </div>
@@ -607,7 +938,7 @@ export default function AdminPage() {
         {tab === 'disputes' && (
           <div>
             {disputesLoading
-              ? <div style={{ color: '#6b7280', padding: 20 }}>Loading disputes...</div>
+              ? <Loader />
               : disputes.length === 0
               ? <EmptyState icon="⚖️" message="No disputes filed yet" />
               : <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -618,11 +949,280 @@ export default function AdminPage() {
         )}
 
       </div>
+
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg) } }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: translateY(0) } }
+        * { box-sizing: border-box; }
+        input, textarea, select { background: #0d0d14; border: 1px solid #2d2d3f; border-radius: 8px; padding: 9px 12px; color: #f9fafb; font-size: 13px; outline: none; }
+        input:focus, textarea:focus, select:focus { border-color: rgba(74,222,128,0.4); }
+        textarea { resize: vertical; }
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #2d2d3f; border-radius: 2px; }
+      `}</style>
     </div>
   )
 }
 
-// ─── REPORT CARD ──────────────────────────────────────────────────
+// ─── DASHBOARD TAB ────────────────────────────────────────────────────────────
+
+function DashboardTab({ stats, onTabSwitch }) {
+  const statCards = [
+    { label: 'Total Users', value: stats.totalUsers || 0, color: '#4ade80', icon: '👥', tab: 'users' },
+    { label: 'Active Listings', value: stats.activeListings || 0, color: '#60a5fa', icon: '📋', tab: 'listings' },
+    { label: 'Pending Reports', value: stats.pendingReports || 0, color: '#f59e0b', icon: '🚩', tab: 'reports', alert: stats.pendingReports > 0 },
+    { label: 'Completed Trades', value: stats.completedTrades || 0, color: '#a78bfa', icon: '✅' },
+    { label: 'Banned Users', value: stats.bannedUsers || 0, color: '#ef4444', icon: '🚫', tab: 'users' },
+    { label: 'Open Disputes', value: stats.openDisputes || 0, color: '#f97316', icon: '⚖️', tab: 'disputes', alert: stats.openDisputes > 0 },
+    { label: 'Active Promotions', value: stats.activePromotions || 0, color: '#f59e0b', icon: '🎖️', tab: 'promotions' },
+  ]
+
+  return (
+    <div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(148px, 1fr))', gap: 10, marginBottom: 28 }}>
+        {statCards.map(s => (
+          <div key={s.label}
+            onClick={() => s.tab && onTabSwitch(s.tab)}
+            style={{
+              background: s.alert ? `${s.color}08` : '#111118',
+              border: `1px solid ${s.alert ? s.color + '40' : '#1f2937'}`,
+              borderRadius: 10, padding: '16px 14px', textAlign: 'center',
+              cursor: s.tab ? 'pointer' : 'default',
+              transition: 'border-color 0.15s, background 0.15s',
+            }}>
+            <div style={{ fontSize: 20, marginBottom: 6 }}>{s.icon}</div>
+            <div style={{ fontSize: 26, fontWeight: 900, color: s.color, lineHeight: 1 }}>{s.value}</div>
+            <div style={{ fontSize: 10, color: '#6b7280', fontWeight: 600, marginTop: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
+        {[
+          { title: '🔴 Needs Attention', items: [
+            { label: 'Pending Reports', value: stats.pendingReports, color: '#f59e0b', tab: 'reports', urgent: stats.pendingReports > 0 },
+            { label: 'Open Disputes', value: stats.openDisputes, color: '#f97316', tab: 'disputes', urgent: stats.openDisputes > 0 },
+          ]},
+          { title: '📈 Site Health', items: [
+            { label: 'Total Users', value: stats.totalUsers, color: '#4ade80' },
+            { label: 'Active Listings', value: stats.activeListings, color: '#60a5fa' },
+            { label: 'Completed Trades', value: stats.completedTrades, color: '#a78bfa' },
+          ]},
+          { title: '🎖️ Roles Active', items: [
+            { label: 'Active Promotions', value: stats.activePromotions, color: '#f59e0b', tab: 'promotions' },
+            { label: 'Banned Users', value: stats.bannedUsers, color: '#ef4444', tab: 'users' },
+          ]},
+        ].map(section => (
+          <div key={section.title} style={{ background: '#111118', border: '1px solid #1f2937', borderRadius: 12, padding: '16px 18px' }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: '#6b7280', marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{section.title}</div>
+            {section.items.map(item => (
+              <div key={item.label}
+                onClick={() => item.tab && onTabSwitch(item.tab)}
+                style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  padding: '8px 0', borderBottom: '1px solid #1f293740',
+                  cursor: item.tab ? 'pointer' : 'default',
+                }}>
+                <span style={{ fontSize: 12, color: item.urgent ? item.color : '#9ca3af' }}>{item.label}</span>
+                <span style={{ fontSize: 16, fontWeight: 900, color: item.urgent ? item.color : '#f9fafb' }}>{item.value ?? '—'}</span>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ─── PROMOTION ROW ────────────────────────────────────────────────────────────
+
+function PromotionRow({ promo, onRevoke }) {
+  const color = BADGE_COLORS[promo.role] || '#9ca3af'
+  const daysLeft = daysUntil(promo.expires_at)
+  const isExpired = promo.expires_at && new Date(promo.expires_at) < new Date()
+  const isLifetime = !promo.expires_at && promo.active
+  const isActive = promo.active && !isExpired
+
+  return (
+    <div style={{
+      background: '#111118',
+      border: `1px solid ${isActive ? color + '30' : '#1f2937'}`,
+      borderRadius: 10, padding: '12px 16px',
+      opacity: isActive ? 1 : 0.65,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        {/* User info */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 160 }}>
+          <div style={{
+            width: 34, height: 34, borderRadius: '50%', flexShrink: 0,
+            background: promo.profiles?.avatar_url ? 'transparent' : `${color}22`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 13, fontWeight: 900, color, overflow: 'hidden', position: 'relative',
+          }}>
+            {promo.profiles?.avatar_url
+              ? <Image src={promo.profiles.avatar_url} alt="" fill sizes="34px" style={{ objectFit: 'cover' }} />
+              : getInitial(promo.profiles?.username)}
+          </div>
+          <div>
+            <Link href={`/profile/${promo.profiles?.username}`} style={{ fontSize: 13, fontWeight: 700, color: '#f9fafb', textDecoration: 'none' }}>
+              @{promo.profiles?.username || 'Unknown'}
+            </Link>
+            <div style={{ fontSize: 10, color: '#6b7280', marginTop: 1 }}>Granted {timeAgo(promo.granted_at)}</div>
+          </div>
+        </div>
+
+        {/* Role badge */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={S.badge(color)}>{BADGE_ICONS[promo.role]} {promo.role}</span>
+
+          {/* Duration info */}
+          <div style={{ fontSize: 11, minWidth: 100 }}>
+            {!promo.active || promo.revoked_at ? (
+              <span style={{ color: '#6b7280' }}>Revoked {timeAgo(promo.revoked_at)}</span>
+            ) : isLifetime ? (
+              <span style={{ color: '#a78bfa' }}>♾ Lifetime</span>
+            ) : isExpired ? (
+              <span style={{ color: '#ef4444' }}>Expired {formatDate(promo.expires_at)}</span>
+            ) : daysLeft !== null ? (
+              <span style={{ color: daysLeft <= 7 ? '#f59e0b' : '#4ade80' }}>
+                {daysLeft <= 0 ? 'Expires today' : `${daysLeft}d left`}
+                <span style={{ color: '#4b5563', marginLeft: 4 }}>({formatDate(promo.expires_at)})</span>
+              </span>
+            ) : null}
+          </div>
+        </div>
+
+        {/* Note */}
+        {promo.note && (
+          <span style={{ fontSize: 11, color: '#6b7280', fontStyle: 'italic', flex: 1, minWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            "{promo.note}"
+          </span>
+        )}
+
+        {/* Revoke button */}
+        {isActive && (
+          <button onClick={() => onRevoke(promo)} style={S.actionBtn('#f87171')}>
+            ✕ Revoke
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── USER ROW ─────────────────────────────────────────────────────────────────
+
+const ALL_BADGES = BADGE_HIERARCHY
+
+function UserRow({ user, onUpdateBadge, onToggleBan, onDelete, onPromote }) {
+  const initialBadges = user.badges?.length ? user.badges : user.badge ? [user.badge] : []
+  const [selectedBadges, setSelectedBadges] = useState(initialBadges)
+  const [saving, setSaving] = useState(false)
+  const [showBadges, setShowBadges] = useState(false)
+
+  const toggleBadge = (badge) => {
+    setSelectedBadges(prev => prev.includes(badge) ? prev.filter(b => b !== badge) : [...prev, badge])
+  }
+
+  async function handleSaveBadges() {
+    setSaving(true)
+    await onUpdateBadge(user.id, selectedBadges)
+    setSaving(false)
+    setShowBadges(false)
+  }
+
+  return (
+    <div style={{
+      background: '#111118',
+      border: `1px solid ${user.banned ? 'rgba(239,68,68,0.2)' : '#1f2937'}`,
+      borderRadius: 10, padding: '12px 16px',
+      opacity: user.banned ? 0.8 : 1,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        {/* Avatar */}
+        <div style={{
+          width: 38, height: 38, borderRadius: '50%', flexShrink: 0, overflow: 'hidden',
+          background: user.avatar_url ? 'transparent' : 'linear-gradient(135deg, #4ade80, #22c55e)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 15, fontWeight: 900, color: '#0a0a0f', position: 'relative',
+        }}>
+          {user.avatar_url ? <Image src={user.avatar_url} alt="" fill sizes="38px" style={{ objectFit: 'cover' }} /> : getInitial(user.username)}
+        </div>
+
+        {/* Info */}
+        <div style={{ flex: 1, minWidth: 120 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 2 }}>
+            <Link href={`/profile/${user.username}`} style={{ fontSize: 14, fontWeight: 700, color: '#f9fafb', textDecoration: 'none' }}>{user.username}</Link>
+            {initialBadges.filter(b => ALL_BADGES.includes(b)).map(b => (
+              <span key={b} style={S.badge(BADGE_COLORS[b] || '#9ca3af')}>{BADGE_ICONS[b]} {b}</span>
+            ))}
+            {user.banned && <span style={S.badge('#ef4444')}>BANNED</span>}
+          </div>
+          <div style={{ fontSize: 11, color: '#6b7280' }}>
+            {user.trade_count || 0} trades · ⭐{user.rating || 0} · {user.review_count || 0} reviews
+            {user.ban_reason && <span style={{ marginLeft: 8, color: '#f87171' }}>Ban: {user.ban_reason}</span>}
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div style={{ display: 'flex', gap: 6, flexShrink: 0, flexWrap: 'wrap' }}>
+          <button onClick={() => onPromote(user)} style={S.actionBtn('#f59e0b')}>🎖️ Promote</button>
+          <button onClick={() => setShowBadges(s => !s)} style={{
+            ...S.actionBtn('#60a5fa'),
+            background: showBadges ? 'rgba(96,165,250,0.2)' : 'rgba(96,165,250,0.1)',
+          }}>🏷 Badges</button>
+          <button onClick={() => onToggleBan(user.id, user.banned, user.username)} style={S.actionBtn(user.banned ? '#4ade80' : '#f87171')}>
+            {user.banned ? '✓ Unban' : '🚫 Ban'}
+          </button>
+        </div>
+      </div>
+
+      {/* Badge editor */}
+      {showBadges && (
+        <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #1f2937' }}>
+          <div style={S.sectionTitle}>Assign Badges</div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+            {ALL_BADGES.map(badge => {
+              const selected = selectedBadges.includes(badge)
+              return (
+                <button key={badge} onClick={() => toggleBadge(badge)} style={{
+                  padding: '5px 12px', borderRadius: 6, fontSize: 12, fontWeight: 700,
+                  cursor: 'pointer', border: 'none', transition: 'all 0.15s',
+                  background: selected ? `${BADGE_COLORS[badge]}22` : '#1f2937',
+                  color: selected ? BADGE_COLORS[badge] : '#6b7280',
+                  outline: selected ? `1px solid ${BADGE_COLORS[badge]}66` : 'none',
+                }}>
+                  {BADGE_ICONS[badge] || '·'} {badge}
+                </button>
+              )
+            })}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button onClick={handleSaveBadges} disabled={saving} style={{
+              padding: '7px 16px', borderRadius: 7, border: 'none',
+              background: saving ? '#1f2937' : '#16a34a', color: saving ? '#6b7280' : '#fff',
+              fontSize: 12, fontWeight: 700, cursor: saving ? 'default' : 'pointer',
+            }}>
+              {saving ? 'Saving...' : 'Save Badges'}
+            </button>
+            <button onClick={() => setSelectedBadges([])} style={{
+              padding: '7px 14px', borderRadius: 7, border: '1px solid #2d2d3f',
+              background: 'transparent', color: '#6b7280', fontSize: 12, cursor: 'pointer',
+            }}>Clear All</button>
+            {selectedBadges.length > 0 && (
+              <span style={{ fontSize: 11, color: '#6b7280' }}>
+                Primary: <strong style={{ color: BADGE_COLORS[getPrimaryBadge(selectedBadges)] }}>{getPrimaryBadge(selectedBadges)}</strong>
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── REPORT CARD ──────────────────────────────────────────────────────────────
 
 function ReportCard({ report, onUpdate }) {
   const [notesOpen, setNotesOpen] = useState(false)
@@ -636,210 +1236,67 @@ function ReportCard({ report, onUpdate }) {
     if (chatLogs) { setChatOpen(o => !o); return }
     setChatLoading(true)
     try {
-      // Fetch all messages between the two users (any listing)
       const { data } = await supabase
         .from('messages')
         .select(`*, sender:profiles!messages_sender_id_fkey(id, username)`)
-        .or(
-          `and(sender_id.eq.${report.reporter_id},receiver_id.eq.${report.reported_user_id}),` +
-          `and(sender_id.eq.${report.reported_user_id},receiver_id.eq.${report.reporter_id})`
-        )
-        .order('created_at', { ascending: true })
-        .limit(200)
-
-      // Also fetch reported user's trade history and reviews
+        .or(`and(sender_id.eq.${report.reporter_id},receiver_id.eq.${report.reported_user_id}),and(sender_id.eq.${report.reported_user_id},receiver_id.eq.${report.reporter_id})`)
+        .order('created_at', { ascending: true }).limit(200)
       const [{ data: trades }, { data: reviews }] = await Promise.all([
-        supabase.from('trade_requests').select('id, status, created_at, listing_id')
-          .eq('seller_id', report.reported_user_id).order('created_at', { ascending: false }).limit(20),
-        supabase.from('reviews').select('rating, comment, created_at')
-          .eq('seller_id', report.reported_user_id).order('created_at', { ascending: false }).limit(10),
+        supabase.from('trade_requests').select('id, status, created_at, listing_id').eq('seller_id', report.reported_user_id).order('created_at', { ascending: false }).limit(20),
+        supabase.from('reviews').select('rating, comment, created_at').eq('seller_id', report.reported_user_id).order('created_at', { ascending: false }).limit(10),
       ])
-
       setChatLogs(data || [])
       setUserActivity({ trades: trades || [], reviews: reviews || [] })
       setChatOpen(true)
     } catch (err) {
-      alert('Failed to load chat logs: ' + err.message)
+      alert('Failed to load logs: ' + err.message)
     } finally {
       setChatLoading(false)
     }
   }
 
   return (
-    <div style={{ background: '#111118', border: `1px solid ${report.status === 'pending' ? 'rgba(245,158,11,0.25)' : '#1f2937'}`, borderRadius: 12, padding: '14px 16px' }}>
+    <div style={{
+      background: '#111118',
+      border: `1px solid ${report.status === 'pending' ? 'rgba(245,158,11,0.25)' : '#1f2937'}`,
+      borderRadius: 12, padding: '14px 16px',
+    }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
-            <span style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: STATUS_COLORS[report.status] || '#6b7280', background: `${STATUS_COLORS[report.status] || '#6b7280'}18`, border: `1px solid ${STATUS_COLORS[report.status] || '#6b7280'}40`, borderRadius: 4, padding: '2px 7px' }}>
-              {report.status}
-            </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+            <span style={S.badge(STATUS_COLORS[report.status] || '#6b7280')}>{report.status}</span>
             <span style={{ fontSize: 12, fontWeight: 700, color: '#f59e0b' }}>{REASON_LABELS[report.reason] || report.reason}</span>
             <span style={{ fontSize: 11, color: '#4b5563' }}>{timeAgo(report.created_at)}</span>
           </div>
-
-          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 8, fontSize: 12 }}>
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6, fontSize: 12 }}>
             <span><span style={{ color: '#6b7280' }}>Reporter: </span><Link href={`/profile/${report.reporter?.username}`} style={{ color: '#4ade80', textDecoration: 'none', fontWeight: 600 }}>{report.reporter?.username || 'Unknown'}</Link></span>
             <span>
               <span style={{ color: '#6b7280' }}>Reported: </span>
               <Link href={`/profile/${report.reported_user?.username}`} style={{ color: '#f87171', textDecoration: 'none', fontWeight: 600 }}>{report.reported_user?.username || 'Unknown'}</Link>
-              {report.reported_user?.banned && <span style={{ marginLeft: 6, fontSize: 9, color: '#ef4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 3, padding: '1px 5px', fontWeight: 700 }}>BANNED</span>}
+              {report.reported_user?.banned && <span style={{ ...S.badge('#ef4444'), marginLeft: 6 }}>BANNED</span>}
             </span>
             {report.listings && <span><span style={{ color: '#6b7280' }}>Listing: </span><Link href={`/listing/${report.listing_id}`} style={{ color: '#60a5fa', textDecoration: 'none', fontWeight: 600 }}>{report.listings.title}</Link></span>}
           </div>
-
           {report.details && <p style={{ margin: '0 0 8px', fontSize: 12, color: '#9ca3af', lineHeight: 1.6, background: '#0d0d14', padding: '8px 12px', borderRadius: 6, border: '1px solid #1f2937' }}>{report.details}</p>}
-          {report.admin_notes && !notesOpen && <p style={{ margin: '0 0 8px', fontSize: 11, color: '#6b7280', fontStyle: 'italic' }}>Notes: {report.admin_notes}</p>}
-          {notesOpen && <textarea rows={2} placeholder="Admin notes..." value={notes} onChange={e => setNotes(e.target.value)} style={{ marginTop: 8, resize: 'vertical', fontSize: 12 }} />}
-
-          {/* Chat log + activity viewer */}
-          {chatOpen && chatLogs !== null && (
-            <ChatAndActivity chatLogs={chatLogs} userActivity={userActivity} username={report.reported_user?.username} />
-          )}
+          {report.admin_notes && !notesOpen && <p style={{ margin: '0 0 6px', fontSize: 11, color: '#6b7280', fontStyle: 'italic' }}>Notes: {report.admin_notes}</p>}
+          {notesOpen && <textarea rows={2} placeholder="Admin notes..." value={notes} onChange={e => setNotes(e.target.value)} style={{ marginTop: 8, width: '100%', fontSize: 12 }} />}
+          {chatOpen && chatLogs !== null && <ChatAndActivity chatLogs={chatLogs} userActivity={userActivity} username={report.reported_user?.username} />}
         </div>
-
-        <div style={{ display: 'flex', gap: 6, flexShrink: 0, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-          <button onClick={loadChatLogs} disabled={chatLoading} style={{ padding: '5px 9px', borderRadius: 6, border: '1px solid rgba(96,165,250,0.3)', background: chatOpen ? 'rgba(96,165,250,0.15)' : 'transparent', color: '#60a5fa', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
-            {chatLoading ? '...' : chatOpen ? '💬 Hide Logs' : '💬 View Logs'}
+        <div style={{ display: 'flex', gap: 5, flexShrink: 0, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+          <button onClick={loadChatLogs} disabled={chatLoading} style={S.actionBtn('#60a5fa')}>
+            {chatLoading ? '...' : chatOpen ? '💬 Hide' : '💬 Logs'}
           </button>
-          <button onClick={() => setNotesOpen(!notesOpen)} style={{ padding: '5px 9px', borderRadius: 6, border: '1px solid #2d2d3f', background: 'transparent', color: '#9ca3af', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
-            📝 {notesOpen ? 'Hide' : 'Notes'}
-          </button>
-          {report.status !== 'resolved' && <button onClick={() => onUpdate(report.id, 'resolved', notes)} style={{ padding: '5px 9px', borderRadius: 6, border: 'none', background: 'rgba(74,222,128,0.15)', color: '#4ade80', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>✓ Resolve</button>}
-          {report.status !== 'dismissed' && <button onClick={() => onUpdate(report.id, 'dismissed', notes)} style={{ padding: '5px 9px', borderRadius: 6, border: 'none', background: '#1f2937', color: '#6b7280', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>✕ Dismiss</button>}
-          {report.status === 'pending' && <button onClick={() => onUpdate(report.id, 'reviewed', notes)} style={{ padding: '5px 9px', borderRadius: 6, border: 'none', background: 'rgba(96,165,250,0.15)', color: '#60a5fa', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>👁 Reviewing</button>}
+          <button onClick={() => setNotesOpen(o => !o)} style={S.actionBtn('#9ca3af')}>📝 Notes</button>
+          {report.status !== 'resolved' && <button onClick={() => onUpdate(report.id, 'resolved', notes)} style={S.actionBtn('#4ade80')}>✓ Resolve</button>}
+          {report.status !== 'dismissed' && <button onClick={() => onUpdate(report.id, 'dismissed', notes)} style={S.actionBtn('#6b7280')}>✕ Dismiss</button>}
+          {report.status === 'pending' && <button onClick={() => onUpdate(report.id, 'reviewed', notes)} style={S.actionBtn('#60a5fa')}>👁 Review</button>}
         </div>
       </div>
     </div>
   )
 }
 
-// ─── USER ROW ─────────────────────────────────────────────────────
-
-const ALL_BADGES = BADGE_HIERARCHY
-
-function UserRow({ user, onUpdateBadge, onToggleBan, onDelete }) {
-  // Support both legacy badge and new badges array
-  const initialBadges = user.badges?.length ? user.badges
-    : user.badge ? [user.badge]
-    : []
-  const [selectedBadges, setSelectedBadges] = useState(initialBadges)
-  const [saving, setSaving] = useState(false)
-  const [showBadges, setShowBadges] = useState(false)
-
-  const toggleBadge = (badge) => {
-    setSelectedBadges(prev =>
-      prev.includes(badge) ? prev.filter(b => b !== badge) : [...prev, badge]
-    )
-  }
-
-  async function handleSaveBadges() {
-    setSaving(true)
-    await onUpdateBadge(user.id, selectedBadges)
-    setSaving(false)
-    setShowBadges(false)
-  }
-
-  const primaryBadge = getPrimaryBadge(selectedBadges)
-
-  return (
-    <div style={{ background: '#111118', border: user.banned ? '1px solid rgba(239,68,68,0.25)' : '1px solid #1f2937', borderRadius: 10, padding: '12px 16px', opacity: user.banned ? 0.8 : 1 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        {/* Avatar */}
-        <div style={{ width: 40, height: 40, borderRadius: '50%', flexShrink: 0, overflow: 'hidden', background: user.avatar_url ? 'transparent' : 'linear-gradient(135deg, #4ade80, #22c55e)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 900, color: '#0a0a0f', position: 'relative' }}>
-          {user.avatar_url ? <Image src={user.avatar_url} alt="" fill sizes="32px" style={{ objectFit: 'cover' }} /> : getInitial(user.username)}
-        </div>
-
-        {/* Info */}
-        <div style={{ flex: 1, minWidth: 120 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 2 }}>
-            <Link href={`/profile/${user.username}`} style={{ fontSize: 14, fontWeight: 700, color: '#f9fafb', textDecoration: 'none' }}>{user.username}</Link>
-            {/* Show all current badges */}
-            {initialBadges.filter(b => ALL_BADGES.includes(b)).map(b => (
-              <span key={b} style={{ fontSize: 9, fontWeight: 800, color: BADGE_COLORS[b] || '#9ca3af', background: `${BADGE_COLORS[b] || '#9ca3af'}18`, border: `1px solid ${BADGE_COLORS[b] || '#9ca3af'}40`, borderRadius: 3, padding: '1px 5px' }}>
-                {b}
-              </span>
-            ))}
-            {user.banned && <span style={{ fontSize: 9, fontWeight: 800, color: '#ef4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 3, padding: '1px 5px' }}>BANNED</span>}
-          </div>
-          <div style={{ fontSize: 11, color: '#6b7280' }}>
-            {user.trade_count || 0} trades · ⭐{user.rating || 0} · {user.review_count || 0} reviews
-            {user.ban_reason && <span style={{ marginLeft: 8, color: '#f87171' }}>Ban: {user.ban_reason}</span>}
-          </div>
-        </div>
-
-        {/* Actions */}
-        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-          <button onClick={() => setShowBadges(s => !s)} style={{ padding: '5px 10px', borderRadius: 6, border: `1px solid ${showBadges ? 'rgba(74,222,128,0.4)' : '#2d2d3f'}`, background: showBadges ? 'rgba(74,222,128,0.1)' : 'transparent', color: showBadges ? '#4ade80' : '#9ca3af', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
-            🏷 Badges
-          </button>
-          <button onClick={() => onToggleBan(user.id, user.banned, user.username)} style={{ padding: '5px 10px', borderRadius: 6, border: 'none', cursor: 'pointer', background: user.banned ? 'rgba(74,222,128,0.1)' : 'rgba(239,68,68,0.1)', color: user.banned ? '#4ade80' : '#f87171', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
-            {user.banned ? '✓ Unban' : '🚫 Ban'}
-          </button>
-        </div>
-      </div>
-
-      {/* Badge editor — expandable */}
-      {showBadges && (
-        <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #1f2937' }}>
-          <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 600, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Assign Badges</div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
-            {ALL_BADGES.map(badge => {
-              const selected = selectedBadges.includes(badge)
-              return (
-                <button key={badge} onClick={() => toggleBadge(badge)} style={{
-                  padding: '5px 12px', borderRadius: 6, fontSize: 12, fontWeight: 700,
-                  cursor: 'pointer', border: 'none', transition: 'all 0.15s',
-                  background: selected ? `${BADGE_COLORS[badge]}22` : '#1f2937',
-                  color: selected ? BADGE_COLORS[badge] : '#6b7280',
-                  outline: selected ? `1px solid ${BADGE_COLORS[badge]}66` : 'none',
-                }}>
-                  {badge === 'Owner' ? '👑' : badge === 'Moderator' ? '🛡️' : badge === 'VIP' ? '⭐' : '✓'} {badge}
-                </button>
-              )
-            })}
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button onClick={handleSaveBadges} disabled={saving} style={{ padding: '6px 14px', borderRadius: 6, border: 'none', background: saving ? '#1f2937' : '#16a34a', color: saving ? '#6b7280' : '#fff', fontSize: 12, fontWeight: 700, cursor: saving ? 'default' : 'pointer' }}>
-              {saving ? 'Saving...' : 'Save Badges'}
-            </button>
-            <button onClick={() => { setSelectedBadges([]); }} style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid #2d2d3f', background: 'transparent', color: '#6b7280', fontSize: 12, cursor: 'pointer' }}>
-              Clear All
-            </button>
-            {selectedBadges.length > 0 && (
-              <span style={{ fontSize: 11, color: '#6b7280' }}>
-                Primary: <strong style={{ color: BADGE_COLORS[getPrimaryBadge(selectedBadges)] }}>{getPrimaryBadge(selectedBadges)}</strong>
-              </span>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function EmptyState({ icon, message }) {
-  return (
-    <div style={{ textAlign: 'center', padding: '60px 0', color: '#6b7280' }}>
-      <div style={{ fontSize: 36, marginBottom: 10 }}>{icon}</div>
-      <div>{message}</div>
-    </div>
-  )
-}
-
-const DISPUTE_REASON_LABELS = {
-  item_not_received: "📦 Didn't receive item",
-  item_not_as_described: '❌ Not as described',
-  payment_not_received: "💸 Didn't receive payment",
-  fraud: '🚨 Fraud / Scam',
-  other: '💬 Other',
-}
-
-const DISPUTE_STATUS_COLORS = {
-  open: '#f97316',
-  under_review: '#60a5fa',
-  resolved: '#4ade80',
-  dismissed: '#6b7280',
-}
+// ─── DISPUTE CARD ─────────────────────────────────────────────────────────────
 
 function DisputeCard({ dispute, onUpdate }) {
   const [notesOpen, setNotesOpen] = useState(false)
@@ -856,19 +1313,14 @@ function DisputeCard({ dispute, onUpdate }) {
     setChatLoading(true)
     try {
       const [{ data: msgs }, { data: trades }, { data: reviews }] = await Promise.all([
-        supabase.from('messages')
-          .select(`*, sender:profiles!messages_sender_id_fkey(id, username)`)
-          .or(
-            `and(sender_id.eq.${dispute.opened_by},receiver_id.eq.${dispute.against_user_id}),` +
-            `and(sender_id.eq.${dispute.against_user_id},receiver_id.eq.${dispute.opened_by})`
-          )
+        supabase.from('messages').select(`*, sender:profiles!messages_sender_id_fkey(id, username)`)
+          .or(`and(sender_id.eq.${dispute.opened_by},receiver_id.eq.${dispute.against_user_id}),and(sender_id.eq.${dispute.against_user_id},receiver_id.eq.${dispute.opened_by})`)
           .order('created_at', { ascending: true }).limit(200),
         supabase.from('trade_requests').select('id, status, created_at, listing_id')
           .or(`seller_id.eq.${dispute.against_user_id},buyer_id.eq.${dispute.against_user_id}`)
           .order('created_at', { ascending: false }).limit(20),
         supabase.from('reviews').select('rating, comment, created_at')
-          .eq('seller_id', dispute.against_user_id)
-          .order('created_at', { ascending: false }).limit(10),
+          .eq('seller_id', dispute.against_user_id).order('created_at', { ascending: false }).limit(10),
       ])
       setChatLogs(msgs || [])
       setUserActivity({ trades: trades || [], reviews: reviews || [] })
@@ -885,86 +1337,70 @@ function DisputeCard({ dispute, onUpdate }) {
     }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
-            <span style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: statusColor, background: `${statusColor}18`, border: `1px solid ${statusColor}40`, borderRadius: 4, padding: '2px 7px' }}>
-              {dispute.status.replace('_', ' ')}
-            </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+            <span style={S.badge(statusColor)}>{dispute.status.replace('_', ' ')}</span>
             <span style={{ fontSize: 12, fontWeight: 700, color: '#f97316' }}>{DISPUTE_REASON_LABELS[dispute.reason] || dispute.reason}</span>
             <span style={{ fontSize: 11, color: '#4b5563' }}>{timeAgo(dispute.created_at)}</span>
           </div>
-
-          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 8, fontSize: 12 }}>
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6, fontSize: 12 }}>
             <span><span style={{ color: '#6b7280' }}>Opened by: </span><Link href={`/profile/${dispute.opener?.username}`} style={{ color: '#4ade80', textDecoration: 'none', fontWeight: 600 }}>{dispute.opener?.username || 'Unknown'}</Link></span>
             <span><span style={{ color: '#6b7280' }}>Against: </span><Link href={`/profile/${dispute.against?.username}`} style={{ color: '#f87171', textDecoration: 'none', fontWeight: 600 }}>{dispute.against?.username || 'Unknown'}</Link></span>
             {dispute.listings && <span><span style={{ color: '#6b7280' }}>Listing: </span><Link href={`/listing/${dispute.listing_id}`} style={{ color: '#60a5fa', textDecoration: 'none', fontWeight: 600 }}>{dispute.listings.title}</Link></span>}
           </div>
-
           {dispute.details && <p style={{ margin: '0 0 8px', fontSize: 12, color: '#9ca3af', lineHeight: 1.6, background: '#0d0d14', padding: '8px 12px', borderRadius: 6, border: '1px solid #1f2937' }}>{dispute.details}</p>}
-
           {notesOpen && (
             <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <textarea rows={2} placeholder="Admin notes (internal)..." value={notes} onChange={e => setNotes(e.target.value)} style={{ resize: 'vertical', fontSize: 12 }} />
+              <textarea rows={2} placeholder="Admin notes (internal)..." value={notes} onChange={e => setNotes(e.target.value)} style={{ fontSize: 12 }} />
               <input type="text" placeholder="Resolution summary (shown to users)..." value={resolution} onChange={e => setResolution(e.target.value)} style={{ fontSize: 12 }} />
             </div>
           )}
           {dispute.resolution && !notesOpen && <p style={{ margin: '4px 0 0', fontSize: 11, color: '#4ade80', fontStyle: 'italic' }}>Resolution: {dispute.resolution}</p>}
-
-          {chatOpen && chatLogs !== null && (
-            <ChatAndActivity chatLogs={chatLogs} userActivity={userActivity} username={dispute.against?.username} />
-          )}
+          {chatOpen && chatLogs !== null && <ChatAndActivity chatLogs={chatLogs} userActivity={userActivity} username={dispute.against?.username} />}
         </div>
-
-        <div style={{ display: 'flex', gap: 6, flexShrink: 0, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-          <button onClick={loadChatLogs} disabled={chatLoading} style={{ padding: '5px 9px', borderRadius: 6, border: '1px solid rgba(96,165,250,0.3)', background: chatOpen ? 'rgba(96,165,250,0.15)' : 'transparent', color: '#60a5fa', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
-            {chatLoading ? '...' : chatOpen ? '💬 Hide Logs' : '💬 View Logs'}
-          </button>
-          <button onClick={() => setNotesOpen(!notesOpen)} style={{ padding: '5px 9px', borderRadius: 6, border: '1px solid #2d2d3f', background: 'transparent', color: '#9ca3af', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
-            📝 {notesOpen ? 'Hide' : 'Notes'}
-          </button>
-          {dispute.status === 'open' && <button onClick={() => onUpdate(dispute.id, 'under_review', resolution, notes)} style={{ padding: '5px 9px', borderRadius: 6, border: 'none', background: 'rgba(96,165,250,0.15)', color: '#60a5fa', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>👁 Reviewing</button>}
-          {dispute.status !== 'resolved' && <button onClick={() => onUpdate(dispute.id, 'resolved', resolution, notes)} style={{ padding: '5px 9px', borderRadius: 6, border: 'none', background: 'rgba(74,222,128,0.15)', color: '#4ade80', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>✓ Resolve</button>}
-          {dispute.status !== 'dismissed' && <button onClick={() => onUpdate(dispute.id, 'dismissed', resolution, notes)} style={{ padding: '5px 9px', borderRadius: 6, border: 'none', background: '#1f2937', color: '#6b7280', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>✕ Dismiss</button>}
+        <div style={{ display: 'flex', gap: 5, flexShrink: 0, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+          <button onClick={loadChatLogs} disabled={chatLoading} style={S.actionBtn('#60a5fa')}>{chatLoading ? '...' : chatOpen ? '💬 Hide' : '💬 Logs'}</button>
+          <button onClick={() => setNotesOpen(o => !o)} style={S.actionBtn('#9ca3af')}>📝 Notes</button>
+          {dispute.status === 'open' && <button onClick={() => onUpdate(dispute.id, 'under_review', resolution, notes)} style={S.actionBtn('#60a5fa')}>👁 Review</button>}
+          {dispute.status !== 'resolved' && <button onClick={() => onUpdate(dispute.id, 'resolved', resolution, notes)} style={S.actionBtn('#4ade80')}>✓ Resolve</button>}
+          {dispute.status !== 'dismissed' && <button onClick={() => onUpdate(dispute.id, 'dismissed', resolution, notes)} style={S.actionBtn('#6b7280')}>✕ Dismiss</button>}
         </div>
       </div>
     </div>
   )
 }
 
-// ─── SHARED CHAT LOG + ACTIVITY VIEWER ──────────────────────────
+// ─── CHAT + ACTIVITY VIEWER ───────────────────────────────────────────────────
 
 function ChatAndActivity({ chatLogs, userActivity, username }) {
   const [viewTab, setViewTab] = useState('chat')
-
   return (
     <div style={{ marginTop: 12, background: '#0d0d14', border: '1px solid #2d2d3f', borderRadius: 10, overflow: 'hidden' }}>
-      {/* Sub-tabs */}
-      <div style={{ display: 'flex', borderBottom: '1px solid #1f2937' }}>
+      <div style={{ display: 'flex', borderBottom: '1px solid #1f2937', overflowX: 'auto' }}>
         {[
-          { id: 'chat', label: `💬 Chat Log (${chatLogs.length} msgs)` },
-          { id: 'trades', label: `🔄 Trade History (${userActivity?.trades?.length || 0})` },
+          { id: 'chat', label: `💬 Chat (${chatLogs.length})` },
+          { id: 'trades', label: `🔄 Trades (${userActivity?.trades?.length || 0})` },
           { id: 'reviews', label: `⭐ Reviews (${userActivity?.reviews?.length || 0})` },
         ].map(t => (
           <button key={t.id} onClick={() => setViewTab(t.id)} style={{
             padding: '7px 12px', background: 'none', border: 'none', cursor: 'pointer',
-            fontSize: 11, fontWeight: 700,
+            fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap',
             color: viewTab === t.id ? '#60a5fa' : '#6b7280',
             borderBottom: viewTab === t.id ? '2px solid #60a5fa' : '2px solid transparent',
-            marginBottom: -1, transition: 'all 0.15s',
+            marginBottom: -1,
           }}>{t.label}</button>
         ))}
       </div>
-
       <div style={{ maxHeight: 300, overflowY: 'auto', padding: 12 }}>
         {viewTab === 'chat' && (
           chatLogs.length === 0
-            ? <div style={{ color: '#4b5563', fontSize: 12, textAlign: 'center', padding: '20px 0' }}>No messages found between these users</div>
+            ? <div style={{ color: '#4b5563', fontSize: 12, textAlign: 'center', padding: '20px 0' }}>No messages between these users</div>
             : <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {chatLogs.map((m, i) => (
                   <div key={m.id || i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                    <span style={{ fontSize: 10, color: '#6b7280', whiteSpace: 'nowrap', marginTop: 2, minWidth: 70 }}>
+                    <span style={{ fontSize: 10, color: '#6b7280', whiteSpace: 'nowrap', marginTop: 2, minWidth: 60 }}>
                       {new Date(m.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     </span>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: m.sender?.username === username ? '#f87171' : '#4ade80', minWidth: 80, whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: m.sender?.username === username ? '#f87171' : '#4ade80', minWidth: 70, whiteSpace: 'nowrap' }}>
                       {m.sender?.username || '?'}:
                     </span>
                     <span style={{ fontSize: 12, color: '#d1d5db', lineHeight: 1.5, wordBreak: 'break-word' }}>{m.content}</span>
@@ -972,29 +1408,23 @@ function ChatAndActivity({ chatLogs, userActivity, username }) {
                 ))}
               </div>
         )}
-
         {viewTab === 'trades' && (
           userActivity?.trades?.length === 0
             ? <div style={{ color: '#4b5563', fontSize: 12, textAlign: 'center', padding: '20px 0' }}>No trade history</div>
             : <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {userActivity.trades.map((t, i) => (
                   <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 12 }}>
-                    <span style={{ color: '#4b5563', whiteSpace: 'nowrap', minWidth: 70 }}>
+                    <span style={{ color: '#4b5563', whiteSpace: 'nowrap', minWidth: 60 }}>
                       {new Date(t.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     </span>
                     <span style={{
-                      padding: '1px 7px', borderRadius: 4, fontSize: 10, fontWeight: 700,
-                      background: t.status === 'completed' ? 'rgba(74,222,128,0.1)' : t.status === 'pending' ? 'rgba(245,158,11,0.1)' : '#1f2937',
-                      color: t.status === 'completed' ? '#4ade80' : t.status === 'pending' ? '#f59e0b' : '#6b7280',
+                      ...S.badge(t.status === 'completed' ? '#4ade80' : t.status === 'pending' ? '#f59e0b' : '#6b7280'),
                     }}>{t.status}</span>
-                    <Link href={`/listing/${t.listing_id}`} style={{ color: '#60a5fa', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      View listing →
-                    </Link>
+                    <Link href={`/listing/${t.listing_id}`} style={{ color: '#60a5fa', textDecoration: 'none' }}>View →</Link>
                   </div>
                 ))}
               </div>
         )}
-
         {viewTab === 'reviews' && (
           userActivity?.reviews?.length === 0
             ? <div style={{ color: '#4b5563', fontSize: 12, textAlign: 'center', padding: '20px 0' }}>No reviews received</div>
@@ -1003,9 +1433,7 @@ function ChatAndActivity({ chatLogs, userActivity, username }) {
                   <div key={i} style={{ fontSize: 12, background: '#111118', border: '1px solid #1f2937', borderRadius: 6, padding: '8px 10px' }}>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: r.comment ? 4 : 0 }}>
                       <span>{'⭐'.repeat(r.rating)}</span>
-                      <span style={{ color: '#4b5563', fontSize: 10 }}>
-                        {new Date(r.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                      </span>
+                      <span style={{ color: '#4b5563', fontSize: 10 }}>{new Date(r.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                     </div>
                     {r.comment && <div style={{ color: '#9ca3af', lineHeight: 1.5 }}>{r.comment}</div>}
                   </div>
@@ -1013,6 +1441,49 @@ function ChatAndActivity({ chatLogs, userActivity, username }) {
               </div>
         )}
       </div>
+    </div>
+  )
+}
+
+// ─── SHARED COMPONENTS ────────────────────────────────────────────────────────
+
+function Modal({ title, onClose, children }) {
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 200,
+      background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+    }} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{
+        background: '#111118', border: '1px solid #2d2d3f', borderRadius: 16,
+        padding: 28, width: '100%', maxWidth: 420,
+        boxShadow: '0 24px 64px rgba(0,0,0,0.6)',
+        animation: 'slideIn 0.2s ease',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#f9fafb' }}>{title}</h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: 22, lineHeight: 1, padding: 0 }}>×</button>
+        </div>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+function Loader() {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '24px 0', color: '#6b7280', fontSize: 13 }}>
+      <div style={{ width: 16, height: 16, border: '2px solid #1f2937', borderTopColor: '#4ade80', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+      Loading...
+    </div>
+  )
+}
+
+function EmptyState({ icon, message }) {
+  return (
+    <div style={{ textAlign: 'center', padding: '60px 0', color: '#6b7280' }}>
+      <div style={{ fontSize: 36, marginBottom: 10 }}>{icon}</div>
+      <div style={{ fontSize: 13 }}>{message}</div>
     </div>
   )
 }
