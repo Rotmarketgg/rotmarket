@@ -30,6 +30,14 @@ body {
 ::-webkit-scrollbar-thumb { background: #2d2d3f; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #4b5563; }
 
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* Selection */
 ::selection { background: rgba(74, 222, 128, 0.3); color: white; }
 
@@ -192,6 +200,13 @@ select option {
   .full-mobile { width: 100% !important; min-width: 0 !important; max-width: 100% !important; }
   .pad-mobile { padding: 12px !important; }
   .no-border-mobile { border-right: none !important; border-bottom: 1px solid #1f2937 !important; }
+  .messages-shell {
+    border-radius: 0 !important;
+    border-left: none !important;
+    border-right: none !important;
+    min-height: calc(100vh - 118px) !important;
+    height: calc(100vh - 118px) !important;
+  }
 }
 @media (min-width: 768px) {
   .hide-desktop { display: none !important; }
