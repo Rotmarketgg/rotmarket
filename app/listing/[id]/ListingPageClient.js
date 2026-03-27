@@ -252,7 +252,7 @@ function BuyerTradePanel({ myOffer, listing, seller, listingId, copiedId, setCop
   if (myOffer.status === 'completed') return (
     <div style={{ background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.3)', borderRadius: 10, padding: 14, marginTop: 14 }}>
       <div style={{ fontSize: 13, fontWeight: 700, color: '#4ade80' }}>🎉 Trade Complete!</div>
-      <p style={{ margin: '5px 0 0', fontSize: 12, color: '#9ca3af' }}>Go to the Reviews tab to leave feedback.</p>
+      <p style={{ margin: '5px 0 0', fontSize: 12, color: '#9ca3af' }}>Scroll down to leave a review for the seller.</p>
     </div>
   )
   return null

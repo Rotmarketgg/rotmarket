@@ -32,6 +32,7 @@ export default function ProfilePageClient({ username: usernameProp, initialProfi
   const [tab, setTab] = useState('listings')
   const [notFound, setNotFound] = useState(false)
   const [listingOffers, setListingOffers] = useState({}) // listingId -> pending offer count
+  const [buyerOffers, setBuyerOffers] = useState([]) // offers this user sent as a buyer
   const [renewError, setRenewError] = useState('')
 
   const load = useCallback(async (silent = false, skipProfileFetch = false) => {
@@ -78,6 +79,22 @@ export default function ProfilePageClient({ username: usernameProp, initialProfi
             setListingOffers(counts)
           }
         }
+      }
+
+      // Load buyer's own outgoing offers (pending/accepted)
+      if (u && u.id === p.id) {
+        const { data: sentOffers } = await supabase
+          .from('trade_requests')
+          .select(`
+            *,
+            listing:listings(id, title, type, price, status),
+            seller:profiles!trade_requests_seller_id_fkey(id, username, avatar_url)
+          `)
+          .eq('buyer_id', u.id)
+          .not('status', 'in', '("cancelled","declined")')
+          .order('created_at', { ascending: false })
+          .limit(50)
+        setBuyerOffers(sentOffers || [])
       }
       setLoading(false)
     } catch (err) {
@@ -449,6 +466,7 @@ export default function ProfilePageClient({ username: usernameProp, initialProfi
                 { id: 'sold', label: 'Sold', count: soldListings.length },
                 { id: 'reviews', label: 'Reviews', count: reviews.length },
                 ...(isOwn && expiredListings.length > 0 ? [{ id: 'expired', label: '⏰ Expired', count: expiredListings.length }] : []),
+                ...(isOwn && buyerOffers.length > 0 ? [{ id: 'my-offers', label: '📨 My Offers', count: buyerOffers.filter(o => o.status === 'pending').length || undefined }] : []),
               ].map(t => (
                 <button key={t.id} onClick={() => setTab(t.id)} style={{
                   flex: 1, padding: '8px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
@@ -627,6 +645,82 @@ export default function ProfilePageClient({ username: usernameProp, initialProfi
                         )}
                       </div>
                     ))}
+                  </div>
+            )}
+
+            {/* ── MY OFFERS TAB (buyer view) ── */}
+            {tab === 'my-offers' && isOwn && (
+              buyerOffers.length === 0
+                ? <EmptyState icon="📨" title="No active offers" message="Offers you send on listings will appear here." />
+                : <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {buyerOffers.map(offer => {
+                      const statusColor = {
+                        pending: '#f59e0b',
+                        accepted: '#4ade80',
+                        completed: '#6b7280',
+                      }[offer.status] || '#6b7280'
+                      const statusLabel = {
+                        pending: '⏳ Pending',
+                        accepted: '✓ Accepted',
+                        completed: '🎉 Completed',
+                      }[offer.status] || offer.status
+                      const needsReview = offer.status === 'completed'
+                      return (
+                        <div key={offer.id} style={{
+                          background: '#111118', border: `1px solid ${offer.status === 'pending' ? 'rgba(245,158,11,0.25)' : '#1f2937'}`,
+                          borderRadius: 12, padding: '14px 16px',
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <Link href={`/listing/${offer.listing_id}`} style={{ fontSize: 14, fontWeight: 700, color: '#f9fafb', textDecoration: 'none', display: 'block', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {offer.listing?.title || 'Listing'}
+                              </Link>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                <span style={{ fontSize: 11, fontWeight: 700, color: statusColor }}>{statusLabel}</span>
+                                {offer.seller && (
+                                  <span style={{ fontSize: 11, color: '#6b7280' }}>
+                                    Seller: <Link href={`/profile/${offer.seller.username}`} style={{ color: '#9ca3af', textDecoration: 'none', fontWeight: 600 }}>{offer.seller.username}</Link>
+                                  </span>
+                                )}
+                                {offer.offer_price && (
+                                  <span style={{ fontSize: 11, color: '#60a5fa', fontWeight: 600 }}>${offer.offer_price}</span>
+                                )}
+                              </div>
+                              {offer.offer_message && (
+                                <p style={{ margin: '6px 0 0', fontSize: 12, color: '#6b7280', fontStyle: 'italic' }}>
+                                  "{offer.offer_message.length > 80 ? offer.offer_message.slice(0, 80) + '…' : offer.offer_message}"
+                                </p>
+                              )}
+                            </div>
+                            <Link href={`/listing/${offer.listing_id}`} style={{
+                              flexShrink: 0, fontSize: 11, fontWeight: 700, color: '#4ade80',
+                              textDecoration: 'none', padding: '5px 12px',
+                              background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.2)',
+                              borderRadius: 6, whiteSpace: 'nowrap',
+                            }}>
+                              View →
+                            </Link>
+                          </div>
+                          {/* Review reminder for completed trades */}
+                          {needsReview && (
+                            <div style={{
+                              marginTop: 10, padding: '8px 12px',
+                              background: 'rgba(74,222,128,0.06)', border: '1px solid rgba(74,222,128,0.15)',
+                              borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap',
+                            }}>
+                              <span style={{ fontSize: 12, color: '#9ca3af' }}>⭐ Leave a review for <strong style={{ color: '#d1d5db' }}>{offer.seller?.username}</strong>?</span>
+                              <Link href={`/listing/${offer.listing_id}`} style={{
+                                fontSize: 11, fontWeight: 700, color: '#4ade80', textDecoration: 'none',
+                                padding: '4px 10px', background: 'rgba(74,222,128,0.12)',
+                                border: '1px solid rgba(74,222,128,0.25)', borderRadius: 6,
+                              }}>
+                                Write Review
+                              </Link>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
             )}
           </div>

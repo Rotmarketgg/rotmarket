@@ -409,9 +409,11 @@ export default function Navbar() {
                       <MenuItem href="/settings" label="Settings" emoji="⚙️" onClick={() => setMenuOpen(false)} />
                       {(() => {
                         const profileBadges = profile?.badges?.length ? profile.badges : profile?.badge ? [profile.badge] : []
-                        return profileBadges.some(b => ['Owner', 'Moderator'].includes(b)) ? (
-                          <MenuItem href="/admin" label="Admin Panel" emoji="🛡️" onClick={() => setMenuOpen(false)} />
-                        ) : null
+                        const isOwnerOrAdmin = profileBadges.some(b => ['Owner', 'Admin'].includes(b))
+                        const isMod = !isOwnerOrAdmin && profileBadges.includes('Moderator')
+                        if (isOwnerOrAdmin) return <MenuItem href="/admin" label="Admin Panel" emoji="🛡️" onClick={() => setMenuOpen(false)} />
+                        if (isMod) return <MenuItem href="/mod" label="Mod Panel" emoji="🔰" onClick={() => setMenuOpen(false)} />
+                        return null
                       })()}
                       <div style={{ borderTop: '1px solid #1f2937', marginTop: 6, paddingTop: 6 }}>
                         <button onClick={handleSignOut} style={{ width: '100%', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: '8px 12px', borderRadius: 6, fontSize: 13, color: '#ef4444', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
