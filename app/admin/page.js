@@ -205,6 +205,10 @@ export default function AdminPage() {
   const [promotions, setPromotions] = useState([])
   const [promotionsLoading, setPromotionsLoading] = useState(false)
   const [promoFilter, setPromoFilter] = useState('all')
+  const [trades, setTrades] = useState([])
+  const [tradesLoading, setTradesLoading] = useState(false)
+  const [tradeSearch, setTradeSearch] = useState('')
+  const [tradeStatusFilter, setTradeStatusFilter] = useState('all')
 
   const [createModal, setCreateModal] = useState(false)
   const [createForm, setCreateForm] = useState({ email: '', password: '', username: '' })
@@ -270,6 +274,7 @@ export default function AdminPage() {
     if (tab === 'listings') loadListings()
     if (tab === 'disputes') loadDisputes()
     if (tab === 'promotions') loadPromotions()
+    if (tab === 'trades') loadTrades()
   }, [tab])
 
   // ─── LOADERS ─────────────────────────────────────────────────────
@@ -279,7 +284,7 @@ export default function AdminPage() {
       supabase.from('profiles').select('id', { count: 'exact', head: true }).not('username', 'is', null),
       supabase.from('listings').select('id', { count: 'exact', head: true }).eq('status', 'active'),
       supabase.from('reports').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
-      supabase.from('trade_requests').select('id', { count: 'exact', head: true }).eq('status', 'completed'),
+      supabase.from('trade_requests').select('id', { count: 'exact', head: true }),
       supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('banned', true),
       supabase.from('disputes').select('id', { count: 'exact', head: true }).eq('status', 'open'),
       supabase.rpc('admin_count_promotions'),
@@ -426,6 +431,32 @@ export default function AdminPage() {
       showToast('Error loading promotions: ' + err.message, 'error')
     } finally {
       setPromotionsLoading(false)
+    }
+  }
+
+  async function loadTrades(search = '') {
+    setTradesLoading(true)
+    try {
+      let q = supabase
+        .from('trade_requests')
+        .select(`
+          *,
+          buyer:profiles!trade_requests_buyer_id_fkey(id, username, avatar_url, badge, badges, banned),
+          seller:profiles!trade_requests_seller_id_fkey(id, username, avatar_url, badge, badges, banned),
+          listing:listings(id, title, type, price, game, rarity)
+        `)
+        .order('created_at', { ascending: false })
+        .limit(200)
+      if (search) {
+        // Can't ilike on a joined column directly — filter client-side after fetch
+      }
+      const { data, error } = await q
+      if (error) throw error
+      setTrades(data || [])
+    } catch (err) {
+      showToast('Error loading trades: ' + err.message, 'error')
+    } finally {
+      setTradesLoading(false)
     }
   }
 
@@ -652,6 +683,7 @@ export default function AdminPage() {
     { id: 'dashboard', label: '📊 Dashboard' },
     { id: 'reports', label: `🚩 Reports${stats.pendingReports > 0 ? ` (${stats.pendingReports})` : ''}` },
     { id: 'disputes', label: `⚖️ Disputes${stats.openDisputes > 0 ? ` (${stats.openDisputes})` : ''}` },
+    { id: 'trades', label: '🔄 Trades' },
     { id: 'users', label: '👥 Users' },
     { id: 'promotions', label: `🎖️ Promotions${stats.activePromotions > 0 ? ` (${stats.activePromotions})` : ''}` },
     { id: 'reviews', label: '⭐ Reviews' },
@@ -1009,6 +1041,163 @@ export default function AdminPage() {
           </div>
         )}
 
+        {/* ─── TRADES TAB ─── */}
+        {tab === 'trades' && (
+          <div>
+            {/* Filters */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+              <input
+                placeholder="Search buyer or seller username…"
+                value={tradeSearch}
+                onChange={e => setTradeSearch(e.target.value)}
+                style={{ flex: 1, minWidth: 180 }}
+              />
+              <select value={tradeStatusFilter} onChange={e => setTradeStatusFilter(e.target.value)} style={{ minWidth: 140 }}>
+                <option value="all">All Statuses</option>
+                <option value="pending">Pending</option>
+                <option value="accepted">Accepted</option>
+                <option value="completed">Completed</option>
+                <option value="declined">Declined</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+              <button onClick={() => loadTrades()} style={{ padding: '8px 14px', background: '#1a1a2e', border: '1px solid #2d2d3f', borderRadius: 8, color: '#9ca3af', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                ↻ Refresh
+              </button>
+            </div>
+
+            {tradesLoading ? <Loader /> : (() => {
+              const filtered = trades.filter(t => {
+                const matchStatus = tradeStatusFilter === 'all' || t.status === tradeStatusFilter
+                const q = tradeSearch.toLowerCase().trim()
+                const matchSearch = !q ||
+                  t.buyer?.username?.toLowerCase().includes(q) ||
+                  t.seller?.username?.toLowerCase().includes(q) ||
+                  t.listing?.title?.toLowerCase().includes(q)
+                return matchStatus && matchSearch
+              })
+
+              if (filtered.length === 0) return <EmptyState icon="🔄" message="No trades match your filters" />
+
+              const statusColor = { pending: '#f59e0b', accepted: '#60a5fa', completed: '#4ade80', declined: '#ef4444', cancelled: '#6b7280' }
+              const statusIcon  = { pending: '⏳', accepted: '✓', completed: '🎉', declined: '✕', cancelled: '—' }
+
+              return (
+                <div>
+                  <div style={{ fontSize: 11, color: '#4b5563', marginBottom: 10 }}>
+                    Showing {filtered.length} of {trades.length} trades
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {filtered.map(t => {
+                      const buyerBanned  = t.buyer?.banned
+                      const sellerBanned = t.seller?.banned
+                      const isFlagged    = buyerBanned || sellerBanned
+                      return (
+                        <div key={t.id} style={{
+                          ...S.card,
+                          borderColor: isFlagged ? 'rgba(239,68,68,0.35)' : undefined,
+                          background: isFlagged ? 'rgba(239,68,68,0.04)' : undefined,
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+
+                            {/* Status pill */}
+                            <div style={{ flexShrink: 0, paddingTop: 2 }}>
+                              <span style={{
+                                fontSize: 10, fontWeight: 800, padding: '3px 8px', borderRadius: 20,
+                                background: (statusColor[t.status] || '#6b7280') + '22',
+                                color: statusColor[t.status] || '#6b7280',
+                                border: `1px solid ${(statusColor[t.status] || '#6b7280')}44`,
+                                whiteSpace: 'nowrap',
+                              }}>
+                                {statusIcon[t.status]} {t.status?.toUpperCase()}
+                              </span>
+                            </div>
+
+                            {/* Main info */}
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              {/* Listing */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
+                                <Link href={`/listing/${t.listing_id}`} style={{ fontSize: 13, fontWeight: 700, color: '#f9fafb', textDecoration: 'none' }}>
+                                  {t.listing?.title || 'Deleted Listing'}
+                                </Link>
+                                {t.listing?.type && <span style={S.badge('#6b7280')}>{t.listing.type}</span>}
+                                {t.listing?.game && <span style={S.badge('#6b7280')}>{t.listing.game}</span>}
+                                {t.offer_price && <span style={S.badge('#60a5fa')}>${t.offer_price}</span>}
+                              </div>
+
+                              {/* Buyer → Seller */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 12 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                  <span style={{ color: '#6b7280' }}>Buyer:</span>
+                                  {t.buyer ? (
+                                    <Link href={`/profile/${t.buyer.username}`} style={{ color: buyerBanned ? '#f87171' : '#d1d5db', textDecoration: 'none', fontWeight: 600 }}>
+                                      {buyerBanned && '🚫 '}{t.buyer.username}
+                                    </Link>
+                                  ) : <span style={{ color: '#4b5563' }}>deleted</span>}
+                                </div>
+                                <span style={{ color: '#2d2d3f' }}>→</span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                  <span style={{ color: '#6b7280' }}>Seller:</span>
+                                  {t.seller ? (
+                                    <Link href={`/profile/${t.seller.username}`} style={{ color: sellerBanned ? '#f87171' : '#d1d5db', textDecoration: 'none', fontWeight: 600 }}>
+                                      {sellerBanned && '🚫 '}{t.seller.username}
+                                    </Link>
+                                  ) : <span style={{ color: '#4b5563' }}>deleted</span>}
+                                </div>
+                              </div>
+
+                              {/* Offer message */}
+                              {t.offer_message && (
+                                <div style={{ marginTop: 6, fontSize: 12, color: '#6b7280', fontStyle: 'italic', borderLeft: '2px solid #1f2937', paddingLeft: 8 }}>
+                                  "{t.offer_message.length > 120 ? t.offer_message.slice(0, 120) + '…' : t.offer_message}"
+                                </div>
+                              )}
+
+                              {/* Confirmations for accepted/completed */}
+                              {(t.status === 'accepted' || t.status === 'completed') && (
+                                <div style={{ marginTop: 6, display: 'flex', gap: 12, fontSize: 11, color: '#6b7280' }}>
+                                  <span>Buyer confirmed: <strong style={{ color: t.buyer_confirmed ? '#4ade80' : '#4b5563' }}>{t.buyer_confirmed ? '✓ Yes' : '✗ No'}</strong></span>
+                                  <span>Seller confirmed: <strong style={{ color: t.seller_confirmed ? '#4ade80' : '#4b5563' }}>{t.seller_confirmed ? '✓ Yes' : '✗ No'}</strong></span>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Timestamp + actions */}
+                            <div style={{ flexShrink: 0, textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+                              <div style={{ fontSize: 11, color: '#4b5563' }}>{timeAgo(t.created_at)}</div>
+                              <div style={{ display: 'flex', gap: 6 }}>
+                                <Link href={`/listing/${t.listing_id}`} style={{ fontSize: 11, fontWeight: 600, color: '#60a5fa', textDecoration: 'none', padding: '4px 8px', background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.2)', borderRadius: 6 }}>
+                                  View Listing
+                                </Link>
+                                {(t.buyer || t.seller) && (
+                                  <button
+                                    onClick={() => {
+                                      const target = t.buyer || t.seller
+                                      setViewUser(target)
+                                    }}
+                                    style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', background: '#1a1a2e', border: '1px solid #2d2d3f', borderRadius: 6, padding: '4px 8px', cursor: 'pointer' }}
+                                  >
+                                    Inspect Users
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {isFlagged && (
+                            <div style={{ marginTop: 8, padding: '5px 10px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 6, fontSize: 11, color: '#f87171', fontWeight: 600 }}>
+                              ⚠️ {buyerBanned && sellerBanned ? 'Both parties are banned' : buyerBanned ? 'Buyer is banned' : 'Seller is banned'}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })()}
+          </div>
+        )}
+
       </div>
 
       <style>{`
@@ -1033,7 +1222,7 @@ function DashboardTab({ stats, onTabSwitch }) {
     { label: 'Total Users', value: stats.totalUsers || 0, color: '#4ade80', icon: '👥', tab: 'users' },
     { label: 'Active Listings', value: stats.activeListings || 0, color: '#60a5fa', icon: '📋', tab: 'listings' },
     { label: 'Pending Reports', value: stats.pendingReports || 0, color: '#f59e0b', icon: '🚩', tab: 'reports', alert: stats.pendingReports > 0 },
-    { label: 'Completed Trades', value: stats.completedTrades || 0, color: '#a78bfa', icon: '✅' },
+    { label: 'Total Trades', value: stats.completedTrades || 0, color: '#a78bfa', icon: '🔄', tab: 'trades' },
     { label: 'Banned Users', value: stats.bannedUsers || 0, color: '#ef4444', icon: '🚫', tab: 'users' },
     { label: 'Open Disputes', value: stats.openDisputes || 0, color: '#f97316', icon: '⚖️', tab: 'disputes', alert: stats.openDisputes > 0 },
     { label: 'Active Promotions', value: stats.activePromotions || 0, color: '#f59e0b', icon: '🎖️', tab: 'promotions' },
@@ -1068,7 +1257,7 @@ function DashboardTab({ stats, onTabSwitch }) {
           { title: '📈 Site Health', items: [
             { label: 'Total Users', value: stats.totalUsers, color: '#4ade80' },
             { label: 'Active Listings', value: stats.activeListings, color: '#60a5fa' },
-            { label: 'Completed Trades', value: stats.completedTrades, color: '#a78bfa' },
+            { label: 'Total Trades', value: stats.completedTrades, color: '#a78bfa', tab: 'trades' },
           ]},
           { title: '🎖️ Roles Active', items: [
             { label: 'Active Promotions', value: stats.activePromotions, color: '#f59e0b', tab: 'promotions' },
