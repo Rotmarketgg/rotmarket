@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { getSessionUser, getProfile, createListing, updateListing, uploadListingImage, supabase } from '@/lib/supabase'
+import { getSessionUser, getVerifiedUser, getProfile, createListing, updateListing, uploadListingImage, supabase } from '@/lib/supabase'
 import { GAMES, RARITIES, PAYMENT_METHODS, LISTING_TYPES } from '@/lib/constants'
 import { validateListing, checkRateLimit, withTimeout } from '@/lib/utils'
 import { validateClean, validateContent } from '@/lib/profanity'
@@ -35,8 +35,9 @@ export default function CreateListingPage() {
   useEffect(() => {
     async function checkAuth() {
       try {
-        const currentUser = await getSessionUser()
-        if (!currentUser) { router.push('/auth/login'); return }
+        const { user: currentUser, redirect, unverified } = await getVerifiedUser()
+        if (redirect) { router.push('/auth/login'); return }
+        if (unverified) { router.push('/auth/verify'); return }
         setUser(currentUser)
         const p = await getProfile(currentUser.id)
         setProfile(p)

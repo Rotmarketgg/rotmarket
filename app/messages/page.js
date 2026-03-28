@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { getSessionUser, getConversations, getMessagesPaginated, sendMessage, getUnreadCount, supabase } from '@/lib/supabase'
+import { getSessionUser, getVerifiedUser, getConversations, getMessagesPaginated, sendMessage, getUnreadCount, supabase } from '@/lib/supabase'
 import { timeAgo, getInitial, checkRateLimit, withTimeout } from '@/lib/utils'
 import { isClean } from '@/lib/profanity'
 
@@ -48,8 +48,9 @@ function MessagesInner() {
   // unreachable from the second useEffect — causing a ReferenceError crash.
   const init = useCallback(async () => {
     try {
-      const u = await getSessionUser()
-      if (!u) { router.push('/auth/login'); return }
+      const { user: u, redirect, unverified } = await getVerifiedUser()
+      if (redirect) { router.push('/auth/login'); return }
+      if (unverified) { router.push('/auth/verify'); return }
       setUser(u)
       const convos = await withTimeout(getConversations(u.id))
       setConversations(convos || [])
@@ -215,6 +216,8 @@ function MessagesInner() {
 
   const handleOpenDispute = async () => {
     if (!disputeForm.reason) { setDisputeError('Please select a reason.'); return }
+    const { unverified } = await getVerifiedUser()
+    if (unverified) { setDisputeError('Please verify your email before opening a dispute.'); return }
     const rl = checkRateLimit('dispute')
     if (rl) { setDisputeError(rl); return }
     setDisputeError('')

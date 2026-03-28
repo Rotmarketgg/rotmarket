@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { supabase, getUser } from '@/lib/supabase'
+import { supabase, getVerifiedUser } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { checkRateLimit } from '@/lib/utils'
 
@@ -26,8 +26,9 @@ export default function ReportButton({ reportedUserId, listingId, label = 'Repor
   const handleSubmit = async () => {
     if (!reason) { setError('Please select a reason.'); return }
     if (!reportedUserId) { setError('Invalid report target.'); return }
-    const user = await getUser()
-    if (!user) { router.push('/auth/login'); return }
+    const { user, redirect, unverified } = await getVerifiedUser()
+    if (redirect) { router.push('/auth/login'); return }
+    if (unverified) { setError('Please verify your email before submitting reports.'); return }
     // Prevent self-reporting
     if (user.id === reportedUserId) { setError('You cannot report yourself.'); return }
     // Rate limit: 1 report per target per 10 min
@@ -49,7 +50,7 @@ export default function ReportButton({ reportedUserId, listingId, label = 'Repor
       setSubmitted(true)
       setTimeout(() => { setOpen(false); setSubmitted(false); setReason(''); setDetails('') }, 2000)
     } catch (err) {
-      setError('Failed to submit report. Please try again.')
+      setError('Failed to submit report: ' + (err.message || 'Please try again.'))
     } finally {
       setLoading(false)
     }

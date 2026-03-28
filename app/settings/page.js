@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 import { clearProfileCache } from '@/components/Navbar'
-import { getSessionUser, getProfile, updateProfile, supabase } from '@/lib/supabase'
+import { getSessionUser, getVerifiedUser, getProfile, updateProfile, supabase } from '@/lib/supabase'
 import { withTimeout, getInitial } from '@/lib/utils'
 import { validateClean } from '@/lib/profanity'
 
@@ -44,8 +44,9 @@ function SettingsPage() {
   useEffect(() => {
     async function load() {
       try {
-      const u = await getSessionUser()
-      if (!u) { router.push('/auth/login'); return }
+      const { user: u, redirect, unverified } = await getVerifiedUser()
+      if (redirect) { router.push('/auth/login'); return }
+      if (unverified) { router.push('/auth/verify'); return }
       setUser(u)
       const p = await getProfile(u.id)
       if (p) {

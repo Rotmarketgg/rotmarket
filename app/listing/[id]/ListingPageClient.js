@@ -6,7 +6,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import StarRating from '@/components/StarRating'
 import ReportButton from '@/components/ReportButton'
-import { getListing, getReviews, getSessionUser, createReview, supabase } from '@/lib/supabase'
+import { getListing, getReviews, getSessionUser, getVerifiedUser, createReview, supabase } from '@/lib/supabase'
 import { getRarityStyle, timeAgo, formatPrice, getInitial, checkRateLimit, withTimeout } from '@/lib/utils'
 import { BADGE_HIERARCHY, BADGE_META, getPrimaryBadge, PAYMENT_METHODS } from '@/lib/constants'
 import { isClean } from '@/lib/profanity'
@@ -359,6 +359,8 @@ export default function ListingPageClient({ id: idProp, initialListing = null })
 
   const handleSendOffer = async () => {
     if (!user) { router.push('/auth/login'); return }
+    const { unverified } = await getVerifiedUser()
+    if (unverified) { setOfferError('Please verify your email before sending offers.'); return }
     if (!offerMessage.trim()) return
     if (!isClean(offerMessage)) { setOfferError('Your message contains inappropriate language.'); return }
     const rl = checkRateLimit('offer')
@@ -383,6 +385,8 @@ export default function ListingPageClient({ id: idProp, initialListing = null })
 
   const handleReview = async () => {
     if (!user) { router.push('/auth/login'); return }
+    const { unverified } = await getVerifiedUser()
+    if (unverified) { setReviewError('Please verify your email before leaving reviews.'); return }
     if (!isClean(reviewComment)) { setReviewError('Your review contains inappropriate language.'); return }
     setReviewError('')
     setReviewLoading(true)
