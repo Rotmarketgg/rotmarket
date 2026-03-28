@@ -223,7 +223,7 @@ export default function ModPage() {
         .select(`
           *,
           reporter:profiles!reports_reporter_id_fkey(id,username,avatar_url),
-          reported_user:profiles!reports_reported_user_id_fkey(id,username,avatar_url,badge,banned),
+          reported_user:profiles!reports_reported_id_fkey(id,username,avatar_url,badge,banned),
           listings(id,title)
         `)
         .order('created_at', { ascending: false })
@@ -631,7 +631,7 @@ function ModReportCard({ report, modUser, onUpdate, onBanUser }) {
       const { data } = await supabase
         .from('messages')
         .select(`*, sender:profiles!messages_sender_id_fkey(id, username)`)
-        .or(`and(sender_id.eq.${report.reporter_id},receiver_id.eq.${report.reported_user_id}),and(sender_id.eq.${report.reported_user_id},receiver_id.eq.${report.reporter_id})`)
+        .or(`and(sender_id.eq.${report.reporter_id},receiver_id.eq.${report.reported_id}),and(sender_id.eq.${report.reported_id},receiver_id.eq.${report.reporter_id})`)
         .order('created_at', { ascending: true }).limit(150)
       setChatLogs(data || [])
       setChatOpen(true)
@@ -718,7 +718,7 @@ function ModReportCard({ report, modUser, onUpdate, onBanUser }) {
           )}
           {/* Mod-level ban (reversible by Owner) */}
           {report.reported_user && !report.reported_user.banned && (
-            <button onClick={() => onBanUser(report.reported_user_id, report.reported_user.username)} style={S.actionBtn('#f87171')}>
+            <button onClick={() => onBanUser(report.reported_id, report.reported_user.username)} style={S.actionBtn('#f87171')}>
               🚫 Warn Ban
             </button>
           )}

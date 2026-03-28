@@ -99,13 +99,27 @@ export default function CreateListingPage() {
     if (Object.keys(errs).length > 0) { setErrors(errs); return }
 
     // Wait for profile if it hasn't loaded yet (e.g. direct navigation)
-    if (!profile && user) {
-      setErrors({ general: 'Profile still loading — please try again in a moment.' })
-      return
+    // Also re-fetch if missing so the badge check below is never based on null
+    let activeProfile = profile
+    if (!activeProfile && user) {
+      try {
+        const { getProfile } = await import('@/lib/supabase')
+        activeProfile = await getProfile(user.id)
+        setProfile(activeProfile)
+      } catch {
+        setErrors({ general: 'Profile still loading — please try again in a moment.' })
+        return
+      }
     }
 
-    // Rate limit is bypassed for VIP, Owner, Admin, and Moderator users
-    const profileBadges = profile?.badges?.length ? profile.badges : profile?.badge ? [profile.badge] : []
+    // Rate limit is bypassed for VIP, Owner, Admin, and Moderator users.
+    // Always derive badges from the freshly-resolved profile so a null profile
+    // race can never cause a privileged user to be incorrectly rate-limited.
+    const profileBadges = activeProfile?.badges?.length
+      ? activeProfile.badges
+      : activeProfile?.badge
+      ? [activeProfile.badge]
+      : []
     const isPrivileged = profileBadges.some(b => ['Owner', 'VIP', 'Moderator', 'Admin'].includes(b))
     if (!isPrivileged) {
       const rl = checkRateLimit('listing')

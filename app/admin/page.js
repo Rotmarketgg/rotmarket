@@ -151,6 +151,21 @@ const S = {
     outline: 'none',
     cursor: 'pointer',
   },
+  inspectRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    padding: '5px 8px',
+    background: '#0a0a0f',
+    borderRadius: 5,
+    flexWrap: 'wrap',
+  },
+  emptyNote: {
+    fontSize: 11,
+    color: '#4b5563',
+    padding: '6px 8px',
+    fontStyle: 'italic',
+  },
 }
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
@@ -210,6 +225,8 @@ export default function AdminPage() {
   const [tradeStatusFilter, setTradeStatusFilter] = useState('all')
 
   const [viewUser, setViewUser] = useState(null)
+  const [inspectData, setInspectData] = useState(null)
+  const [inspectLoading, setInspectLoading] = useState(false)
 
   const [createModal, setCreateModal] = useState(false)
   const [createForm, setCreateForm] = useState({ email: '', password: '', username: '' })
@@ -306,7 +323,7 @@ export default function AdminPage() {
     try {
       let q = supabase
         .from('reports')
-        .select(`*, reporter:profiles!reports_reporter_id_fkey(id,username,avatar_url), reported_user:profiles!reports_reported_user_id_fkey(id,username,avatar_url,badge,banned), listings(id,title)`)
+        .select(`*, reporter:profiles!reports_reporter_id_fkey(id,username,avatar_url), reported_user:profiles!reports_reported_id_fkey(id,username,avatar_url,badge,banned), listings(id,title)`)
         .order('created_at', { ascending: false })
         .limit(100)
       if (status !== 'all') q = q.eq('status', status)
@@ -462,6 +479,44 @@ export default function AdminPage() {
   }
 
   // ─── ACTIONS ─────────────────────────────────────────────────────
+
+  async function openInspect(user) {
+    setViewUser(user)
+    setInspectData(null)
+    setInspectLoading(true)
+    try {
+      const [
+        { data: userListings },
+        { data: userReports },
+        { data: reportsMade },
+        { data: userTrades },
+        { data: userReviews },
+        { data: messages },
+        { count: msgCount },
+      ] = await Promise.all([
+        supabase.from('listings').select('id, title, game, type, status, price, created_at, views').eq('user_id', user.id).order('created_at', { ascending: false }).limit(10),
+        supabase.from('reports').select('id, reason, created_at, status, reporter:profiles!reports_reporter_id_fkey(username)').eq('reported_id', user.id).order('created_at', { ascending: false }).limit(10),
+        supabase.from('reports').select('id, reason, created_at, reported:profiles!reports_reported_id_fkey(username)').eq('reporter_id', user.id).order('created_at', { ascending: false }).limit(5),
+        supabase.from('trade_requests').select('id, status, created_at, offer_price, listing:listings(title)').or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`).order('created_at', { ascending: false }).limit(10),
+        supabase.from('reviews').select('id, rating, comment, created_at, reviewer:profiles!reviews_reviewer_id_fkey(username)').eq('seller_id', user.id).order('created_at', { ascending: false }).limit(5),
+        supabase.from('messages').select('id, created_at, content').or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`).order('created_at', { ascending: false }).limit(1),
+        supabase.from('messages').select('id', { count: 'exact', head: true }).or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`),
+      ])
+      setInspectData({
+        listings: userListings || [],
+        reports: userReports || [],
+        reportsMade: reportsMade || [],
+        trades: userTrades || [],
+        reviews: userReviews || [],
+        lastActive: messages?.[0]?.created_at ?? null,
+        messageCount: msgCount || 0,
+      })
+    } catch (err) {
+      showToast('Failed to load inspect data: ' + err.message, 'error')
+    } finally {
+      setInspectLoading(false)
+    }
+  }
 
   async function updateDispute(disputeId, status, resolution, notes) {
     try {
@@ -821,7 +876,8 @@ export default function AdminPage() {
 
       {/* Inspect User Modal */}
       {viewUser && (
-        <Modal title="🔍 Inspect User" onClose={() => setViewUser(null)}>
+        <Modal title="🔍 Inspect User" onClose={() => { setViewUser(null); setInspectData(null) }}>
+          {/* Header */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
             <div style={{
               width: 48, height: 48, borderRadius: '50%', flexShrink: 0, overflow: 'hidden',
@@ -842,21 +898,109 @@ export default function AdminPage() {
               <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>
                 {(viewUser.badges?.length ? viewUser.badges : viewUser.badge ? [viewUser.badge] : []).join(', ') || 'No badges'}
               </div>
+              <div style={{ fontSize: 10, color: '#4b5563', marginTop: 1 }}>ID: {viewUser.id}</div>
             </div>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12 }}>
+
+          {/* Stats row */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 16 }}>
             {[
-              ['Trades', viewUser.trade_count ?? '—'],
+              ['Trades', viewUser.trade_count ?? 0],
               ['Rating', `⭐ ${viewUser.rating || 0}`],
-              ['Reviews', viewUser.review_count ?? '—'],
-              ['Banned', viewUser.banned ? `Yes — ${viewUser.ban_reason || 'no reason given'}` : 'No'],
+              ['Reviews', viewUser.review_count ?? 0],
+              ['Msgs', inspectData?.messageCount ?? '…'],
             ].map(([label, val]) => (
-              <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 10px', background: '#0d0d14', borderRadius: 7, border: '1px solid #1f2937' }}>
-                <span style={{ color: '#6b7280', fontWeight: 600 }}>{label}</span>
-                <span style={{ color: '#f9fafb', fontWeight: 700 }}>{val}</span>
+              <div key={label} style={{ background: '#0d0d14', border: '1px solid #1f2937', borderRadius: 7, padding: '8px 6px', textAlign: 'center' }}>
+                <div style={{ fontSize: 14, fontWeight: 800, color: '#f9fafb' }}>{val}</div>
+                <div style={{ fontSize: 10, color: '#6b7280', marginTop: 2 }}>{label}</div>
               </div>
             ))}
           </div>
+
+          {inspectLoading ? (
+            <div style={{ textAlign: 'center', padding: '24px 0', color: '#6b7280', fontSize: 13 }}>Loading activity data…</div>
+          ) : inspectData ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxHeight: 420, overflowY: 'auto' }}>
+
+              {/* Reports against this user */}
+              <InspectSection title={`🚩 Reports Against (${inspectData.reports.length})`} accent="#ef4444">
+                {inspectData.reports.length === 0
+                  ? <div style={S.emptyNote}>No reports filed against this user.</div>
+                  : inspectData.reports.map(r => (
+                    <div key={r.id} style={S.inspectRow}>
+                      <span style={{ color: '#f87171', fontWeight: 700, fontSize: 11 }}>{r.reason}</span>
+                      <span style={{ color: '#6b7280', fontSize: 10 }}>by {r.reporter?.username ?? '?'} · {timeAgo(r.created_at)}</span>
+                      <span style={{ ...S.badge(r.status === 'pending' ? '#f59e0b' : '#4ade80'), fontSize: 9 }}>{r.status}</span>
+                    </div>
+                  ))
+                }
+              </InspectSection>
+
+              {/* Listings */}
+              <InspectSection title={`📋 Listings (${inspectData.listings.length})`} accent="#60a5fa">
+                {inspectData.listings.length === 0
+                  ? <div style={S.emptyNote}>No listings.</div>
+                  : inspectData.listings.map(l => (
+                    <div key={l.id} style={S.inspectRow}>
+                      <Link href={`/listing/${l.id}`} target="_blank" style={{ color: '#93c5fd', fontSize: 11, fontWeight: 600, textDecoration: 'none', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.title}</Link>
+                      <span style={{ color: '#6b7280', fontSize: 10 }}>{l.views ?? 0} views · {l.status}</span>
+                      <span style={{ color: '#9ca3af', fontSize: 10 }}>{timeAgo(l.created_at)}</span>
+                    </div>
+                  ))
+                }
+              </InspectSection>
+
+              {/* Trade requests */}
+              <InspectSection title={`🔄 Trades (${inspectData.trades.length})`} accent="#a78bfa">
+                {inspectData.trades.length === 0
+                  ? <div style={S.emptyNote}>No trade activity.</div>
+                  : inspectData.trades.map(t => (
+                    <div key={t.id} style={S.inspectRow}>
+                      <span style={{ color: '#c4b5fd', fontSize: 11, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.listing?.title ?? 'Unknown listing'}</span>
+                      <span style={{ color: t.status === 'completed' ? '#4ade80' : t.status === 'pending' ? '#f59e0b' : '#6b7280', fontSize: 10, fontWeight: 700 }}>{t.status}</span>
+                      <span style={{ color: '#6b7280', fontSize: 10 }}>{timeAgo(t.created_at)}</span>
+                    </div>
+                  ))
+                }
+              </InspectSection>
+
+              {/* Reviews received */}
+              <InspectSection title={`⭐ Reviews Received (${inspectData.reviews.length})`} accent="#f59e0b">
+                {inspectData.reviews.length === 0
+                  ? <div style={S.emptyNote}>No reviews yet.</div>
+                  : inspectData.reviews.map(r => (
+                    <div key={r.id} style={{ ...S.inspectRow, flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
+                      <div style={{ display: 'flex', gap: 8, width: '100%', alignItems: 'center' }}>
+                        <span style={{ color: '#fbbf24', fontSize: 11 }}>{'⭐'.repeat(r.rating)}</span>
+                        <span style={{ color: '#6b7280', fontSize: 10 }}>by {r.reviewer?.username ?? '?'} · {timeAgo(r.created_at)}</span>
+                      </div>
+                      {r.comment && <div style={{ fontSize: 11, color: '#9ca3af', fontStyle: 'italic' }}>"{r.comment}"</div>}
+                    </div>
+                  ))
+                }
+              </InspectSection>
+
+              {/* Reports made by this user */}
+              {inspectData.reportsMade.length > 0 && (
+                <InspectSection title={`📤 Reports Filed by User (${inspectData.reportsMade.length})`} accent="#6b7280">
+                  {inspectData.reportsMade.map(r => (
+                    <div key={r.id} style={S.inspectRow}>
+                      <span style={{ color: '#9ca3af', fontSize: 11 }}>{r.reason} → {r.reported?.username ?? '?'}</span>
+                      <span style={{ color: '#6b7280', fontSize: 10 }}>{timeAgo(r.created_at)}</span>
+                    </div>
+                  ))}
+                </InspectSection>
+              )}
+
+              {inspectData.lastActive && (
+                <div style={{ fontSize: 11, color: '#4b5563', textAlign: 'right' }}>
+                  Last message activity: {timeAgo(inspectData.lastActive)}
+                </div>
+              )}
+            </div>
+          ) : null}
+
+          {/* Actions */}
           <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
             <Link href={`/profile/${viewUser.username}`} target="_blank" style={{
               flex: 1, textAlign: 'center', padding: '8px 0', borderRadius: 7, fontSize: 12, fontWeight: 700,
@@ -864,7 +1008,7 @@ export default function AdminPage() {
               textDecoration: 'none',
             }}>View Profile ↗</Link>
             <button
-              onClick={() => { toggleBan(viewUser.id, viewUser.banned, viewUser.username); setViewUser(null) }}
+              onClick={() => { toggleBan(viewUser.id, viewUser.banned, viewUser.username); setViewUser(null); setInspectData(null) }}
               style={{
                 flex: 1, padding: '8px 0', borderRadius: 7, border: 'none', fontSize: 12, fontWeight: 700, cursor: 'pointer',
                 background: viewUser.banned ? 'rgba(74,222,128,0.12)' : 'rgba(239,68,68,0.12)',
@@ -980,6 +1124,7 @@ export default function AdminPage() {
                       onUpdateBadge={updateBadge}
                       onToggleBan={toggleBan}
                       onDelete={confirmDeleteUser}
+                      onInspect={openInspect}
                       onPromote={(u) => { setPromoteModal({ user: u }); setPromoteForm({ role: 'VIP', duration: 30, note: '' }) }}
                     />
                   ))}
@@ -1227,7 +1372,7 @@ export default function AdminPage() {
                                   <button
                                     onClick={() => {
                                       const target = t.buyer || t.seller
-                                      setViewUser(target)
+                                      openInspect(target)
                                     }}
                                     style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', background: '#1a1a2e', border: '1px solid #2d2d3f', borderRadius: 6, padding: '4px 8px', cursor: 'pointer' }}
                                   >
@@ -1416,7 +1561,7 @@ function PromotionRow({ promo, onRevoke }) {
 
 const ALL_BADGES = BADGE_HIERARCHY
 
-function UserRow({ user, emailData, onUpdateBadge, onToggleBan, onDelete, onPromote }) {
+function UserRow({ user, emailData, onUpdateBadge, onToggleBan, onDelete, onPromote, onInspect }) {
   const initialBadges = user.badges?.length ? user.badges : user.badge ? [user.badge] : []
   const [selectedBadges, setSelectedBadges] = useState(initialBadges)
   const [saving, setSaving] = useState(false)
@@ -1480,6 +1625,7 @@ function UserRow({ user, emailData, onUpdateBadge, onToggleBan, onDelete, onProm
 
         {/* Actions */}
         <div style={{ display: 'flex', gap: 6, flexShrink: 0, flexWrap: 'wrap' }}>
+          <button onClick={() => onInspect(user)} style={S.actionBtn('#9ca3af')}>🔍 Inspect</button>
           <button onClick={() => onPromote(user)} style={S.actionBtn('#f59e0b')}>🎖️ Promote</button>
           <button onClick={() => setShowBadges(s => !s)} style={{
             ...S.actionBtn('#60a5fa'),
@@ -1555,11 +1701,11 @@ function ReportCard({ report, onUpdate }) {
       const { data } = await supabase
         .from('messages')
         .select(`*, sender:profiles!messages_sender_id_fkey(id, username)`)
-        .or(`and(sender_id.eq.${report.reporter_id},receiver_id.eq.${report.reported_user_id}),and(sender_id.eq.${report.reported_user_id},receiver_id.eq.${report.reporter_id})`)
+        .or(`and(sender_id.eq.${report.reporter_id},receiver_id.eq.${report.reported_id}),and(sender_id.eq.${report.reported_id},receiver_id.eq.${report.reporter_id})`)
         .order('created_at', { ascending: true }).limit(200)
       const [{ data: trades }, { data: reviews }] = await Promise.all([
-        supabase.from('trade_requests').select('id, status, created_at, listing_id').eq('seller_id', report.reported_user_id).order('created_at', { ascending: false }).limit(20),
-        supabase.from('reviews').select('rating, comment, created_at').eq('seller_id', report.reported_user_id).order('created_at', { ascending: false }).limit(10),
+        supabase.from('trade_requests').select('id, status, created_at, listing_id').eq('seller_id', report.reported_id).order('created_at', { ascending: false }).limit(20),
+        supabase.from('reviews').select('rating, comment, created_at').eq('seller_id', report.reported_id).order('created_at', { ascending: false }).limit(10),
       ])
       setChatLogs(data || [])
       setUserActivity({ trades: trades || [], reviews: reviews || [] })
@@ -1760,6 +1906,17 @@ function ChatAndActivity({ chatLogs, userActivity, username }) {
 }
 
 // ─── SHARED COMPONENTS ────────────────────────────────────────────────────────
+
+function InspectSection({ title, accent, children }) {
+  return (
+    <div>
+      <div style={{ fontSize: 10, fontWeight: 800, color: accent, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
+        {title}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>{children}</div>
+    </div>
+  )
+}
 
 function Modal({ title, onClose, children }) {
   return (
