@@ -323,7 +323,7 @@ export default function AdminPage() {
     try {
       let q = supabase
         .from('reports')
-        .select(`*, reporter:profiles!reports_reporter_id_fkey(id,username,avatar_url), reported_user:profiles!reports_reported_id_fkey(id,username,avatar_url,badge,banned), listings(id,title)`)
+        .select(`*, reporter:profiles!reporter_id(id,username,avatar_url), reported_user:profiles!reported_id(id,username,avatar_url,badge,banned), listings(id,title)`)
         .order('created_at', { ascending: false })
         .limit(100)
       if (status !== 'all') q = q.eq('status', status)
@@ -495,8 +495,8 @@ export default function AdminPage() {
         { count: msgCount },
       ] = await Promise.all([
         supabase.from('listings').select('id, title, game, type, status, price, created_at, views').eq('user_id', user.id).order('created_at', { ascending: false }).limit(10),
-        supabase.from('reports').select('id, reason, created_at, status, reporter:profiles!reports_reporter_id_fkey(username)').eq('reported_id', user.id).order('created_at', { ascending: false }).limit(10),
-        supabase.from('reports').select('id, reason, created_at, reported:profiles!reports_reported_id_fkey(username)').eq('reporter_id', user.id).order('created_at', { ascending: false }).limit(5),
+        supabase.from('reports').select('id, reason, created_at, status, reporter:profiles!reporter_id(username)').eq('reported_id', user.id).order('created_at', { ascending: false }).limit(10),
+        supabase.from('reports').select('id, reason, created_at, reported:profiles!reported_id(username)').eq('reporter_id', user.id).order('created_at', { ascending: false }).limit(5),
         supabase.from('trade_requests').select('id, status, created_at, offer_price, listing:listings(title)').or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`).order('created_at', { ascending: false }).limit(10),
         supabase.from('reviews').select('id, rating, comment, created_at, reviewer:profiles!reviews_reviewer_id_fkey(username)').eq('seller_id', user.id).order('created_at', { ascending: false }).limit(5),
         supabase.from('messages').select('id, created_at, content').or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`).order('created_at', { ascending: false }).limit(1),

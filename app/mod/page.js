@@ -222,8 +222,8 @@ export default function ModPage() {
         .from('reports')
         .select(`
           *,
-          reporter:profiles!reports_reporter_id_fkey(id,username,avatar_url),
-          reported_user:profiles!reports_reported_id_fkey(id,username,avatar_url,badge,banned),
+          reporter:profiles!reporter_id(id,username,avatar_url),
+          reported_user:profiles!reported_id(id,username,avatar_url,badge,banned),
           listings(id,title)
         `)
         .order('created_at', { ascending: false })
