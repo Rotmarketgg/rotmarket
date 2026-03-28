@@ -76,7 +76,11 @@ function SettingsPage() {
   const handleAvatarChange = (e) => {
     const file = e.target.files?.[0]
     if (!file) return
-    if (!file.type.startsWith('image/')) { setError('Please select an image file.'); return }
+    const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif']
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      setError('Please select a valid image file (JPEG, PNG, WebP, or GIF).')
+      return
+    }
     if (file.size > 2 * 1024 * 1024) { setError('Avatar must be under 2MB.'); return }
     setAvatarFile(file)
     const reader = new FileReader()
@@ -88,27 +92,24 @@ function SettingsPage() {
     if (!avatarFile) return form.avatar_url
     setAvatarUploading(true)
     try {
-      const ext = avatarFile.name.split('.').pop().toLowerCase()
+      // Derive extension from MIME type — never trust file.name which can be spoofed
+      const mimeToExt = {
+        'image/jpeg': 'jpg', 'image/jpg': 'jpg',
+        'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif',
+      }
+      const ext = mimeToExt[avatarFile.type]
+      if (!ext) throw new Error('Unsupported image format.')
       const path = `avatars/${userId}/avatar.${ext}`
-      // Try dedicated avatars bucket first, fall back to listing-images
-      // Run the avatars bucket SQL in Supabase if you haven't already
-      let bucket = 'avatars'
       const { error: uploadError } = await supabase.storage
-        .from(bucket)
-        .upload(path, avatarFile, { upsert: true })
-      if (uploadError?.message?.includes('Bucket not found')) {
-        // Fall back to listing-images bucket
-        bucket = 'listing-images'
-        const { error: fallbackError } = await supabase.storage
-          .from(bucket)
-          .upload(path, avatarFile, { upsert: true })
-        if (fallbackError) throw fallbackError
-      } else if (uploadError) {
+        .from('avatars')
+        .upload(path, avatarFile, { upsert: true, contentType: avatarFile.type })
+      if (uploadError) {
+        if (uploadError.message?.includes('Bucket not found')) {
+          throw new Error('Avatar uploads are not configured yet. Please contact support.')
+        }
         throw uploadError
       }
-      const { data: { publicUrl } } = supabase.storage
-        .from(bucket)
-        .getPublicUrl(path)
+      const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path)
       return publicUrl
     } finally {
       setAvatarUploading(false)

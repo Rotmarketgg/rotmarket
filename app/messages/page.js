@@ -178,6 +178,7 @@ function MessagesInner() {
   const handleSend = async () => {
     if (!newMsg.trim() || !activeConvo || !user || sending) return
     if (!isClean(newMsg)) { setSendError('Your message contains inappropriate language.'); return }
+    if (newMsg.length > 2000) { setSendError('Message is too long (max 2000 characters).'); return }
     setSendError('')
     setSending(true)
     const otherId = activeConvo.sender_id === user.id ? activeConvo.receiver_id : activeConvo.sender_id
@@ -615,19 +616,27 @@ function MessagesInner() {
                       <button onClick={() => setSendError('')} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: 14, lineHeight: 1 }}>×</button>
                     </div>
                   )}
-                  <div style={{ padding: '12px 16px', display: 'flex', gap: 10 }}>
-                    <input
-                      ref={inputRef}
-                      type="text"
-                      placeholder="Type a message..."
-                      value={newMsg}
-                      onChange={e => { setNewMsg(e.target.value); if (sendError) setSendError('') }}
-                      onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
-                      style={{ flex: 1, background: '#111118', fontSize: 14 }}
-                    />
-                    <button onClick={handleSend} disabled={!newMsg.trim() || sending} className="btn-primary" style={{ padding: '10px 20px', fontSize: 13, flexShrink: 0 }}>
-                      {sending ? '...' : 'Send'}
-                    </button>
+                  <div style={{ padding: '12px 16px', display: 'flex', gap: 10, flexDirection: 'column' }}>
+                    {newMsg.length > 1800 && (
+                      <div style={{ fontSize: 11, color: newMsg.length >= 2000 ? '#ef4444' : '#f59e0b', textAlign: 'right' }}>
+                        {newMsg.length}/2000
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', gap: 10 }}>
+                      <input
+                        ref={inputRef}
+                        type="text"
+                        placeholder="Type a message..."
+                        value={newMsg}
+                        maxLength={2000}
+                        onChange={e => { setNewMsg(e.target.value); if (sendError) setSendError('') }}
+                        onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
+                        style={{ flex: 1, background: '#111118', fontSize: 14 }}
+                      />
+                      <button onClick={handleSend} disabled={!newMsg.trim() || sending || newMsg.length > 2000} className="btn-primary" style={{ padding: '10px 20px', fontSize: 13, flexShrink: 0 }}>
+                        {sending ? '...' : 'Send'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </>
