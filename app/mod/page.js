@@ -220,18 +220,38 @@ export default function ModPage() {
     try {
       let q = supabase
         .from('reports')
-        .select(`
-          *,
-          reporter:profiles!reporter_id(id,username,avatar_url),
-          reported_user:profiles!reported_id(id,username,avatar_url,badge,banned),
-          listings(id,title)
-        `)
+        .select('*')
         .order('created_at', { ascending: false })
         .limit(100)
       if (status !== 'all') q = q.eq('status', status)
-      const { data, error } = await q
+      const { data: rawReports, error } = await q
       if (error) throw error
-      setReports(data || [])
+      if (!rawReports?.length) { setReports([]); return }
+
+      const userIds = [...new Set([
+        ...rawReports.map(r => r.reporter_id).filter(Boolean),
+        ...rawReports.map(r => r.reported_id).filter(Boolean),
+      ])]
+      const listingIds = [...new Set(rawReports.map(r => r.listing_id).filter(Boolean))]
+
+      const [{ data: profileRows }, { data: listingRows }] = await Promise.all([
+        userIds.length
+          ? supabase.from('profiles').select('id,username,avatar_url,badge,badges,banned').in('id', userIds)
+          : { data: [] },
+        listingIds.length
+          ? supabase.from('listings').select('id,title').in('id', listingIds)
+          : { data: [] },
+      ])
+
+      const profileMap = Object.fromEntries((profileRows || []).map(p => [p.id, p]))
+      const listingMap = Object.fromEntries((listingRows || []).map(l => [l.id, l]))
+
+      setReports(rawReports.map(r => ({
+        ...r,
+        reporter: profileMap[r.reporter_id] ?? null,
+        reported_user: profileMap[r.reported_id] ?? null,
+        listings: listingMap[r.listing_id] ?? null,
+      })))
     } catch (err) {
       showToast('Error loading reports: ' + err.message, 'error')
     } finally {

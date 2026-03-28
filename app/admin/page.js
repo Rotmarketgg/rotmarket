@@ -323,13 +323,41 @@ export default function AdminPage() {
     try {
       let q = supabase
         .from('reports')
-        .select(`*, reporter:profiles!reporter_id(id,username,avatar_url), reported_user:profiles!reported_id(id,username,avatar_url,badge,banned), listings(id,title)`)
+        .select('*')
         .order('created_at', { ascending: false })
         .limit(100)
       if (status !== 'all') q = q.eq('status', status)
-      const { data, error } = await q
+      const { data: rawReports, error } = await q
       if (error) throw error
-      setReports(data || [])
+      if (!rawReports?.length) { setReports([]); return }
+
+      // Collect unique user IDs and listing IDs, then batch fetch
+      const userIds = [...new Set([
+        ...rawReports.map(r => r.reporter_id).filter(Boolean),
+        ...rawReports.map(r => r.reported_id).filter(Boolean),
+      ])]
+      const listingIds = [...new Set(rawReports.map(r => r.listing_id).filter(Boolean))]
+
+      const [{ data: profileRows }, { data: listingRows }] = await Promise.all([
+        userIds.length
+          ? supabase.from('profiles').select('id,username,avatar_url,badge,badges,banned').in('id', userIds)
+          : { data: [] },
+        listingIds.length
+          ? supabase.from('listings').select('id,title').in('id', listingIds)
+          : { data: [] },
+      ])
+
+      const profileMap = Object.fromEntries((profileRows || []).map(p => [p.id, p]))
+      const listingMap = Object.fromEntries((listingRows || []).map(l => [l.id, l]))
+
+      const enriched = rawReports.map(r => ({
+        ...r,
+        reporter: profileMap[r.reporter_id] ?? null,
+        reported_user: profileMap[r.reported_id] ?? null,
+        listings: listingMap[r.listing_id] ?? null,
+      }))
+
+      setReports(enriched)
     } catch (err) {
       showToast('Error loading reports: ' + err.message, 'error')
     } finally {
@@ -495,19 +523,37 @@ export default function AdminPage() {
         { count: msgCount },
       ] = await Promise.all([
         supabase.from('listings').select('id, title, game, type, status, price, created_at, views').eq('user_id', user.id).order('created_at', { ascending: false }).limit(10),
-        supabase.from('reports').select('id, reason, created_at, status, reporter:profiles!reporter_id(username)').eq('reported_id', user.id).order('created_at', { ascending: false }).limit(10),
-        supabase.from('reports').select('id, reason, created_at, reported:profiles!reported_id(username)').eq('reporter_id', user.id).order('created_at', { ascending: false }).limit(5),
-        supabase.from('trade_requests').select('id, status, created_at, offer_price, listing:listings(title)').or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`).order('created_at', { ascending: false }).limit(10),
-        supabase.from('reviews').select('id, rating, comment, created_at, reviewer:profiles!reviews_reviewer_id_fkey(username)').eq('seller_id', user.id).order('created_at', { ascending: false }).limit(5),
-        supabase.from('messages').select('id, created_at, content').or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`).order('created_at', { ascending: false }).limit(1),
+        supabase.from('reports').select('id, reason, created_at, status, reporter_id').eq('reported_id', user.id).order('created_at', { ascending: false }).limit(10),
+        supabase.from('reports').select('id, reason, created_at, reported_id').eq('reporter_id', user.id).order('created_at', { ascending: false }).limit(5),
+        supabase.from('trade_requests').select('id, status, created_at, offer_price, listing_id').or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`).order('created_at', { ascending: false }).limit(10),
+        supabase.from('reviews').select('id, rating, comment, created_at, reviewer_id').eq('seller_id', user.id).order('created_at', { ascending: false }).limit(5),
+        supabase.from('messages').select('id, created_at').or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`).order('created_at', { ascending: false }).limit(1),
         supabase.from('messages').select('id', { count: 'exact', head: true }).or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`),
       ])
+
+      // Batch resolve usernames for reports and reviews
+      const resolveIds = [...new Set([
+        ...(userReports || []).map(r => r.reporter_id),
+        ...(reportsMade || []).map(r => r.reported_id),
+        ...(userReviews || []).map(r => r.reviewer_id),
+      ].filter(Boolean))]
+
+      const resolveListingIds = [...new Set((userTrades || []).map(r => r.listing_id).filter(Boolean))]
+
+      const [{ data: resolvedProfiles }, { data: resolvedListings }] = await Promise.all([
+        resolveIds.length ? supabase.from('profiles').select('id, username').in('id', resolveIds) : { data: [] },
+        resolveListingIds.length ? supabase.from('listings').select('id, title').in('id', resolveListingIds) : { data: [] },
+      ])
+
+      const pMap = Object.fromEntries((resolvedProfiles || []).map(p => [p.id, p]))
+      const lMap = Object.fromEntries((resolvedListings || []).map(l => [l.id, l]))
+
       setInspectData({
         listings: userListings || [],
-        reports: userReports || [],
-        reportsMade: reportsMade || [],
-        trades: userTrades || [],
-        reviews: userReviews || [],
+        reports: (userReports || []).map(r => ({ ...r, reporter: pMap[r.reporter_id] ?? null })),
+        reportsMade: (reportsMade || []).map(r => ({ ...r, reported: pMap[r.reported_id] ?? null })),
+        trades: (userTrades || []).map(t => ({ ...t, listing: lMap[t.listing_id] ?? null })),
+        reviews: (userReviews || []).map(r => ({ ...r, reviewer: pMap[r.reviewer_id] ?? null })),
         lastActive: messages?.[0]?.created_at ?? null,
         messageCount: msgCount || 0,
       })
