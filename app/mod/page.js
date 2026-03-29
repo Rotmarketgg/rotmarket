@@ -230,7 +230,7 @@ export default function ModPage() {
 
       const userIds = [...new Set([
         ...rawReports.map(r => r.reporter_id).filter(Boolean),
-        ...rawReports.map(r => r.reported_id).filter(Boolean),
+        ...rawReports.map(r => r.reported_user_id).filter(Boolean),
       ])]
       const listingIds = [...new Set(rawReports.map(r => r.listing_id).filter(Boolean))]
 
@@ -249,7 +249,7 @@ export default function ModPage() {
       setReports(rawReports.map(r => ({
         ...r,
         reporter: profileMap[r.reporter_id] ?? null,
-        reported_user: profileMap[r.reported_id] ?? null,
+        reported_user: profileMap[r.reported_user_id] ?? null,
         listings: listingMap[r.listing_id] ?? null,
       })))
     } catch (err) {
@@ -651,7 +651,7 @@ function ModReportCard({ report, modUser, onUpdate, onBanUser }) {
       const { data } = await supabase
         .from('messages')
         .select(`*, sender:profiles!messages_sender_id_fkey(id, username)`)
-        .or(`and(sender_id.eq.${report.reporter_id},receiver_id.eq.${report.reported_id}),and(sender_id.eq.${report.reported_id},receiver_id.eq.${report.reporter_id})`)
+        .or(`and(sender_id.eq.${report.reporter_id},receiver_id.eq.${report.reported_user_id}),and(sender_id.eq.${report.reported_user_id},receiver_id.eq.${report.reporter_id})`)
         .order('created_at', { ascending: true }).limit(150)
       setChatLogs(data || [])
       setChatOpen(true)
@@ -738,7 +738,7 @@ function ModReportCard({ report, modUser, onUpdate, onBanUser }) {
           )}
           {/* Mod-level ban (reversible by Owner) */}
           {report.reported_user && !report.reported_user.banned && (
-            <button onClick={() => onBanUser(report.reported_id, report.reported_user.username)} style={S.actionBtn('#f87171')}>
+            <button onClick={() => onBanUser(report.reported_user_id, report.reported_user.username)} style={S.actionBtn('#f87171')}>
               🚫 Warn Ban
             </button>
           )}

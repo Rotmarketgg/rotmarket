@@ -40,7 +40,7 @@ export default function ReportButton({ reportedUserId, listingId, label = 'Repor
     try {
       const { error: dbError } = await supabase.from('reports').insert({
         reporter_id: user.id,
-        reported_id: reportedUserId,
+        reported_user_id: reportedUserId,
         listing_id: listingId || null,
         reason,
         details: details.trim() || null,

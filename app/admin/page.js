@@ -334,7 +334,7 @@ export default function AdminPage() {
       // Collect unique user IDs and listing IDs, then batch fetch
       const userIds = [...new Set([
         ...rawReports.map(r => r.reporter_id).filter(Boolean),
-        ...rawReports.map(r => r.reported_id).filter(Boolean),
+        ...rawReports.map(r => r.reported_user_id).filter(Boolean),
       ])]
       const listingIds = [...new Set(rawReports.map(r => r.listing_id).filter(Boolean))]
 
@@ -353,7 +353,7 @@ export default function AdminPage() {
       const enriched = rawReports.map(r => ({
         ...r,
         reporter: profileMap[r.reporter_id] ?? null,
-        reported_user: profileMap[r.reported_id] ?? null,
+        reported_user: profileMap[r.reported_user_id] ?? null,
         listings: listingMap[r.listing_id] ?? null,
       }))
 
@@ -523,8 +523,8 @@ export default function AdminPage() {
         { count: msgCount },
       ] = await Promise.all([
         supabase.from('listings').select('id, title, game, type, status, price, created_at, views').eq('user_id', user.id).order('created_at', { ascending: false }).limit(10),
-        supabase.from('reports').select('id, reason, created_at, status, reporter_id').eq('reported_id', user.id).order('created_at', { ascending: false }).limit(10),
-        supabase.from('reports').select('id, reason, created_at, reported_id').eq('reporter_id', user.id).order('created_at', { ascending: false }).limit(5),
+        supabase.from('reports').select('id, reason, created_at, status, reporter_id').eq('reported_user_id', user.id).order('created_at', { ascending: false }).limit(10),
+        supabase.from('reports').select('id, reason, created_at, reported_user_id').eq('reporter_id', user.id).order('created_at', { ascending: false }).limit(5),
         supabase.from('trade_requests').select('id, status, created_at, offer_price, listing_id').or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`).order('created_at', { ascending: false }).limit(10),
         supabase.from('reviews').select('id, rating, comment, created_at, reviewer_id').eq('seller_id', user.id).order('created_at', { ascending: false }).limit(5),
         supabase.from('messages').select('id, created_at').or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`).order('created_at', { ascending: false }).limit(1),
@@ -534,7 +534,7 @@ export default function AdminPage() {
       // Batch resolve usernames for reports and reviews
       const resolveIds = [...new Set([
         ...(userReports || []).map(r => r.reporter_id),
-        ...(reportsMade || []).map(r => r.reported_id),
+        ...(reportsMade || []).map(r => r.reported_user_id),
         ...(userReviews || []).map(r => r.reviewer_id),
       ].filter(Boolean))]
 
@@ -551,7 +551,7 @@ export default function AdminPage() {
       setInspectData({
         listings: userListings || [],
         reports: (userReports || []).map(r => ({ ...r, reporter: pMap[r.reporter_id] ?? null })),
-        reportsMade: (reportsMade || []).map(r => ({ ...r, reported: pMap[r.reported_id] ?? null })),
+        reportsMade: (reportsMade || []).map(r => ({ ...r, reported: pMap[r.reported_user_id] ?? null })),
         trades: (userTrades || []).map(t => ({ ...t, listing: lMap[t.listing_id] ?? null })),
         reviews: (userReviews || []).map(r => ({ ...r, reviewer: pMap[r.reviewer_id] ?? null })),
         lastActive: messages?.[0]?.created_at ?? null,
@@ -1747,11 +1747,11 @@ function ReportCard({ report, onUpdate }) {
       const { data } = await supabase
         .from('messages')
         .select(`*, sender:profiles!messages_sender_id_fkey(id, username)`)
-        .or(`and(sender_id.eq.${report.reporter_id},receiver_id.eq.${report.reported_id}),and(sender_id.eq.${report.reported_id},receiver_id.eq.${report.reporter_id})`)
+        .or(`and(sender_id.eq.${report.reporter_id},receiver_id.eq.${report.reported_user_id}),and(sender_id.eq.${report.reported_user_id},receiver_id.eq.${report.reporter_id})`)
         .order('created_at', { ascending: true }).limit(200)
       const [{ data: trades }, { data: reviews }] = await Promise.all([
-        supabase.from('trade_requests').select('id, status, created_at, listing_id').eq('seller_id', report.reported_id).order('created_at', { ascending: false }).limit(20),
-        supabase.from('reviews').select('rating, comment, created_at').eq('seller_id', report.reported_id).order('created_at', { ascending: false }).limit(10),
+        supabase.from('trade_requests').select('id, status, created_at, listing_id').eq('seller_id', report.reported_user_id).order('created_at', { ascending: false }).limit(20),
+        supabase.from('reviews').select('rating, comment, created_at').eq('seller_id', report.reported_user_id).order('created_at', { ascending: false }).limit(10),
       ])
       setChatLogs(data || [])
       setUserActivity({ trades: trades || [], reviews: reviews || [] })
