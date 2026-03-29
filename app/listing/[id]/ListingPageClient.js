@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -175,7 +175,6 @@ function SellerOfferCard({ offer, onUpdate, onSetListing }) {
 }
 
 function BuyerTradePanel({ myOffer, listing, seller, listingId, copiedId, setCopiedId, handleBuyerConfirm, setMyOffer, setOfferSent, setOfferMessage, setOfferPrice, confirmError, setConfirmError }) {
-  const [cancelConfirm, setCancelConfirm] = React.useState(false)
   if (!myOffer) return null
   const isTradeType = listing?.type === 'trade'
 
@@ -183,24 +182,13 @@ function BuyerTradePanel({ myOffer, listing, seller, listingId, copiedId, setCop
     <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 10, padding: 14, marginTop: 14 }}>
       <div style={{ fontSize: 13, fontWeight: 700, color: '#fde68a', marginBottom: 4 }}>⏳ Offer Pending</div>
       <p style={{ margin: '0 0 10px', fontSize: 12, color: '#9ca3af' }}>Waiting for the seller to respond.</p>
-      {cancelConfirm ? (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 12, color: '#9ca3af' }}>Cancel your offer?</span>
-          <button onClick={async () => {
-            await updateTradeRequest(myOffer.id, { status: 'cancelled' })
-            setMyOffer(null); setOfferSent(false); setOfferMessage(''); setOfferPrice('')
-          }} style={{ background: '#ef4444', border: 'none', color: '#fff', borderRadius: 6, padding: '5px 12px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
-            Yes, Cancel
-          </button>
-          <button onClick={() => setCancelConfirm(false)} style={{ background: 'none', border: '1px solid #2d2d3f', color: '#6b7280', borderRadius: 6, padding: '5px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
-            Keep
-          </button>
-        </div>
-      ) : (
-        <button onClick={() => setCancelConfirm(true)} style={{ background: 'none', border: '1px solid #2d2d3f', color: '#6b7280', borderRadius: 6, padding: '5px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
-          Cancel Offer
-        </button>
-      )}
+      <button onClick={async () => {
+        if (!confirm('Cancel your offer?')) return
+        await updateTradeRequest(myOffer.id, { status: 'cancelled' })
+        setMyOffer(null); setOfferSent(false); setOfferMessage(''); setOfferPrice('')
+      }} style={{ background: 'none', border: '1px solid #2d2d3f', color: '#6b7280', borderRadius: 6, padding: '5px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+        Cancel Offer
+      </button>
     </div>
   )
 
@@ -234,14 +222,10 @@ function BuyerTradePanel({ myOffer, listing, seller, listingId, copiedId, setCop
       ) : (
         <div style={{ background: '#0d0d14', border: '1px solid #2d2d3f', borderRadius: 8, padding: 12, marginBottom: 10 }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: '#6b7280', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.08em' }}>💳 Payment Info</div>
-          {listing.accepts?.includes('PayPal') && seller?.paypal_email && <div style={{ fontSize: 12, color: '#d1d5db', marginBottom: 3 }}>🔵 PayPal: <strong>{seller.paypal_email}</strong></div>}
-          {listing.accepts?.includes('Cash App') && seller?.cashapp_handle && <div style={{ fontSize: 12, color: '#d1d5db', marginBottom: 3 }}>🟢 Cash App: <strong>{seller.cashapp_handle}</strong></div>}
-          {listing.accepts?.includes('Venmo') && seller?.venmo_handle && <div style={{ fontSize: 12, color: '#d1d5db', marginBottom: 3 }}>💙 Venmo: <strong>{seller.venmo_handle}</strong></div>}
-          {(
-            (!listing.accepts?.includes('PayPal') || !seller?.paypal_email) &&
-            (!listing.accepts?.includes('Cash App') || !seller?.cashapp_handle) &&
-            (!listing.accepts?.includes('Venmo') || !seller?.venmo_handle)
-          ) && (
+          {seller?.paypal_email && <div style={{ fontSize: 12, color: '#d1d5db', marginBottom: 3 }}>🔵 PayPal: <strong>{seller.paypal_email}</strong></div>}
+          {seller?.cashapp_handle && <div style={{ fontSize: 12, color: '#d1d5db', marginBottom: 3 }}>🟢 Cash App: <strong>{seller.cashapp_handle}</strong></div>}
+          {seller?.venmo_handle && <div style={{ fontSize: 12, color: '#d1d5db', marginBottom: 3 }}>💙 Venmo: <strong>{seller.venmo_handle}</strong></div>}
+          {!seller?.paypal_email && !seller?.cashapp_handle && !seller?.venmo_handle && (
             <div style={{ fontSize: 12, color: '#4b5563' }}>Message the seller for payment details.</div>
           )}
           <div style={{ marginTop: 8, fontSize: 10, color: '#4b5563', borderTop: '1px solid #1f2937', paddingTop: 6 }}>

@@ -32,9 +32,7 @@ export default function ProfilePageClient({ username: usernameProp, initialProfi
   const [notFound, setNotFound] = useState(false)
   const [listingOffers, setListingOffers] = useState({}) // listingId -> pending offer count
   const [buyerOffers, setBuyerOffers] = useState([]) // offers this user sent as a buyer
-  const [myReviewedListingIds, setMyReviewedListingIds] = useState(new Set()) // listing IDs current user has already reviewed
   const [renewError, setRenewError] = useState('')
-  const [deleteListingId, setDeleteListingId] = useState(null)
 
   const load = useCallback(async (silent = false, skipProfileFetch = false) => {
     if (!silent) setLoading(true)
@@ -96,22 +94,6 @@ export default function ProfilePageClient({ username: usernameProp, initialProfi
           .order('created_at', { ascending: false })
           .limit(50)
         setBuyerOffers(sentOffers || [])
-
-        // Load which listings the current user has already reviewed
-        if (sentOffers?.length) {
-          const completedListingIds = sentOffers
-            .filter(o => o.status === 'completed')
-            .map(o => o.listing_id)
-            .filter(Boolean)
-          if (completedListingIds.length) {
-            const { data: myReviews } = await supabase
-              .from('reviews')
-              .select('listing_id')
-              .eq('reviewer_id', u.id)
-              .in('listing_id', completedListingIds)
-            setMyReviewedListingIds(new Set((myReviews || []).map(r => r.listing_id)))
-          }
-        }
       }
       setLoading(false)
     } catch (err) {
@@ -165,13 +147,7 @@ export default function ProfilePageClient({ username: usernameProp, initialProfi
   }
 
   const handleDelete = async (id) => {
-    setDeleteListingId(id)
-  }
-
-  const confirmDelete = async () => {
-    if (!deleteListingId) return
-    const id = deleteListingId
-    setDeleteListingId(null)
+    if (!confirm('Delete this listing?')) return
     await deleteListing(id)
     setListings(prev => prev.filter(l => l.id !== id))
   }
@@ -686,7 +662,7 @@ export default function ProfilePageClient({ username: usernameProp, initialProfi
                         accepted: '✓ Accepted',
                         completed: '🎉 Completed',
                       }[offer.status] || offer.status
-                      const needsReview = offer.status === 'completed' && !myReviewedListingIds.has(offer.listing_id)
+                      const needsReview = offer.status === 'completed'
                       return (
                         <div key={offer.id} style={{
                           background: '#111118', border: `1px solid ${offer.status === 'pending' ? 'rgba(245,158,11,0.25)' : '#1f2937'}`,
@@ -750,23 +726,6 @@ export default function ProfilePageClient({ username: usernameProp, initialProfi
         </div>
       </div>
     </div>
-
-    {/* Delete Listing Confirm Modal */}
-    {deleteListingId && (
-      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-        <div style={{ background: '#111118', border: '1px solid #2d2d3f', borderRadius: 16, padding: 24, width: '100%', maxWidth: 360 }}>
-          <div style={{ textAlign: 'center', marginBottom: 20 }}>
-            <div style={{ fontSize: 36, marginBottom: 10 }}>🗑️</div>
-            <h3 style={{ margin: '0 0 8px', color: '#f9fafb', fontSize: 16 }}>Delete Listing?</h3>
-            <p style={{ margin: 0, fontSize: 13, color: '#6b7280' }}>This cannot be undone.</p>
-          </div>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button onClick={() => setDeleteListingId(null)} style={{ flex: 1, padding: '11px', borderRadius: 8, border: '1px solid #2d2d3f', background: 'transparent', color: '#9ca3af', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Cancel</button>
-            <button onClick={confirmDelete} style={{ flex: 1, padding: '11px', borderRadius: 8, border: 'none', background: '#ef4444', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Delete</button>
-          </div>
-        </div>
-      </div>
-    )}
   )
 }
 
