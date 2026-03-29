@@ -945,6 +945,16 @@ export default function AdminPage() {
                 {(viewUser.badges?.length ? viewUser.badges : viewUser.badge ? [viewUser.badge] : []).join(', ') || 'No badges'}
               </div>
               <div style={{ fontSize: 10, color: '#4b5563', marginTop: 1 }}>ID: {viewUser.id}</div>
+              {userEmails[viewUser.id]?.lastSignIn && (
+                <div style={{ fontSize: 10, color: '#4b5563', marginTop: 1 }}>
+                  🕐 Last login: {timeAgo(userEmails[viewUser.id].lastSignIn)}
+                </div>
+              )}
+              {userEmails[viewUser.id]?.email && (
+                <div style={{ fontSize: 10, color: '#60a5fa', marginTop: 1 }}>
+                  📧 {userEmails[viewUser.id].email}
+                </div>
+              )}
             </div>
           </div>
 
