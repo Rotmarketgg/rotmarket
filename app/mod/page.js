@@ -129,6 +129,9 @@ export default function ModPage() {
   const [unauthorized, setUnauthorized] = useState(false)
   const [tab, setTab] = useState('overview')
   const [toast, setToast] = useState(null)
+  const [confirmModal, setConfirmModal] = useState(null)
+  const [banTarget, setBanTarget] = useState(null)
+  const [banReason, setBanReason] = useState('')
 
   // Stats
   const [stats, setStats] = useState({})
@@ -323,21 +326,8 @@ export default function ModPage() {
   // Moderators can warn-ban (temporary) but not permanently delete users.
   // For permanent actions, escalate to Owner via admin panel.
   async function warnBanUser(userId, username) {
-    if (!confirm(`Temporarily ban @${username}? They can appeal to an Owner.`)) return
-    const reason = prompt(`Reason for warning/banning @${username}:`)
-    if (!reason) return
-    try {
-      const { error } = await supabase.rpc('admin_update_profile', {
-        target_id: userId,
-        new_badges: null,
-        new_banned: true,
-        new_ban_reason: `[Mod action] ${reason}`,
-      })
-      if (error) throw error
-      showToast(`@${username} banned — Owner can review/reverse this`)
-    } catch (err) {
-      showToast('Failed: ' + err.message + ' — Escalate to Owner if needed', 'error')
-    }
+    setBanTarget({ userId, username })
+    setBanReason('')
   }
 
   // ─── RENDER GUARDS ───────────────────────────────────────────────
@@ -524,6 +514,36 @@ export default function ModPage() {
         ::-webkit-scrollbar-thumb { background: #2d2d3f; border-radius: 2px; }
       `}</style>
     </div>
+
+    {/* Ban User Modal */}
+    {banTarget && (
+      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+        <div style={{ background: '#111118', border: '1px solid #2d2d3f', borderRadius: 16, padding: 24, width: '100%', maxWidth: 400 }}>
+          <h3 style={{ margin: '0 0 12px', color: '#f9fafb', fontSize: 16 }}>Temporarily Ban @{banTarget.username}</h3>
+          <p style={{ color: '#9ca3af', fontSize: 13, margin: '0 0 12px' }}>They can appeal to an Owner. Enter a reason:</p>
+          <input
+            value={banReason}
+            onChange={e => setBanReason(e.target.value)}
+            placeholder="Reason for ban..."
+            autoFocus
+            onKeyDown={e => { if (e.key === 'Enter' && banReason.trim()) document.getElementById('mod-confirm-ban-btn').click() }}
+            style={{ width: '100%', background: '#0d0d14', border: '1px solid #2d2d3f', borderRadius: 8, padding: '10px 14px', color: '#f9fafb', fontSize: 13, boxSizing: 'border-box', outline: 'none' }}
+          />
+          <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+            <button onClick={() => { setBanTarget(null); setBanReason('') }} style={{ flex: 1, padding: 11, borderRadius: 8, border: '1px solid #2d2d3f', background: 'transparent', color: '#9ca3af', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Cancel</button>
+            <button id="mod-confirm-ban-btn" disabled={!banReason.trim()} onClick={async () => {
+              const { userId, username } = banTarget
+              setBanTarget(null); setBanReason('')
+              try {
+                const { error } = await supabase.rpc('admin_update_profile', { target_id: userId, new_badges: null, new_banned: true, new_ban_reason: `[Mod action] ${banReason}` })
+                if (error) throw error
+                showToast(`@${username} banned — Owner can review/reverse this`)
+              } catch (err) { showToast('Failed: ' + err.message, 'error') }
+            }} style={{ flex: 1, padding: 11, borderRadius: 8, border: 'none', background: banReason.trim() ? '#ef4444' : '#7f1d1d', color: '#fff', fontSize: 13, fontWeight: 700, cursor: banReason.trim() ? 'pointer' : 'default' }}>Ban User</button>
+          </div>
+        </div>
+      </div>
+    )}
   )
 }
 
@@ -656,7 +676,7 @@ function ModReportCard({ report, modUser, onUpdate, onBanUser }) {
       setChatLogs(data || [])
       setChatOpen(true)
     } catch (err) {
-      alert('Failed to load logs: ' + err.message)
+      console.error('Failed to load logs:', err)
     } finally {
       setChatLoading(false)
     }
@@ -771,7 +791,7 @@ function ModDisputeCard({ dispute, modUser, onUpdate }) {
       setChatLogs(data || [])
       setChatOpen(true)
     } catch (err) {
-      alert('Failed to load logs: ' + err.message)
+      console.error('Failed to load logs:', err)
     } finally {
       setChatLoading(false)
     }

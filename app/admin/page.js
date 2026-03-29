@@ -235,6 +235,9 @@ export default function AdminPage() {
   const [promoteForm, setPromoteForm] = useState({ role: 'VIP', duration: 30, note: '' })
   const [promoting, setPromoting] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(null) // { userId, username }
+  const [confirmModal, setConfirmModal] = useState(null) // { title, message, danger, onConfirm }
+  const [banTarget, setBanTarget] = useState(null) // { userId, username }
+  const [banReason, setBanReason] = useState('')
 
   const profileBadges = profile?.badges?.length ? profile.badges : profile?.badge ? [profile.badge] : []
   const isOwner = profileBadges.includes('Owner')
@@ -627,47 +630,59 @@ export default function AdminPage() {
   async function toggleBan(userId, currentlyBanned, username) {
     if (userId === user?.id) { showToast('Cannot ban your own account.', 'error'); return }
     if (currentlyBanned) {
-      if (!confirm(`Unban @${username}?`)) return
-      const { error } = await supabase.rpc('admin_update_profile', {
-        target_id: userId, new_badges: null, new_banned: false, new_ban_reason: null,
+      setConfirmModal({
+        title: 'Unban User',
+        message: `Unban @${username}? They will regain full access.`,
+        danger: false,
+        onConfirm: async () => {
+          const { error } = await supabase.rpc('admin_update_profile', {
+            target_id: userId, new_badges: null, new_banned: false, new_ban_reason: null,
+          })
+          if (error) { showToast('Failed: ' + error.message, 'error'); return }
+          showToast(`@${username} unbanned`)
+          loadUsers(userSearch); loadStats()
+        },
       })
-      if (error) { showToast('Failed: ' + error.message, 'error'); return }
-      showToast(`@${username} unbanned`)
     } else {
-      const reason = prompt(`Reason for banning @${username}:`)
-      if (!reason) return
-      const { error } = await supabase.rpc('admin_update_profile', {
-        target_id: userId, new_badges: null, new_banned: true, new_ban_reason: reason,
-      })
-      if (error) { showToast('Failed: ' + error.message, 'error'); return }
-      await supabase.from('listings').update({ status: 'deleted' }).eq('user_id', userId).eq('status', 'active')
-      showToast(`@${username} banned`)
+      setBanTarget({ userId, username })
+      setBanReason('')
     }
-    loadUsers(userSearch); loadStats()
   }
 
   async function deleteReview(reviewId) {
-    if (!confirm('Delete this review? This will recalculate the seller\'s rating.')) return
-    try {
-      const { error } = await supabase.rpc('admin_delete_review', { review_id: reviewId })
-      if (error) throw error
-      loadReviews(reviewSearch)
-      showToast('Review deleted')
-    } catch (err) {
-      showToast('Failed: ' + err.message, 'error')
-    }
+    setConfirmModal({
+      title: 'Delete Review',
+      message: "Delete this review? This will recalculate the seller's rating.",
+      danger: true,
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase.rpc('admin_delete_review', { review_id: reviewId })
+          if (error) throw error
+          loadReviews(reviewSearch)
+          showToast('Review deleted')
+        } catch (err) {
+          showToast('Failed: ' + err.message, 'error')
+        }
+      },
+    })
   }
 
   async function deleteListing(listingId) {
-    if (!confirm('Delete this listing?')) return
-    try {
-      const { error } = await supabase.rpc('admin_delete_listing', { listing_id: listingId })
-      if (error) throw error
-      loadListings(); loadStats()
-      showToast('Listing deleted')
-    } catch (err) {
-      showToast('Failed: ' + err.message, 'error')
-    }
+    setConfirmModal({
+      title: 'Delete Listing',
+      message: 'Delete this listing? This cannot be undone.',
+      danger: true,
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase.rpc('admin_delete_listing', { listing_id: listingId })
+          if (error) throw error
+          loadListings(); loadStats()
+          showToast('Listing deleted')
+        } catch (err) {
+          showToast('Failed: ' + err.message, 'error')
+        }
+      },
+    })
   }
 
   async function createAccount() {
@@ -730,25 +745,24 @@ export default function AdminPage() {
 
   // FIX: use admin_revoke_promotion RPC
   async function revokePromotion(promo) {
-    if (!confirm(`Revoke ${promo.role} from @${promo.user?.username}?`)) return
-    try {
-      const { error: rpcError } = await supabase.rpc('admin_revoke_promotion', {
-        p_promo_id: promo.id
-      })
-      if (rpcError) throw rpcError
-
-      // Remove badge from user
-      const currentBadges = promo.user?.badges?.length ? promo.user.badges : []
-      const newBadges = currentBadges.filter(b => b !== promo.role)
-      await supabase.rpc('admin_update_profile', {
-        target_id: promo.user_id, new_badges: newBadges, new_banned: null, new_ban_reason: null,
-      })
-
-      showToast(`${promo.role} revoked from @${promo.user?.username}`)
-      loadPromotions(); loadStats()
-    } catch (err) {
-      showToast('Failed: ' + err.message, 'error')
-    }
+    setConfirmModal({
+      title: 'Revoke Role',
+      message: `Revoke ${promo.role} from @${promo.user?.username}?`,
+      danger: true,
+      onConfirm: async () => {
+        try {
+          const { error: rpcError } = await supabase.rpc('admin_revoke_promotion', { p_promo_id: promo.id })
+          if (rpcError) throw rpcError
+          const currentBadges = promo.user?.badges?.length ? promo.user.badges : []
+          const newBadges = currentBadges.filter(b => b !== promo.role)
+          await supabase.rpc('admin_update_profile', { target_id: promo.user_id, new_badges: newBadges, new_banned: null, new_ban_reason: null })
+          showToast(`${promo.role} revoked from @${promo.user?.username}`)
+          loadPromotions(); loadStats()
+        } catch (err) {
+          showToast('Failed: ' + err.message, 'error')
+        }
+      },
+    })
   }
 
   // ─── RENDER GUARDS ───────────────────────────────────────────────
@@ -813,6 +827,52 @@ export default function AdminPage() {
         }}>
           {toast.type === 'error' ? '✕' : '✓'} {toast.msg}
         </div>
+      )}
+
+      {/* Generic Confirm Modal */}
+      {confirmModal && (
+        <Modal title={confirmModal.title} onClose={() => setConfirmModal(null)}>
+          <div style={{ textAlign: 'center', padding: '8px 0 20px' }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>{confirmModal.danger ? '⚠️' : '❓'}</div>
+            <p style={{ color: '#f9fafb', fontSize: 14, marginBottom: 20 }}>{confirmModal.message}</p>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setConfirmModal(null)} style={{ flex: 1, padding: '11px', borderRadius: 8, border: '1px solid #2d2d3f', background: 'transparent', color: '#9ca3af', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Cancel</button>
+              <button onClick={() => { setConfirmModal(null); confirmModal.onConfirm() }} style={{ flex: 1, padding: '11px', borderRadius: 8, border: 'none', background: confirmModal.danger ? '#ef4444' : '#16a34a', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Confirm</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Ban User Modal (replaces prompt()) */}
+      {banTarget && (
+        <Modal title={`Ban @${banTarget.username}`} onClose={() => { setBanTarget(null); setBanReason('') }}>
+          <div style={{ padding: '4px 0 16px' }}>
+            <p style={{ color: '#9ca3af', fontSize: 13, marginBottom: 12 }}>
+              Temporarily ban <strong style={{ color: '#f9fafb' }}>@{banTarget.username}</strong>? Enter a reason:
+            </p>
+            <input
+              value={banReason}
+              onChange={e => setBanReason(e.target.value)}
+              placeholder="Reason for ban..."
+              style={S.input}
+              onKeyDown={e => e.key === 'Enter' && banReason.trim() && document.getElementById('confirm-ban-btn').click()}
+              autoFocus
+            />
+          </div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button onClick={() => { setBanTarget(null); setBanReason('') }} style={{ flex: 1, padding: '11px', borderRadius: 8, border: '1px solid #2d2d3f', background: 'transparent', color: '#9ca3af', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Cancel</button>
+            <button id="confirm-ban-btn" disabled={!banReason.trim()} onClick={async () => {
+              if (!banReason.trim()) return
+              const { userId, username } = banTarget
+              setBanTarget(null); setBanReason('')
+              const { error } = await supabase.rpc('admin_update_profile', { target_id: userId, new_badges: null, new_banned: true, new_ban_reason: banReason })
+              if (error) { showToast('Failed: ' + error.message, 'error'); return }
+              await supabase.from('listings').update({ status: 'deleted' }).eq('user_id', userId).eq('status', 'active')
+              showToast(`@${username} banned`)
+              loadUsers(userSearch); loadStats()
+            }} style={{ flex: 1, padding: '11px', borderRadius: 8, border: 'none', background: banReason.trim() ? '#ef4444' : '#7f1d1d', color: '#fff', fontSize: 13, fontWeight: 700, cursor: banReason.trim() ? 'pointer' : 'default' }}>Ban User</button>
+          </div>
+        </Modal>
       )}
 
       {/* Delete Confirmation Modal */}
@@ -1767,7 +1827,7 @@ function ReportCard({ report, onUpdate }) {
       setUserActivity({ trades: trades || [], reviews: reviews || [] })
       setChatOpen(true)
     } catch (err) {
-      alert('Failed to load logs: ' + err.message)
+      showToast('Failed to load logs: ' + err.message, 'error')
     } finally {
       setChatLoading(false)
     }
@@ -1843,7 +1903,7 @@ function DisputeCard({ dispute, onUpdate }) {
       setChatLogs(msgs || [])
       setUserActivity({ trades: trades || [], reviews: reviews || [] })
       setChatOpen(true)
-    } catch (err) { alert('Failed to load logs: ' + err.message) }
+    } catch (err) { console.error('Failed to load logs:', err) }
     finally { setChatLoading(false) }
   }
 

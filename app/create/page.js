@@ -121,7 +121,12 @@ export default function CreateListingPage() {
       ? [activeProfile.badge]
       : []
     const isPrivileged = profileBadges.some(b => ['Owner', 'VIP', 'Moderator', 'Admin'].includes(b))
-    if (!isPrivileged) {
+    // Always clear stale session rate-limit keys for privileged users before checking,
+    // so any previously stored entries never block them.
+    if (isPrivileged) {
+      sessionStorage.removeItem('rl_listing')
+      sessionStorage.removeItem('rl_listing_day')
+    } else {
       const rl = checkRateLimit('listing')
       if (rl) { setErrors({ general: rl }); return }
       const rlDay = checkRateLimit('listing_daily')
