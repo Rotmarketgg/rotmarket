@@ -7,6 +7,7 @@ import Image from 'next/image'
 import ListingCard from '@/components/ListingCard'
 import StarRating from '@/components/StarRating'
 import ReportButton from '@/components/ReportButton'
+import ConfirmModal from '@/components/ConfirmModal'
 import { getProfileByUsername, getSessionUser, getUserListings, getReviews, deleteListing, supabase } from '@/lib/supabase'
 
 import { timeAgo, getInitial, withTimeout } from '@/lib/utils'
@@ -33,6 +34,7 @@ export default function ProfilePageClient({ username: usernameProp, initialProfi
   const [listingOffers, setListingOffers] = useState({}) // listingId -> pending offer count
   const [buyerOffers, setBuyerOffers] = useState([]) // offers this user sent as a buyer
   const [renewError, setRenewError] = useState('')
+  const [modal, setModal] = useState(null)
 
   const load = useCallback(async (silent = false, skipProfileFetch = false) => {
     if (!silent) setLoading(true)
@@ -93,7 +95,25 @@ export default function ProfilePageClient({ username: usernameProp, initialProfi
           .not('status', 'in', '("cancelled","declined")')
           .order('created_at', { ascending: false })
           .limit(50)
-        setBuyerOffers(sentOffers || [])
+
+        // Fetch listing IDs the user has already reviewed so we can hide the prompt
+        const completedListingIds = (sentOffers || [])
+          .filter(o => o.status === 'completed')
+          .map(o => o.listing_id)
+        let reviewedListingIds = new Set()
+        if (completedListingIds.length > 0) {
+          const { data: myReviews } = await supabase
+            .from('reviews')
+            .select('listing_id')
+            .eq('reviewer_id', u.id)
+            .in('listing_id', completedListingIds)
+          reviewedListingIds = new Set((myReviews || []).map(r => r.listing_id))
+        }
+
+        setBuyerOffers((sentOffers || []).map(o => ({
+          ...o,
+          already_reviewed: reviewedListingIds.has(o.listing_id),
+        })))
       }
       setLoading(false)
     } catch (err) {
@@ -147,9 +167,16 @@ export default function ProfilePageClient({ username: usernameProp, initialProfi
   }
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete this listing?')) return
-    await deleteListing(id)
-    setListings(prev => prev.filter(l => l.id !== id))
+    setModal({
+      title: 'Delete Listing?',
+      message: 'This will permanently remove the listing. This cannot be undone.',
+      danger: true,
+      confirmLabel: 'Delete',
+      onConfirm: async () => {
+        await deleteListing(id)
+        setListings(prev => prev.filter(l => l.id !== id))
+      },
+    })
   }
 
   const handleRenew = async (listingId) => {
@@ -211,6 +238,7 @@ export default function ProfilePageClient({ username: usernameProp, initialProfi
 
   return (
     <div style={{ minHeight: '100vh' }}>
+      <ConfirmModal modal={modal} onClose={() => setModal(null)} />
       <div style={{ maxWidth: 1040, margin: '0 auto', padding: '28px 16px 60px' }}>
         <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', flexWrap: 'wrap' }}>
 
@@ -662,7 +690,7 @@ export default function ProfilePageClient({ username: usernameProp, initialProfi
                         accepted: '✓ Accepted',
                         completed: '🎉 Completed',
                       }[offer.status] || offer.status
-                      const needsReview = offer.status === 'completed'
+                      const needsReview = offer.status === 'completed' && !offer.already_reviewed
                       return (
                         <div key={offer.id} style={{
                           background: '#111118', border: `1px solid ${offer.status === 'pending' ? 'rgba(245,158,11,0.25)' : '#1f2937'}`,
@@ -714,6 +742,11 @@ export default function ProfilePageClient({ username: usernameProp, initialProfi
                               }}>
                                 Write Review
                               </Link>
+                            </div>
+                          )}
+                          {offer.status === 'completed' && offer.already_reviewed && (
+                            <div style={{ marginTop: 8, fontSize: 11, color: '#4ade80', fontWeight: 600 }}>
+                              ✓ Review submitted
                             </div>
                           )}
                         </div>

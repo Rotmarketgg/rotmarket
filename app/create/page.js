@@ -121,12 +121,10 @@ export default function CreateListingPage() {
       ? [activeProfile.badge]
       : []
     const isPrivileged = profileBadges.some(b => ['Owner', 'VIP', 'Moderator', 'Admin'].includes(b))
-    if (!isPrivileged) {
-      const rl = checkRateLimit('listing')
-      if (rl) { setErrors({ general: rl }); return }
-      const rlDay = checkRateLimit('listing_daily')
-      if (rlDay) { setErrors({ general: rlDay }); return }
-    }
+    const rl = checkRateLimit('listing', '', isPrivileged)
+    if (rl) { setErrors({ general: rl }); return }
+    const rlDay = checkRateLimit('listing_daily', '', isPrivileged)
+    if (rlDay) { setErrors({ general: rlDay }); return }
     setErrors({})
     setLoading(true)
 

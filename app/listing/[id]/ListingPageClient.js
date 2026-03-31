@@ -6,6 +6,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import StarRating from '@/components/StarRating'
 import ReportButton from '@/components/ReportButton'
+import ConfirmModal from '@/components/ConfirmModal'
 import { getListing, getReviews, getSessionUser, getVerifiedUser, createReview, supabase } from '@/lib/supabase'
 import { getRarityStyle, timeAgo, formatPrice, getInitial, checkRateLimit, withTimeout } from '@/lib/utils'
 import { BADGE_HIERARCHY, BADGE_META, getPrimaryBadge, PAYMENT_METHODS } from '@/lib/constants'
@@ -175,18 +176,25 @@ function SellerOfferCard({ offer, onUpdate, onSetListing }) {
 }
 
 function BuyerTradePanel({ myOffer, listing, seller, listingId, copiedId, setCopiedId, handleBuyerConfirm, setMyOffer, setOfferSent, setOfferMessage, setOfferPrice, confirmError, setConfirmError }) {
+  const [modal, setModal] = useState(null)
   if (!myOffer) return null
   const isTradeType = listing?.type === 'trade'
 
   if (myOffer.status === 'pending') return (
     <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 10, padding: 14, marginTop: 14 }}>
+      <ConfirmModal modal={modal} onClose={() => setModal(null)} />
       <div style={{ fontSize: 13, fontWeight: 700, color: '#fde68a', marginBottom: 4 }}>⏳ Offer Pending</div>
       <p style={{ margin: '0 0 10px', fontSize: 12, color: '#9ca3af' }}>Waiting for the seller to respond.</p>
-      <button onClick={async () => {
-        if (!confirm('Cancel your offer?')) return
-        await updateTradeRequest(myOffer.id, { status: 'cancelled' })
-        setMyOffer(null); setOfferSent(false); setOfferMessage(''); setOfferPrice('')
-      }} style={{ background: 'none', border: '1px solid #2d2d3f', color: '#6b7280', borderRadius: 6, padding: '5px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+      <button onClick={() => setModal({
+        title: 'Cancel Offer?',
+        message: 'Your offer will be withdrawn and the seller will no longer see it.',
+        danger: true,
+        confirmLabel: 'Cancel Offer',
+        onConfirm: async () => {
+          await updateTradeRequest(myOffer.id, { status: 'cancelled' })
+          setMyOffer(null); setOfferSent(false); setOfferMessage(''); setOfferPrice('')
+        },
+      })} style={{ background: 'none', border: '1px solid #2d2d3f', color: '#6b7280', borderRadius: 6, padding: '5px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
         Cancel Offer
       </button>
     </div>
@@ -222,12 +230,22 @@ function BuyerTradePanel({ myOffer, listing, seller, listingId, copiedId, setCop
       ) : (
         <div style={{ background: '#0d0d14', border: '1px solid #2d2d3f', borderRadius: 8, padding: 12, marginBottom: 10 }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: '#6b7280', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.08em' }}>💳 Payment Info</div>
-          {seller?.paypal_email && <div style={{ fontSize: 12, color: '#d1d5db', marginBottom: 3 }}>🔵 PayPal: <strong>{seller.paypal_email}</strong></div>}
-          {seller?.cashapp_handle && <div style={{ fontSize: 12, color: '#d1d5db', marginBottom: 3 }}>🟢 Cash App: <strong>{seller.cashapp_handle}</strong></div>}
-          {seller?.venmo_handle && <div style={{ fontSize: 12, color: '#d1d5db', marginBottom: 3 }}>💙 Venmo: <strong>{seller.venmo_handle}</strong></div>}
-          {!seller?.paypal_email && !seller?.cashapp_handle && !seller?.venmo_handle && (
-            <div style={{ fontSize: 12, color: '#4b5563' }}>Message the seller for payment details.</div>
-          )}
+          {(() => {
+            const accepts = listing?.accepts || []
+            const showPaypal = seller?.paypal_email && accepts.some(a => a.toLowerCase().includes('paypal'))
+            const showCashapp = seller?.cashapp_handle && accepts.some(a => a.toLowerCase().includes('cash app') || a.toLowerCase().includes('cashapp'))
+            const showVenmo = seller?.venmo_handle && accepts.some(a => a.toLowerCase().includes('venmo'))
+            return (
+              <>
+                {showPaypal && <div style={{ fontSize: 12, color: '#d1d5db', marginBottom: 3 }}>🔵 PayPal: <strong>{seller.paypal_email}</strong></div>}
+                {showCashapp && <div style={{ fontSize: 12, color: '#d1d5db', marginBottom: 3 }}>🟢 Cash App: <strong>{seller.cashapp_handle}</strong></div>}
+                {showVenmo && <div style={{ fontSize: 12, color: '#d1d5db', marginBottom: 3 }}>💙 Venmo: <strong>{seller.venmo_handle}</strong></div>}
+                {!showPaypal && !showCashapp && !showVenmo && (
+                  <div style={{ fontSize: 12, color: '#4b5563' }}>Message the seller for payment details.</div>
+                )}
+              </>
+            )
+          })()}
           <div style={{ marginTop: 8, fontSize: 10, color: '#4b5563', borderTop: '1px solid #1f2937', paddingTop: 6 }}>
             Memo: <strong style={{ color: '#9ca3af' }}>{listingId.slice(0, 8)}</strong>
             <button onClick={() => { navigator.clipboard.writeText(listingId); setCopiedId(true); setTimeout(() => setCopiedId(false), 2000) }}

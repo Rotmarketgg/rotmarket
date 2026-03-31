@@ -6,6 +6,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { getSessionUser, getProfile, supabase } from '@/lib/supabase'
 import { timeAgo, getInitial } from '@/lib/utils'
+import ConfirmModal from '@/components/ConfirmModal'
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 
@@ -129,6 +130,7 @@ export default function ModPage() {
   const [unauthorized, setUnauthorized] = useState(false)
   const [tab, setTab] = useState('overview')
   const [toast, setToast] = useState(null)
+  const [modal, setModal] = useState(null)
 
   // Stats
   const [stats, setStats] = useState({})
@@ -323,21 +325,29 @@ export default function ModPage() {
   // Moderators can warn-ban (temporary) but not permanently delete users.
   // For permanent actions, escalate to Owner via admin panel.
   async function warnBanUser(userId, username) {
-    if (!confirm(`Temporarily ban @${username}? They can appeal to an Owner.`)) return
-    const reason = prompt(`Reason for warning/banning @${username}:`)
-    if (!reason) return
-    try {
-      const { error } = await supabase.rpc('admin_update_profile', {
-        target_id: userId,
-        new_badges: null,
-        new_banned: true,
-        new_ban_reason: `[Mod action] ${reason}`,
-      })
-      if (error) throw error
-      showToast(`@${username} banned — Owner can review/reverse this`)
-    } catch (err) {
-      showToast('Failed: ' + err.message + ' — Escalate to Owner if needed', 'error')
-    }
+    setModal({
+      title: `Ban @${username}?`,
+      message: `This will temporarily ban @${username}. They can appeal to an Owner.`,
+      danger: true,
+      confirmLabel: 'Ban User',
+      inputLabel: 'Reason for ban',
+      inputPlaceholder: 'e.g. Scamming, harassment...',
+      onConfirm: async (reason) => {
+        if (!reason) return
+        try {
+          const { error } = await supabase.rpc('admin_update_profile', {
+            target_id: userId,
+            new_badges: null,
+            new_banned: true,
+            new_ban_reason: `[Mod action] ${reason}`,
+          })
+          if (error) throw error
+          showToast(`@${username} banned — Owner can review/reverse this`)
+        } catch (err) {
+          showToast('Failed: ' + err.message + ' — Escalate to Owner if needed', 'error')
+        }
+      },
+    })
   }
 
   // ─── RENDER GUARDS ───────────────────────────────────────────────
@@ -373,6 +383,8 @@ export default function ModPage() {
 
   return (
     <div style={S.page}>
+
+      <ConfirmModal modal={modal} onClose={() => setModal(null)} />
 
       {/* Toast */}
       {toast && (
@@ -656,7 +668,7 @@ function ModReportCard({ report, modUser, onUpdate, onBanUser }) {
       setChatLogs(data || [])
       setChatOpen(true)
     } catch (err) {
-      alert('Failed to load logs: ' + err.message)
+      showToast('Failed to load logs: ' + err.message, 'error')
     } finally {
       setChatLoading(false)
     }
@@ -771,7 +783,7 @@ function ModDisputeCard({ dispute, modUser, onUpdate }) {
       setChatLogs(data || [])
       setChatOpen(true)
     } catch (err) {
-      alert('Failed to load logs: ' + err.message)
+      showToast('Failed to load logs: ' + err.message, 'error')
     } finally {
       setChatLoading(false)
     }
