@@ -20,7 +20,6 @@ async function getListing(id) {
         *,
         profiles (
           id, username, epic_username, roblox_username,
-          paypal_email, cashapp_handle, venmo_handle,
           trade_count, rating, review_count, badge, badges, avatar_url, bio
         )
       `)

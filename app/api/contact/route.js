@@ -121,7 +121,7 @@ export async function POST(request) {
     const safeUsername = escapeHtml(cleanUsername)
     const safeMessage = escapeHtml(String(message || '').trim())
 
-    await resend.emails.send({
+    const { error: sendError } = await resend.emails.send({
       from: CONTACT_FROM_EMAIL,
       to: ADMIN_EMAIL,
       replyTo: cleanEmail,
@@ -160,6 +160,9 @@ export async function POST(request) {
         </div>
       `,
     })
+    if (sendError) {
+      throw new Error(sendError.message || 'Failed to send email')
+    }
 
     return Response.json({ success: true })
   } catch (err) {

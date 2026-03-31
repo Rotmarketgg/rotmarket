@@ -241,7 +241,7 @@ function SellerOfferCard({ offer, onUpdate, onSetListing }) {
   )
 }
 
-function BuyerTradePanel({ myOffer, listing, seller, listingId, copiedId, setCopiedId, handleBuyerConfirm, setMyOffer, setOfferSent, setOfferMessage, setOfferPrice, confirmError, setConfirmError }) {
+function BuyerTradePanel({ myOffer, listing, seller, sellerPayout, listingId, copiedId, setCopiedId, handleBuyerConfirm, setMyOffer, setOfferSent, setOfferMessage, setOfferPrice, confirmError, setConfirmError }) {
   const [modal, setModal] = useState(null)
   if (!myOffer) return null
   const isTradeType = listing?.type === 'trade'
@@ -301,14 +301,14 @@ function BuyerTradePanel({ myOffer, listing, seller, listingId, copiedId, setCop
           <div style={{ fontSize: 10, fontWeight: 700, color: '#6b7280', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.08em' }}>💳 Payment Info</div>
           {(() => {
             const accepts = listing?.accepts || []
-            const showPaypal = seller?.paypal_email && accepts.some(a => a.toLowerCase().includes('paypal'))
-            const showCashapp = seller?.cashapp_handle && accepts.some(a => a.toLowerCase().includes('cash app') || a.toLowerCase().includes('cashapp'))
-            const showVenmo = seller?.venmo_handle && accepts.some(a => a.toLowerCase().includes('venmo'))
+            const showPaypal = sellerPayout?.paypal_email && accepts.some(a => a.toLowerCase().includes('paypal'))
+            const showCashapp = sellerPayout?.cashapp_handle && accepts.some(a => a.toLowerCase().includes('cash app') || a.toLowerCase().includes('cashapp'))
+            const showVenmo = sellerPayout?.venmo_handle && accepts.some(a => a.toLowerCase().includes('venmo'))
             return (
               <>
-                {showPaypal && <div style={{ fontSize: 12, color: '#d1d5db', marginBottom: 3 }}>🔵 PayPal: <strong>{seller.paypal_email}</strong></div>}
-                {showCashapp && <div style={{ fontSize: 12, color: '#d1d5db', marginBottom: 3 }}>🟢 Cash App: <strong>{seller.cashapp_handle}</strong></div>}
-                {showVenmo && <div style={{ fontSize: 12, color: '#d1d5db', marginBottom: 3 }}>💙 Venmo: <strong>{seller.venmo_handle}</strong></div>}
+                {showPaypal && <div style={{ fontSize: 12, color: '#d1d5db', marginBottom: 3 }}>🔵 PayPal: <strong>{sellerPayout.paypal_email}</strong></div>}
+                {showCashapp && <div style={{ fontSize: 12, color: '#d1d5db', marginBottom: 3 }}>🟢 Cash App: <strong>{sellerPayout.cashapp_handle}</strong></div>}
+                {showVenmo && <div style={{ fontSize: 12, color: '#d1d5db', marginBottom: 3 }}>💙 Venmo: <strong>{sellerPayout.venmo_handle}</strong></div>}
                 {!showPaypal && !showCashapp && !showVenmo && (
                   <div style={{ fontSize: 12, color: '#4b5563' }}>Message the seller for payment details.</div>
                 )}
@@ -380,6 +380,7 @@ export default function ListingPageClient({ id: idProp, initialListing = null })
   const [reviewSuccess, setReviewSuccess] = useState(false)
   const [reviewError, setReviewError] = useState('')
   const [confirmError, setConfirmError] = useState('')
+  const [sellerPayout, setSellerPayout] = useState(null)
   const hydratedFromServerRef = useRef(initialListing !== null)
 
   const load = useCallback(async (silent = false) => {
@@ -442,6 +443,28 @@ export default function ListingPageClient({ id: idProp, initialListing = null })
   const alreadyReviewedThisListing = reviews.some(
     r => r.reviewer_id === user?.id && r.listing_id === id
   )
+
+  useEffect(() => {
+    let cancelled = false
+    async function loadSellerPayout() {
+      if (!user || !seller?.id || isSeller || !myOffer) {
+        setSellerPayout(null)
+        return
+      }
+      if (!['accepted', 'completed'].includes(myOffer.status)) {
+        setSellerPayout(null)
+        return
+      }
+      const { data } = await supabase
+        .from('profiles')
+        .select('paypal_email, cashapp_handle, venmo_handle')
+        .eq('id', seller.id)
+        .maybeSingle()
+      if (!cancelled) setSellerPayout(data || null)
+    }
+    loadSellerPayout()
+    return () => { cancelled = true }
+  }, [user?.id, seller?.id, isSeller, myOffer?.status])
 
   // Keep buyer/seller trade state fresh in real time so accepted/declined/
   // confirmed updates appear without requiring a manual page refresh.
@@ -803,7 +826,7 @@ export default function ListingPageClient({ id: idProp, initialListing = null })
                     )}
 
                     {/* BUYER: show their offer status */}
-                    {!isSeller && <BuyerTradePanel myOffer={myOffer} listing={listing} seller={seller} listingId={id} copiedId={copiedId} setCopiedId={setCopiedId} handleBuyerConfirm={handleBuyerConfirm} setMyOffer={setMyOffer} setOfferSent={setOfferSent} setOfferMessage={setOfferMessage} setOfferPrice={setOfferPrice} confirmError={confirmError} setConfirmError={setConfirmError} />}
+                    {!isSeller && <BuyerTradePanel myOffer={myOffer} listing={listing} seller={seller} sellerPayout={sellerPayout} listingId={id} copiedId={copiedId} setCopiedId={setCopiedId} handleBuyerConfirm={handleBuyerConfirm} setMyOffer={setMyOffer} setOfferSent={setOfferSent} setOfferMessage={setOfferMessage} setOfferPrice={setOfferPrice} confirmError={confirmError} setConfirmError={setConfirmError} />}
 
                     {/* REVIEW FORM — shows in details tab after completed trade */}
                     {!isSeller && user && myOffer?.status === 'completed' && (

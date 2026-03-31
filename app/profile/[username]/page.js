@@ -19,10 +19,9 @@ async function getProfileData(username) {
         id, username, avatar_url, bio, badge, badges,
         trade_count, rating, review_count, banned, ban_reason,
         epic_username, roblox_username, profile_url,
-        paypal_email, cashapp_handle, venmo_handle,
         created_at
       `)
-      .eq('username', username)
+      .ilike('username', username)
       .single()
     return data
   } catch {
