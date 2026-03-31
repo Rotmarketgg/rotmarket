@@ -373,6 +373,50 @@ export default function ListingPageClient({ id: idProp, initialListing = null })
     r => r.reviewer_id === user?.id && r.listing_id === id
   )
 
+  // Keep buyer/seller trade state fresh in real time so accepted/declined/
+  // confirmed updates appear without requiring a manual page refresh.
+  useEffect(() => {
+    if (!id || !user?.id) return
+
+    let refreshTimer = null
+
+    const refreshTradeState = async () => {
+      try {
+        const refreshedListing = await getListing(id).catch(() => null)
+        if (refreshedListing) setListing(refreshedListing)
+
+        if (isSeller) {
+          const offers = await getSellerOffers(id, user.id)
+          setSellerOffers(offers || [])
+        } else {
+          const tr = await getMyTradeRequest(id, user.id)
+          setMyOffer(tr)
+          if (!tr) setOfferSent(false)
+        }
+      } catch (_) {}
+    }
+
+    const scheduleRefresh = () => {
+      if (refreshTimer) clearTimeout(refreshTimer)
+      refreshTimer = setTimeout(refreshTradeState, 180)
+    }
+
+    const channel = supabase
+      .channel(`trade-${id}-${user.id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'trade_requests',
+        filter: `listing_id=eq.${id}`,
+      }, scheduleRefresh)
+      .subscribe()
+
+    return () => {
+      if (refreshTimer) clearTimeout(refreshTimer)
+      supabase.removeChannel(channel)
+    }
+  }, [id, isSeller, user?.id])
+
   // ─── HANDLERS ─────────────────────────────────────────────────
 
   const handleSendOffer = async () => {

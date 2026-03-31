@@ -1788,11 +1788,13 @@ function ReportCard({ report, onUpdate }) {
   const [chatLogs, setChatLogs] = useState(null)
   const [chatLoading, setChatLoading] = useState(false)
   const [chatOpen, setChatOpen] = useState(false)
+  const [chatError, setChatError] = useState('')
   const [userActivity, setUserActivity] = useState(null)
 
   const loadChatLogs = async () => {
     if (chatLogs) { setChatOpen(o => !o); return }
     setChatLoading(true)
+    setChatError('')
     try {
       const { data } = await supabase
         .from('messages')
@@ -1807,7 +1809,7 @@ function ReportCard({ report, onUpdate }) {
       setUserActivity({ trades: trades || [], reviews: reviews || [] })
       setChatOpen(true)
     } catch (err) {
-      setLoadError('Failed to load logs: ' + err.message)
+      setChatError('Failed to load logs: ' + err.message)
     } finally {
       setChatLoading(false)
     }
@@ -1839,6 +1841,7 @@ function ReportCard({ report, onUpdate }) {
           {report.admin_notes && !notesOpen && <p style={{ margin: '0 0 6px', fontSize: 11, color: '#6b7280', fontStyle: 'italic' }}>Notes: {report.admin_notes}</p>}
           {notesOpen && <textarea rows={2} placeholder="Admin notes..." value={notes} onChange={e => setNotes(e.target.value)} style={{ marginTop: 8, width: '100%', fontSize: 12 }} />}
           {chatOpen && chatLogs !== null && <ChatAndActivity chatLogs={chatLogs} userActivity={userActivity} username={report.reported_user?.username} />}
+          {chatError && <div style={{ fontSize: 11, color: '#f87171', marginTop: 6 }}>⚠️ {chatError}</div>}
         </div>
         <div style={{ display: 'flex', gap: 5, flexShrink: 0, flexWrap: 'wrap', alignItems: 'flex-start' }}>
           <button onClick={loadChatLogs} disabled={chatLoading} style={S.actionBtn('#60a5fa')}>

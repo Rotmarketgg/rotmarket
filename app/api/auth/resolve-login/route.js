@@ -40,15 +40,21 @@ function checkRateLimit(ip) {
 
 export async function POST(request) {
   try {
-    // ── Auth: only our own login flow should call this ────────────
-    // Set LOGIN_RESOLVER_SECRET in Vercel env vars (server-only, no NEXT_PUBLIC_ prefix).
-    // The signIn() function in lib/supabase.js sends this header.
-    // When the env var is unset (local dev), the check is skipped.
-    const resolverSecret = process.env.LOGIN_RESOLVER_SECRET
-    if (resolverSecret) {
-      const provided = request.headers.get('x-resolver-secret') || ''
-      if (provided !== resolverSecret) {
-        return Response.json({ email: null }, { status: 401 })
+    // Basic same-origin hardening. If a browser sends Origin, require host match.
+
+
+
+    const origin = request.headers.get('origin')
+    const host = request.headers.get('host')
+    if (origin && host) {
+      let originHost = null
+      try {
+        originHost = new URL(origin).host
+      } catch {
+        return Response.json({ email: null }, { status: 400 })
+      }
+      if (originHost !== host) {
+        return Response.json({ email: null }, { status: 403 })
       }
     }
 

@@ -490,7 +490,7 @@ export default function ModPage() {
               ? <EmptyState icon="✅" message={`No ${reportFilter} reports`} />
               : <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {reports.map(r => (
-                    <ModReportCard key={r.id} report={r} modUser={user} onUpdate={updateReport} onBanUser={warnBanUser} />
+                    <ModReportCard key={r.id} report={r} modUser={user} onUpdate={updateReport} onBanUser={warnBanUser} onError={(msg) => showToast(msg, 'error')} />
                   ))}
                 </div>
             }
@@ -515,7 +515,7 @@ export default function ModPage() {
               ? <EmptyState icon="⚖️" message={`No ${disputeFilter.replace('_', ' ')} disputes`} />
               : <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {disputes.map(d => (
-                    <ModDisputeCard key={d.id} dispute={d} modUser={user} onUpdate={updateDispute} />
+                    <ModDisputeCard key={d.id} dispute={d} modUser={user} onUpdate={updateDispute} onError={(msg) => showToast(msg, 'error')} />
                   ))}
                 </div>
             }
@@ -649,7 +649,7 @@ function ModOverview({ stats, onTabSwitch, profile }) {
 
 // ─── MOD REPORT CARD ──────────────────────────────────────────────────────────
 
-function ModReportCard({ report, modUser, onUpdate, onBanUser }) {
+function ModReportCard({ report, modUser, onUpdate, onBanUser, onError }) {
   const [notesOpen, setNotesOpen] = useState(false)
   const [notes, setNotes] = useState(report.admin_notes || '')
   const [chatLogs, setChatLogs] = useState(null)
@@ -668,7 +668,7 @@ function ModReportCard({ report, modUser, onUpdate, onBanUser }) {
       setChatLogs(data || [])
       setChatOpen(true)
     } catch (err) {
-      showToast('Failed to load logs: ' + err.message, 'error')
+      onError?.('Failed to load logs: ' + err.message)
     } finally {
       setChatLoading(false)
     }
@@ -762,7 +762,7 @@ function ModReportCard({ report, modUser, onUpdate, onBanUser }) {
 
 // ─── MOD DISPUTE CARD ─────────────────────────────────────────────────────────
 
-function ModDisputeCard({ dispute, modUser, onUpdate }) {
+function ModDisputeCard({ dispute, modUser, onUpdate, onError }) {
   const [notesOpen, setNotesOpen] = useState(false)
   const [notes, setNotes] = useState(dispute.admin_notes || '')
   const [resolution, setResolution] = useState(dispute.resolution || '')
@@ -783,7 +783,7 @@ function ModDisputeCard({ dispute, modUser, onUpdate }) {
       setChatLogs(data || [])
       setChatOpen(true)
     } catch (err) {
-      showToast('Failed to load logs: ' + err.message, 'error')
+      onError?.('Failed to load logs: ' + err.message)
     } finally {
       setChatLoading(false)
     }
