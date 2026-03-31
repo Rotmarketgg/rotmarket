@@ -303,7 +303,7 @@ export default function AdminPage() {
       supabase.from('profiles').select('id', { count: 'exact', head: true }).not('username', 'is', null),
       supabase.from('listings').select('id', { count: 'exact', head: true }).eq('status', 'active'),
       supabase.from('reports').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
-      supabase.from('trade_requests').select('id', { count: 'exact', head: true }),
+      supabase.from('trade_requests').select('id', { count: 'exact', head: true }).eq('status', 'completed'),
       supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('banned', true),
       supabase.from('disputes').select('id', { count: 'exact', head: true }).eq('status', 'open'),
       supabase.rpc('admin_count_promotions'),
