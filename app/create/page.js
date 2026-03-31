@@ -117,6 +117,21 @@ export default function CreateListingPage() {
       }
     }
 
+    // Gate: must have at least one payment method AND at least one game username
+    const hasPayment = !!(activeProfile?.paypal_email || activeProfile?.cashapp_handle || activeProfile?.venmo_handle)
+    const hasGameId = !!(activeProfile?.epic_username || activeProfile?.roblox_username)
+    if (!hasPayment || !hasGameId) {
+      const missing = []
+      if (!hasPayment) missing.push('a payment method (PayPal, Cash App, or Venmo)')
+      if (!hasGameId) missing.push('a game username (Epic or Roblox)')
+      setErrors({
+        general: `Complete your profile before posting: add ${missing.join(' and ')}. Update in Settings.`,
+        profileIncomplete: true,
+      })
+      setLoading(false)
+      return
+    }
+
     // Rate limit is bypassed for VIP, Owner, Admin, and Moderator users.
     // Always derive badges from the freshly-resolved profile so a null profile
     // race can never cause a privileged user to be incorrectly rate-limited.
@@ -204,6 +219,23 @@ export default function CreateListingPage() {
           </h1>
           <p style={{ margin: 0, fontSize: 13, color: '#6b7280' }}>List your Brainrot for sale or trade.</p>
         </div>
+
+        {/* Profile incomplete warning — shown passively before submit */}
+        {profile && (() => {
+          const hasPayment = !!(profile.paypal_email || profile.cashapp_handle || profile.venmo_handle)
+          const hasGameId = !!(profile.epic_username || profile.roblox_username)
+          if (hasPayment && hasGameId) return null
+          const missing = []
+          if (!hasPayment) missing.push('a payment method')
+          if (!hasGameId) missing.push('a game username')
+          return (
+            <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 10, padding: '12px 16px', fontSize: 13, color: '#fbbf24', marginBottom: 8 }}>
+              ⚠️ Your profile is missing {missing.join(' and ')}. You won't be able to post until you add{' '}
+              {missing.length > 1 ? 'these' : 'this'} in{' '}
+              <a href="/settings" style={{ color: '#4ade80', textDecoration: 'underline', fontWeight: 700 }}>Settings</a>.
+            </div>
+          )
+        })()}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
@@ -427,6 +459,11 @@ export default function CreateListingPage() {
           {errors.general && (
             <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 10, padding: '12px 16px', fontSize: 13, color: '#f87171', fontWeight: 600 }}>
               ⚠️ {errors.general}
+              {errors.profileIncomplete && (
+                <div style={{ marginTop: 8 }}>
+                  <a href="/settings" style={{ color: '#4ade80', textDecoration: 'underline', fontWeight: 700 }}>Go to Settings →</a>
+                </div>
+              )}
             </div>
           )}
 
