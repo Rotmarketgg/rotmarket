@@ -79,6 +79,72 @@ async function completeTrade(requestId) {
   if (error) throw error
 }
 
+function TradeProgress({ offer, isTradeType = false }) {
+  if (!offer) return null
+
+  const doneTone = '#4ade80'
+  const activeTone = '#f59e0b'
+  const idleTone = '#4b5563'
+  const isDone = offer.status === 'completed'
+  const isAccepted = offer.status === 'accepted' || isDone
+  const buyerDone = !!offer.buyer_confirmed || isDone
+  const sellerDone = !!offer.seller_confirmed || isDone
+
+  const steps = [
+    { label: 'Offer Sent', done: true, active: offer.status === 'pending' },
+    { label: 'Offer Accepted', done: isAccepted, active: offer.status === 'accepted' },
+    { label: isTradeType ? 'Item Exchange' : 'Payment + Delivery', done: buyerDone || sellerDone, active: isAccepted && !isDone },
+    { label: 'Complete', done: isDone, active: false },
+  ]
+
+  const lineColor = (idx) => {
+    const left = steps[idx]
+    const right = steps[idx + 1]
+    return left?.done && right?.done ? doneTone : '#1f2937'
+  }
+
+  const circleColor = (step) => {
+    if (step.done) return doneTone
+    if (step.active) return activeTone
+    return idleTone
+  }
+
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ fontSize: 10, color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
+        Trade Progress
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))`, gap: 6, alignItems: 'start' }}>
+        {steps.map((step, idx) => (
+          <div key={step.label} style={{ position: 'relative' }}>
+            {idx < steps.length - 1 && (
+              <div style={{
+                position: 'absolute',
+                top: 7,
+                left: '58%',
+                right: '-45%',
+                height: 2,
+                background: lineColor(idx),
+              }} />
+            )}
+            <div style={{
+              width: 14,
+              height: 14,
+              borderRadius: '50%',
+              background: circleColor(step),
+              boxShadow: step.active ? '0 0 0 3px rgba(245,158,11,0.15)' : 'none',
+              marginBottom: 5,
+            }} />
+            <div style={{ fontSize: 10, lineHeight: 1.35, color: step.done ? '#d1d5db' : '#6b7280', fontWeight: step.active ? 700 : 600 }}>
+              {step.label}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ─── MODULE-LEVEL SUB-COMPONENTS ─────────────────────────────────────────────
 // Defined outside ListingPage so React doesn't recreate their identity on every
 // parent render. Previously defined inside caused unmount/remount on each render,
@@ -183,6 +249,7 @@ function BuyerTradePanel({ myOffer, listing, seller, listingId, copiedId, setCop
   if (myOffer.status === 'pending') return (
     <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 10, padding: 14, marginTop: 14 }}>
       <ConfirmModal modal={modal} onClose={() => setModal(null)} />
+      <TradeProgress offer={myOffer} isTradeType={isTradeType} />
       <div style={{ fontSize: 13, fontWeight: 700, color: '#fde68a', marginBottom: 4 }}>⏳ Offer Pending</div>
       <p style={{ margin: '0 0 10px', fontSize: 12, color: '#9ca3af' }}>Waiting for the seller to respond.</p>
       <button onClick={() => setModal({
@@ -202,6 +269,7 @@ function BuyerTradePanel({ myOffer, listing, seller, listingId, copiedId, setCop
 
   if (myOffer.status === 'declined') return (
     <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 10, padding: 14, marginTop: 14 }}>
+      <TradeProgress offer={myOffer} isTradeType={isTradeType} />
       <div style={{ fontSize: 13, fontWeight: 700, color: '#f87171', marginBottom: 6 }}>✕ Offer Declined</div>
       <p style={{ margin: '0 0 10px', fontSize: 12, color: '#9ca3af' }}>The seller declined. You can send a new offer.</p>
       <button onClick={() => { setMyOffer(null); setOfferSent(false); setOfferMessage(''); setOfferPrice('') }}
@@ -211,6 +279,7 @@ function BuyerTradePanel({ myOffer, listing, seller, listingId, copiedId, setCop
 
   if (myOffer.status === 'accepted') return (
     <div style={{ background: 'rgba(74,222,128,0.06)', border: '1px solid rgba(74,222,128,0.25)', borderRadius: 10, padding: 14, marginTop: 14 }}>
+      <TradeProgress offer={myOffer} isTradeType={isTradeType} />
       <div style={{ fontSize: 13, fontWeight: 700, color: '#4ade80', marginBottom: 10 }}>✓ Offer Accepted</div>
 
       {isTradeType ? (
@@ -270,6 +339,7 @@ function BuyerTradePanel({ myOffer, listing, seller, listingId, copiedId, setCop
 
   if (myOffer.status === 'completed') return (
     <div style={{ background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.3)', borderRadius: 10, padding: 14, marginTop: 14 }}>
+      <TradeProgress offer={myOffer} isTradeType={isTradeType} />
       <div style={{ fontSize: 13, fontWeight: 700, color: '#4ade80' }}>🎉 Trade Complete!</div>
       <p style={{ margin: '5px 0 0', fontSize: 12, color: '#9ca3af' }}>Scroll down to leave a review for the seller.</p>
     </div>
@@ -459,7 +529,12 @@ export default function ListingPageClient({ id: idProp, initialListing = null })
       setReviews(refreshedReviews)
       setListing(refreshedListing)
     } catch (err) {
-      setReviewError(err.message || 'Failed to post review.')
+      const msg = (err?.message || '').toLowerCase()
+      if (err?.code === '23505' || msg.includes('already left a review') || msg.includes('duplicate key')) {
+        setReviewError('You already left a review for this listing.')
+      } else {
+        setReviewError(err?.message || 'Failed to post review.')
+      }
     } finally {
       setReviewLoading(false)
     }
@@ -793,6 +868,27 @@ export default function ListingPageClient({ id: idProp, initialListing = null })
                             </button>
                           </div>
                         )}
+                      </div>
+                    )}
+
+                    {!isSeller && !myOffer && listing.status !== 'active' && (
+                      <div style={{ marginTop: 14 }}>
+                        <div style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 10, padding: 14 }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: '#fbbf24', marginBottom: 6 }}>Listing No Longer Accepting Offers</div>
+                          <p style={{ margin: '0 0 10px', fontSize: 12, color: '#9ca3af', lineHeight: 1.6 }}>
+                            This listing is currently marked as {listing.status}. You cannot submit a new offer on it.
+                          </p>
+                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                            <Link href="/browse" className="btn-ghost" style={{ textDecoration: 'none', fontSize: 12, padding: '7px 12px' }}>
+                              Browse Similar Listings
+                            </Link>
+                            {seller?.username && (
+                              <Link href={`/messages?user=${seller.username}`} className="btn-ghost" style={{ textDecoration: 'none', fontSize: 12, padding: '7px 12px' }}>
+                                Message Seller
+                              </Link>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>

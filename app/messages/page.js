@@ -32,6 +32,7 @@ function MessagesInner() {
   const [msgHasMore, setMsgHasMore] = useState(false)
   const [msgCursor, setMsgCursor] = useState(null)
   const [msgLoadingMore, setMsgLoadingMore] = useState(false)
+  const [archiveNotice, setArchiveNotice] = useState('')
 
   const getConvoOtherId = useCallback((convo, currentUserId) => {
     if (!convo || !currentUserId) return null
@@ -206,12 +207,20 @@ function MessagesInner() {
   const handleArchive = async (convo) => {
     const otherId = convo.sender_id === user.id ? convo.receiver_id : convo.sender_id
     const isArchived = convo.archived_by?.includes(user.id)
-    await supabase.rpc(isArchived ? 'unarchive_conversation' : 'archive_conversation', {
-      p_listing_id: convo.listing_id, p_other_user_id: otherId
-    })
-    const updated = await getConversations(user.id)
-    setConversations(updated || [])
-    if (!isArchived) { setActiveConvo(null); setMobileView('list') }
+    try {
+      const { error } = await supabase.rpc(isArchived ? 'unarchive_conversation' : 'archive_conversation', {
+        p_listing_id: convo.listing_id, p_other_user_id: otherId
+      })
+      if (error) throw error
+      const updated = await getConversations(user.id)
+      setConversations(updated || [])
+      setArchiveNotice(isArchived ? 'Conversation unarchived.' : 'Conversation archived.')
+      setTimeout(() => setArchiveNotice(''), 2200)
+      if (!isArchived) { setActiveConvo(null); setMobileView('list') }
+    } catch {
+      setArchiveNotice('Could not update archive state. Please try again.')
+      setTimeout(() => setArchiveNotice(''), 2600)
+    }
   }
 
   const handleOpenDispute = async () => {
@@ -517,6 +526,19 @@ function MessagesInner() {
 
                 {/* Messages */}
                 <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {archiveNotice && (
+                    <div style={{
+                      background: 'rgba(74,222,128,0.08)',
+                      border: '1px solid rgba(74,222,128,0.25)',
+                      borderRadius: 8,
+                      padding: '8px 12px',
+                      fontSize: 12,
+                      color: '#4ade80',
+                      marginBottom: 8,
+                    }}>
+                      {archiveNotice}
+                    </div>
+                  )}
                   {/* Load earlier messages button — shown when there are older pages */}
                   {msgHasMore && (
                     <div style={{ textAlign: 'center', paddingBottom: 8 }}>
