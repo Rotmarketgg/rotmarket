@@ -45,8 +45,13 @@ export default function CreateListingPage() {
         // from before their role was assigned would otherwise block them
         const badges = p?.badges?.length ? p.badges : p?.badge ? [p.badge] : []
         if (badges.some(b => ['VIP', 'Owner', 'Admin', 'Moderator'].includes(b))) {
+          // Clear ALL listing rate-limit keys for privileged users
           sessionStorage.removeItem('rl_listing')
           sessionStorage.removeItem('rl_listing_day')
+          // Also clear any legacy key variants
+          Object.keys(sessionStorage)
+            .filter(k => k.startsWith('rl_listing'))
+            .forEach(k => sessionStorage.removeItem(k))
         }
       } catch (err) {
         console.error('Auth check error:', err)
@@ -121,6 +126,11 @@ export default function CreateListingPage() {
       ? [activeProfile.badge]
       : []
     const isPrivileged = profileBadges.some(b => ['Owner', 'VIP', 'Moderator', 'Admin'].includes(b))
+    if (isPrivileged) {
+      Object.keys(sessionStorage)
+        .filter(k => k.startsWith('rl_listing'))
+        .forEach(k => sessionStorage.removeItem(k))
+    }
     const rl = checkRateLimit('listing', '', isPrivileged)
     if (rl) { setErrors({ general: rl }); return }
     const rlDay = checkRateLimit('listing_daily', '', isPrivileged)
