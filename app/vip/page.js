@@ -58,7 +58,6 @@ const TIERS = [
       { section: 'Perks' },
       { text: '2× referral bonus multiplier' },
       { text: 'Monthly giveaway entries (×2)' },
-      { text: 'Discord VIP+ role' },
     ],
   },
   {
@@ -79,13 +78,12 @@ const TIERS = [
       { text: 'Full seller analytics', sub: 'Views, conversion, profile visits' },
       { text: 'Price history on rarities', sub: "See what's sold & for how much" },
       { section: 'Trust & profile' },
-      { text: 'Red 🔴 crown badge (rarest)' },
+      { text: 'Red 🔴 crown badge' },
       { text: 'Custom profile accent color' },
       { text: 'Verified payment method shown' },
       { text: 'Dispute priority review' },
       { section: 'Exclusive' },
-      { text: 'VIP Max leaderboard tab' },
-      { text: 'Monthly giveaway entries (×5)' },
+      { text: 'Monthly giveaway entries (×3)' },
       { text: 'Beta access before VIP Plus' },
       { text: 'Dedicated support channel' },
     ],
@@ -104,14 +102,14 @@ const COMPARISON = [
   { label: 'Homepage spotlight',  vip: '—',       plus: '—',       max: '✓' },
   { label: 'Custom banner',       vip: '—',       plus: '✓',       max: '✓' },
   { label: 'Referral multiplier', vip: '1×',      plus: '2×',      max: '3×' },
-  { label: 'Giveaway entries',    vip: '×1',      plus: '×2',      max: '×5' },
+  { label: 'Giveaway entries',    vip: '×1',      plus: '×2',      max: '×3' },
   { label: 'Price/month',         vip: '$10',     plus: '$20',     max: '$40', priceRow: true },
 ]
 
 const PAYMENT_METHODS = [
   { id: 'cashapp', label: 'Cash App', icon: '🟢', value: CASHAPP, note: 'Recommended' },
   { id: 'venmo',   label: 'Venmo',    icon: '💙', value: VENMO },
-  { id: 'paypal',  label: 'PayPal',   icon: '🔵', value: PAYPAL,  note: 'Goods & Services' },
+  { id: 'paypal',  label: 'PayPal',   icon: '🔵', value: PAYPAL,},
 ]
 
 // ─── COMPONENT ────────────────────────────────────────────────────────────────
