@@ -53,7 +53,7 @@ const FAQS = [
   },
   {
     q: 'What payment methods are supported?',
-    a: 'PayPal, Cash App, and Venmo. Always use a payment method that offers buyer protection where possible.',
+    a: 'PayPal, Cash App, Venmo, and Revolut. Always use a payment method that offers buyer protection where possible.',
   },
   {
     q: 'Is RotMarket affiliated with Epic Games or Roblox?',

@@ -176,10 +176,10 @@ export default function ContactPage() {
               borderRadius: 10, padding: '14px 16px',
             }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: '#f87171', marginBottom: 6 }}>
-                🚨 Important — PayPal scam recovery
+                🚨 Important — Payment dispute recovery
               </div>
               <p style={{ margin: 0, fontSize: 12, color: '#9ca3af', lineHeight: 1.7 }}>
-                If you paid via PayPal Goods & Services, open a dispute through PayPal directly for the fastest resolution. We cannot reverse payments but we will ban the scammer. Include the listing ID and their PayPal email in your message.
+                If you paid via PayPal Goods & Services, open a dispute through PayPal directly for the fastest resolution. For Cash App, Venmo, or Revolut, contact their support teams immediately. We cannot reverse payments but we will ban the scammer. Include the listing ID and payment details in your message.
               </p>
             </div>
           )}

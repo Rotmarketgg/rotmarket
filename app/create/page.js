@@ -426,7 +426,7 @@ export default function CreateListingPage() {
           <Section title="Listing Title" required error={errors.title}>
             <input
               type="text"
-              placeholder="e.g. Max Level Tralalero Tralala"
+              placeholder="e.g. Brainrot God Tralalero Tralala"
               value={form.title}
               onChange={e => set('title', e.target.value)}
               maxLength={80}
@@ -569,7 +569,7 @@ export default function CreateListingPage() {
           <Section title="Description" hint="Optional — tell buyers about condition, level, etc.">
             <textarea
               rows={4}
-              placeholder="e.g. Max level, fully evolved. Screenshots available on request. Happy to go first if you have 20+ trades."
+              placeholder="e.g. Heaven rarity, max traited. Screenshots available on request. Happy to go first if you have 20+ trades."
               value={form.description}
               onChange={e => set('description', e.target.value)}
               maxLength={500}
