@@ -112,6 +112,8 @@ const PAYMENT_METHODS = [
   { id: 'paypal',  label: 'PayPal',   icon: '🔵', value: PAYPAL,},
 ]
 
+const TIER_RANK = { 'VIP': 1, 'VIP Plus': 2, 'VIP Max': 3 }
+
 // ─── COMPONENT ────────────────────────────────────────────────────────────────
 
 export default function VIPPage() {
@@ -148,18 +150,28 @@ export default function VIPPage() {
   }, [])
 
   // Badge detection — only runs after auth is ready
-  const badges    = profile?.badges?.length ? profile.badges : profile?.badge ? [profile.badge] : []
+  const normalizeBadges = (p) => {
+    if (Array.isArray(p?.badges)) return p.badges
+    if (typeof p?.badges === 'string' && p.badges.trim()) return [p.badges.trim()]
+    if (typeof p?.badge === 'string' && p.badge.trim()) return [p.badge.trim()]
+    return []
+  }
+  const badges = normalizeBadges(profile)
   const primary   = getPrimaryBadge(badges)
-  const isVipMax  = primary === 'VIP Max'  || primary === 'Owner'
-  const isVipPlus = primary === 'VIP Plus' || isVipMax
-  const isVip     = primary === 'VIP'      || isVipPlus
+  const isStaff   = badges.some(b => ['Owner', 'Admin', 'Moderator'].includes(b))
+  const currentTier = ['VIP', 'VIP Plus', 'VIP Max'].includes(primary) ? primary : null
 
-  const isOwned = (id) => {
-    if (!authReady || !user) return false  // not logged in → never "owned"
-    if (id === 'VIP Max')  return isVipMax
-    if (id === 'VIP Plus') return isVipPlus
-    if (id === 'VIP')      return isVip
-    return false
+  const isCurrentTier = (id) => currentTier === id
+  const canUpgradeTo = (id) => {
+    if (isStaff) return false
+    if (!currentTier) return true
+    return TIER_RANK[id] > TIER_RANK[currentTier]
+  }
+
+  const lowerTierLabel = (id) => {
+    if (!currentTier) return null
+    if (TIER_RANK[id] < TIER_RANK[currentTier]) return `Included in ${currentTier}`
+    return null
   }
 
   const copy = (text, key) => {
@@ -171,6 +183,7 @@ export default function VIPPage() {
   const openPayment = (tierId) => {
     if (!authReady) return
     if (!user) { router.push('/auth/login'); return }
+    if (!canUpgradeTo(tierId)) return
     setSelected(tierId)
     setPayMethod(null)
     setStep(1)
@@ -228,13 +241,13 @@ export default function VIPPage() {
       <div style={{ maxWidth: 1080, margin: '0 auto', padding: '40px 16px 60px' }}>
 
         {/* Current plan banner */}
-        {primary && ['VIP', 'VIP Plus', 'VIP Max'].includes(primary) && (
+        {currentTier && (
           <div style={{
             background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.25)',
             borderRadius: 12, padding: '12px 18px', marginBottom: 28,
             fontSize: 14, color: '#fbbf24', fontWeight: 600, textAlign: 'center',
           }}>
-            You're a <strong>{primary}</strong> member — thank you for supporting RotMarket!
+            You're a <strong>{currentTier}</strong> member — thank you for supporting RotMarket!
           </div>
         )}
 
@@ -245,7 +258,9 @@ export default function VIPPage() {
           gap: 16, marginBottom: 32,
         }}>
           {TIERS.map(t => {
-            const owned     = isOwned(t.id)
+            const current = isCurrentTier(t.id)
+            const canUpgrade = canUpgradeTo(t.id)
+            const lowerTier = lowerTierLabel(t.id)
             const tierPrice = billing === 'yearly' ? t.yearlyPrice : t.price
             const yearlySave = (t.price * 12) - t.yearlyPrice
             return (
@@ -315,7 +330,7 @@ export default function VIPPage() {
 
                 {/* CTA */}
                 <div style={{ padding: '16px 22px', borderTop: '1px solid #1f2937' }}>
-                  {owned ? (
+                  {current ? (
                     <div style={{
                       textAlign: 'center', padding: '11px',
                       fontSize: 13, fontWeight: 700,
@@ -324,9 +339,37 @@ export default function VIPPage() {
                     }}>
                       {t.icon} Current Plan
                     </div>
+                  ) : !authReady ? (
+                    <div style={{
+                      textAlign: 'center', padding: '11px',
+                      fontSize: 12, fontWeight: 700,
+                      color: '#6b7280', background: '#0d0d14',
+                      borderRadius: 9, border: '1px solid #1f2937',
+                    }}>
+                      Checking account...
+                    </div>
+                  ) : isStaff ? (
+                    <div style={{
+                      textAlign: 'center', padding: '11px',
+                      fontSize: 12, fontWeight: 700,
+                      color: '#6b7280', background: '#0d0d14',
+                      borderRadius: 9, border: '1px solid #1f2937',
+                    }}>
+                      Managed by staff role
+                    </div>
+                  ) : lowerTier ? (
+                    <div style={{
+                      textAlign: 'center', padding: '11px',
+                      fontSize: 12, fontWeight: 700,
+                      color: '#6b7280', background: '#0d0d14',
+                      borderRadius: 9, border: '1px solid #1f2937',
+                    }}>
+                      {lowerTier}
+                    </div>
                   ) : (
                     <button
                       onClick={() => openPayment(t.id)}
+                      disabled={!canUpgrade}
                       style={{
                         width: '100%', padding: '11px', borderRadius: 9,
                         border: 'none', cursor: 'pointer',
@@ -334,9 +377,11 @@ export default function VIPPage() {
                         color: t.featured ? '#fff' : t.color,
                         fontSize: 13, fontWeight: 800,
                         transition: 'opacity 0.15s',
+                        opacity: canUpgrade ? 1 : 0.6,
+                        cursor: canUpgrade ? 'pointer' : 'not-allowed',
                       }}
                     >
-                      Get {t.id} →
+                      {currentTier ? `Upgrade to ${t.id} →` : `Get ${t.id} →`}
                     </button>
                   )}
                 </div>

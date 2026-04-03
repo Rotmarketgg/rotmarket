@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import ConfirmModal from '@/components/ConfirmModal'
 import { getSessionUser, getVerifiedUser, getProfile, createListing, updateListing, uploadListingImage, supabase } from '@/lib/supabase'
 import { GAMES, RARITIES, PAYMENT_METHODS, LISTING_TYPES } from '@/lib/constants'
 import { validateListing, checkRateLimit, withTimeout } from '@/lib/utils'
@@ -22,6 +23,7 @@ export default function CreateListingPage() {
   const [images, setImages] = useState([]) // [{file, preview}]
   const [success, setSuccess] = useState(false)
   const [templates, setTemplates] = useState([])
+  const [modal, setModal] = useState(null)
 
   const [form, setForm] = useState({
     title: '',
@@ -92,28 +94,35 @@ export default function CreateListingPage() {
   const handleSaveTemplate = () => {
     if (!canUseTemplates) return
     const fallback = form.title.trim() ? `${form.title.trim().slice(0, 32)}` : 'My Listing Template'
-    const name = window.prompt('Template name', fallback)
-    if (!name) return
-    const cleanName = name.trim().slice(0, 40)
-    if (!cleanName) return
-    const next = [
-      {
-        name: cleanName,
-        savedAt: new Date().toISOString(),
-        data: {
-          title: form.title,
-          game: form.game,
-          rarity: form.rarity,
-          type: form.type,
-          price: form.price,
-          description: form.description,
-          accepts: form.accepts,
-          quantity: form.quantity,
-        },
+    setModal({
+      title: 'Save Listing Template',
+      message: 'Choose a name so you can quickly reuse this setup later.',
+      inputLabel: 'Template Name',
+      inputPlaceholder: fallback,
+      confirmLabel: 'Save Template',
+      onConfirm: (name) => {
+        const cleanName = (name || '').trim().slice(0, 40)
+        if (!cleanName) return
+        const next = [
+          {
+            name: cleanName,
+            savedAt: new Date().toISOString(),
+            data: {
+              title: form.title,
+              game: form.game,
+              rarity: form.rarity,
+              type: form.type,
+              price: form.price,
+              description: form.description,
+              accepts: form.accepts,
+              quantity: form.quantity,
+            },
+          },
+          ...templates,
+        ].slice(0, 12)
+        persistTemplates(next)
       },
-      ...templates,
-    ].slice(0, 12)
-    persistTemplates(next)
+    })
   }
 
   const applyTemplate = (tpl) => {
@@ -301,6 +310,7 @@ export default function CreateListingPage() {
 
   return (
     <div style={{ minHeight: '100vh' }}>
+      <ConfirmModal modal={modal} onClose={() => setModal(null)} />
       <div style={{ maxWidth: 680, margin: '0 auto', padding: '32px 16px' }}>
 
         <div style={{ marginBottom: 24 }}>
