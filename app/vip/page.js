@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { getSessionUser, getProfile } from '@/lib/supabase'
-import { getPrimaryBadge } from '@/lib/constants'
 
 const CASHAPP = '$tdowdy94'
 const VENMO   = '@davari'
@@ -157,13 +156,13 @@ export default function VIPPage() {
     return []
   }
   const badges = normalizeBadges(profile)
-  const primary   = getPrimaryBadge(badges)
-  const isStaff   = badges.some(b => ['Owner', 'Admin', 'Moderator'].includes(b))
-  const currentTier = ['VIP', 'VIP Plus', 'VIP Max'].includes(primary) ? primary : null
+  const currentTier = badges.includes('VIP Max') ? 'VIP Max'
+    : badges.includes('VIP Plus') ? 'VIP Plus'
+    : badges.includes('VIP') ? 'VIP'
+    : null
 
   const isCurrentTier = (id) => currentTier === id
   const canUpgradeTo = (id) => {
-    if (isStaff) return false
     if (!currentTier) return true
     return TIER_RANK[id] > TIER_RANK[currentTier]
   }
@@ -347,15 +346,6 @@ export default function VIPPage() {
                       borderRadius: 9, border: '1px solid #1f2937',
                     }}>
                       Checking account...
-                    </div>
-                  ) : isStaff ? (
-                    <div style={{
-                      textAlign: 'center', padding: '11px',
-                      fontSize: 12, fontWeight: 700,
-                      color: '#6b7280', background: '#0d0d14',
-                      borderRadius: 9, border: '1px solid #1f2937',
-                    }}>
-                      Managed by staff role
                     </div>
                   ) : lowerTier ? (
                     <div style={{
