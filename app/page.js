@@ -10,21 +10,35 @@ const PAGE_SIZE = 20
 
 export default function HomePage() {
   const [listings, setListings] = useState([])
+  const [promotedPool, setPromotedPool] = useState([])
   const [loading, setLoading]   = useState(true)
   const [wishlistTerms, setWishlistTerms] = useState([])
 
   const fetchListings = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
     try {
-      const { data } = await withTimeout(getListings({
-        status: 'active',
-        limit: PAGE_SIZE,
-        offset: 0,
-      }), silent ? 8000 : 20000)
-      setListings(data || [])
+      const [latestRes, promotedRes] = await withTimeout(Promise.all([
+        getListings({
+          status: 'active',
+          limit: PAGE_SIZE,
+          offset: 0,
+          sort: 'latest',
+        }),
+        getListings({
+          status: 'active',
+          limit: 200,
+          offset: 0,
+          sort: 'promoted',
+        }),
+      ]), silent ? 8000 : 20000)
+      setListings(latestRes?.data || [])
+      setPromotedPool((promotedRes?.data || []).filter(l => !!l.promoted))
     } catch (err) {
       console.error('Listings load error:', err.message)
-      if (!silent) setListings([])
+      if (!silent) {
+        setListings([])
+        setPromotedPool([])
+      }
     } finally {
       if (!silent) setLoading(false)
     }
@@ -81,14 +95,14 @@ export default function HomePage() {
   }, [listings, wishlistTerms])
 
   const promotedListings = useMemo(() => {
-    const promoted = listings.filter(l => !!l.promoted)
+    const promoted = promotedPool
     if (promoted.length <= 4) return promoted
     const now = new Date()
     const daySeed = Math.floor((Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) - Date.UTC(now.getUTCFullYear(), 0, 0)) / 86400000)
     const rotation = (daySeed * 24 + now.getUTCHours()) % promoted.length
     const rotated = [...promoted.slice(rotation), ...promoted.slice(0, rotation)]
     return rotated.slice(0, 4)
-  }, [listings])
+  }, [promotedPool])
 
   return (
     <div className="noise" style={{ minHeight: '100vh' }}>

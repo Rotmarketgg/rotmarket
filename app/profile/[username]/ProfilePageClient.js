@@ -181,7 +181,7 @@ export default function ProfilePageClient({ username: usernameProp, initialProfi
 
   useEffect(() => {
     if (!isOwn) return
-    if (!['VIP Plus', 'VIP Max'].includes(vipAccessTier)) return
+    if (vipAccessTier !== 'VIP Max') return
     if (expiredListings.length === 0) return
     const key = `${vipAccessTier}:${expiredListings.map(l => l.id).sort().join(',')}`
     if (!key || autoRelistKeyRef.current === key) return
@@ -198,7 +198,7 @@ export default function ProfilePageClient({ username: usernameProp, initialProfi
         .map(l => l.id)
       if (renewedIds.length === 0) return
 
-      const days = vipAccessTier === 'VIP Max' ? null : 60
+      const days = null
       setListings(prev => prev.map(l => renewedIds.includes(l.id)
         ? { ...l, status: 'active', expires_at: days === null ? null : new Date(Date.now() + days * 86400000).toISOString() }
         : l
@@ -606,7 +606,7 @@ export default function ProfilePageClient({ username: usernameProp, initialProfi
                     {sortedActiveListings.map(l => {
                       const days = daysUntilExpiry(l)
                       const isPermanentListing = days === null
-                      const expiringSoon = !isPermanentListing && days <= 5
+                      const expiringSoon = vipAccessTier !== 'VIP Max' && !isPermanentListing && days <= 5
                       return (
                         <div key={l.id} style={{ display: 'flex', flexDirection: 'column' }}>
                           <div style={{ flex: 1, position: 'relative' }}>
@@ -664,7 +664,7 @@ export default function ProfilePageClient({ username: usernameProp, initialProfi
               expiredListings.length === 0
                 ? <EmptyState icon="⏰" title="No expired listings" message="Listings expire after 30 days." />
                 : <div>
-                    {['VIP Plus', 'VIP Max'].includes(vipAccessTier) && autoRelistInfo && (
+                    {vipAccessTier === 'VIP Max' && autoRelistInfo && (
                       <div style={{ background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.25)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#4ade80', marginBottom: 10, fontWeight: 700 }}>
                         ✓ {autoRelistInfo}
                       </div>
