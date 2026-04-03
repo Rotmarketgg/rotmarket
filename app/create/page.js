@@ -202,11 +202,11 @@ export default function CreateListingPage() {
     }
 
     // Gate: must have at least one payment method AND at least one game username
-    const hasPayment = !!(activeProfile?.paypal_email || activeProfile?.cashapp_handle || activeProfile?.venmo_handle)
+    const hasPayment = !!(activeProfile?.paypal_email || activeProfile?.cashapp_handle || activeProfile?.venmo_handle || activeProfile?.revolut_handle)
     const hasGameId = !!(activeProfile?.epic_username || activeProfile?.roblox_username)
     if (!hasPayment || !hasGameId) {
       const missing = []
-      if (!hasPayment) missing.push('a payment method (PayPal, Cash App, or Venmo)')
+      if (!hasPayment) missing.push('a payment method (PayPal, Cash App, Venmo, or Revolut)')
       if (!hasGameId) missing.push('a game username (Epic or Roblox)')
       setErrors({
         general: `Complete your profile before posting: add ${missing.join(' and ')}. Update in Settings.`,
@@ -396,7 +396,7 @@ export default function CreateListingPage() {
 
         {/* Profile incomplete warning — shown passively before submit */}
         {profile && (() => {
-          const hasPayment = !!(profile.paypal_email || profile.cashapp_handle || profile.venmo_handle)
+          const hasPayment = !!(profile.paypal_email || profile.cashapp_handle || profile.venmo_handle || profile.revolut_handle)
           const hasGameId = !!(profile.epic_username || profile.roblox_username)
           if (hasPayment && hasGameId) return null
           const missing = []

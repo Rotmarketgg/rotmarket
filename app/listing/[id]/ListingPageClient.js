@@ -304,12 +304,14 @@ function BuyerTradePanel({ myOffer, listing, seller, sellerPayout, listingId, co
             const showPaypal = sellerPayout?.paypal_email && accepts.some(a => a.toLowerCase().includes('paypal'))
             const showCashapp = sellerPayout?.cashapp_handle && accepts.some(a => a.toLowerCase().includes('cash app') || a.toLowerCase().includes('cashapp'))
             const showVenmo = sellerPayout?.venmo_handle && accepts.some(a => a.toLowerCase().includes('venmo'))
+            const showRevolut = sellerPayout?.revolut_handle && accepts.some(a => a.toLowerCase().includes('revolut'))
             return (
               <>
                 {showPaypal && <div style={{ fontSize: 12, color: '#d1d5db', marginBottom: 3 }}>🔵 PayPal: <strong>{sellerPayout.paypal_email}</strong></div>}
                 {showCashapp && <div style={{ fontSize: 12, color: '#d1d5db', marginBottom: 3 }}>🟢 Cash App: <strong>{sellerPayout.cashapp_handle}</strong></div>}
                 {showVenmo && <div style={{ fontSize: 12, color: '#d1d5db', marginBottom: 3 }}>💙 Venmo: <strong>{sellerPayout.venmo_handle}</strong></div>}
-                {!showPaypal && !showCashapp && !showVenmo && (
+                {showRevolut && <div style={{ fontSize: 12, color: '#d1d5db', marginBottom: 3 }}>🟣 Revolut: <strong>{sellerPayout.revolut_handle}</strong></div>}
+                {!showPaypal && !showCashapp && !showVenmo && !showRevolut && (
                   <div style={{ fontSize: 12, color: '#4b5563' }}>Message the seller for payment details.</div>
                 )}
               </>
@@ -471,7 +473,7 @@ export default function ListingPageClient({ id: idProp, initialListing = null })
       }
       const { data } = await supabase
         .from('profiles')
-        .select('paypal_email, cashapp_handle, venmo_handle')
+        .select('paypal_email, cashapp_handle, venmo_handle, revolut_handle')
         .eq('id', seller.id)
         .maybeSingle()
       if (!cancelled) setSellerPayout(data || null)

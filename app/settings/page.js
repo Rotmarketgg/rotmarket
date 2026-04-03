@@ -43,6 +43,7 @@ function SettingsPage() {
     paypal_email: '',
     cashapp_handle: '',
     venmo_handle: '',
+    revolut_handle: '',
     bio: '',
     avatar_url: '',
     profile_url: '',
@@ -66,6 +67,7 @@ function SettingsPage() {
           paypal_email: p.paypal_email || '',
           cashapp_handle: p.cashapp_handle || '',
           venmo_handle: p.venmo_handle || '',
+          revolut_handle: p.revolut_handle || '',
           bio: p.bio || '',
           avatar_url: p.avatar_url || '',
           profile_url: p.profile_url || '',
@@ -185,6 +187,7 @@ function SettingsPage() {
         paypal_email: form.paypal_email.trim() || null,
         cashapp_handle: form.cashapp_handle.trim() || null,
         venmo_handle: form.venmo_handle.trim() || null,
+        revolut_handle: form.revolut_handle.trim() || null,
         bio: form.bio.trim() || null,
         avatar_url: avatarUrl || null,
         profile_url: form.profile_url.trim() || null,
@@ -318,6 +321,12 @@ function SettingsPage() {
               <div style={{ position: 'relative' }}>
                 <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }}>@</span>
                 <input type="text" placeholder="YourHandle" value={form.venmo_handle.replace('@', '')} onChange={e => set('venmo_handle', '@' + e.target.value.replace('@', ''))} style={{ paddingLeft: 28 }} />
+              </div>
+            </Field>
+            <Field label="Revolut Handle">
+              <div style={{ position: 'relative' }}>
+                <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }}>@</span>
+                <input type="text" placeholder="YourHandle" value={form.revolut_handle.replace('@', '')} onChange={e => set('revolut_handle', '@' + e.target.value.replace('@', ''))} style={{ paddingLeft: 28 }} />
               </div>
             </Field>
           </Section>
