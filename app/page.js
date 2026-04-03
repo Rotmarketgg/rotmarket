@@ -138,7 +138,6 @@ export default function HomePage() {
               <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#60a5fa' }}>
                 ⚡ Promoted Listings
               </h2>
-              <div style={{ fontSize: 12, color: '#6b7280' }}>Rotates hourly when more than 4 are promoted</div>
             </div>
             <div className="listing-grid">
               {promotedListings.map(listing => (

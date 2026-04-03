@@ -24,12 +24,13 @@ export default function ListingCard({ listing }) {
   const primaryMeta = primaryBadge ? BADGE_META[primaryBadge] : null
   const vipGlowTier = getVipGlowTier(badges)
   const isVip = !!vipGlowTier
-  const isVerified = badges.includes('Verified Trader')
+  const isPermanentTier = badges.some(b => ['VIP Max', 'Owner', 'Admin'].includes(b))
 
   const vipMeta = vipGlowTier ? VIP_GLOW_META[vipGlowTier] : null
   const vipColor = vipMeta?.color
   const vipGlowNormal = vipMeta?.glowNormal
   const vipGlowHover = vipMeta?.glowHover
+  const isPromoted = !!listing.promoted && !!vipGlowTier
 
   const typeKey = listing.status === 'sold' ? 'sold' : listing.type
   const typeConf = TYPE_CONFIG[typeKey] || TYPE_CONFIG.sale
@@ -37,7 +38,7 @@ export default function ListingCard({ listing }) {
   const daysLeft = listing.expires_at
     ? Math.ceil((new Date(listing.expires_at) - new Date()) / 86400000)
     : null
-  const expiringSoon = daysLeft !== null && daysLeft <= 3 && daysLeft > 0
+  const expiringSoon = !isPermanentTier && daysLeft !== null && daysLeft <= 3 && daysLeft > 0
   const hasImage = !!listing.images?.[0]
 
   return (
@@ -55,29 +56,29 @@ export default function ListingCard({ listing }) {
           height: '100%',
           minHeight: 320,
           opacity: listing.status === 'sold' ? 0.5 : 1,
-          outline: listing.promoted
-            ? '2px solid rgba(59,130,246,0.7)'
+          outline: isPromoted
+            ? `2px solid ${vipColor}99`
             : isVip
             ? `2px solid ${vipColor}99`
             : `1px solid ${rarity.border}44`,
-          boxShadow: listing.promoted
-            ? `0 0 20px rgba(59,130,246,0.3), inset 0 0 0 1px rgba(59,130,246,0.15)`
+          boxShadow: isPromoted
+            ? `0 0 20px ${vipGlowNormal}, inset 0 0 0 1px ${vipColor}18`
             : isVip
             ? `0 0 20px ${vipGlowNormal}, inset 0 0 0 1px ${vipColor}18`
             : `0 2px 8px rgba(0,0,0,0.4)`,
         }}
         onMouseEnter={e => {
           e.currentTarget.style.transform = 'translateY(-4px) scale(1.01)'
-          e.currentTarget.style.boxShadow = listing.promoted
-            ? `0 12px 32px rgba(59,130,246,0.45), inset 0 0 0 1px rgba(59,130,246,0.2)`
+          e.currentTarget.style.boxShadow = isPromoted
+            ? `0 12px 32px ${vipGlowHover}, inset 0 0 0 1px ${vipColor}25`
             : isVip
             ? `0 12px 32px ${vipGlowHover}, inset 0 0 0 1px ${vipColor}25`
             : `0 12px 28px rgba(0,0,0,0.5), 0 0 0 1px ${rarity.border}66`
         }}
         onMouseLeave={e => {
           e.currentTarget.style.transform = 'translateY(0) scale(1)'
-          e.currentTarget.style.boxShadow = listing.promoted
-            ? `0 0 20px rgba(59,130,246,0.3), inset 0 0 0 1px rgba(59,130,246,0.15)`
+          e.currentTarget.style.boxShadow = isPromoted
+            ? `0 0 20px ${vipGlowNormal}, inset 0 0 0 1px ${vipColor}18`
             : isVip
             ? `0 0 20px ${vipGlowNormal}, inset 0 0 0 1px ${vipColor}18`
             : `0 2px 8px rgba(0,0,0,0.4)`
@@ -101,8 +102,8 @@ export default function ListingCard({ listing }) {
           <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 48, background: 'linear-gradient(to top, #0f0f18 0%, transparent 100%)', pointerEvents: 'none' }} />
 
           {/* Promoted badge */}
-          {listing.promoted && (
-            <div style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)', border: '1px solid rgba(59,130,246,0.6)', color: '#60a5fa', fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', borderRadius: 4, padding: '3px 7px' }}>⚡ PROMOTED</div>
+          {isPromoted && (
+            <div style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)', border: `1px solid ${vipColor}99`, color: vipColor, fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', borderRadius: 4, padding: '3px 7px' }}>⚡ PROMOTED</div>
           )}
 
           {/* Type badge */}

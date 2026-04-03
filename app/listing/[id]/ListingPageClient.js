@@ -440,6 +440,7 @@ export default function ListingPageClient({ id: idProp, initialListing = null })
   const vipGlowTier = getVipGlowTier(sellerBadgesForGlow)
   const isVip = !!vipGlowTier
   const vipGlowMeta = vipGlowTier ? VIP_GLOW_META[vipGlowTier] : null
+  const isPromoted = !!listing?.promoted && !!vipGlowTier
   // Allow reviewing the same seller multiple times (different listings)
   // but not the same listing twice
   const alreadyReviewedThisListing = reviews.some(
@@ -660,15 +661,15 @@ export default function ListingPageClient({ id: idProp, initialListing = null })
 
         <div style={{
             background: '#0f0f18',
-            border: listing?.promoted
-              ? '2px solid rgba(59,130,246,0.7)'
+            border: isPromoted
+              ? `2px solid ${vipGlowMeta.color}99`
               : isVip
               ? `2px solid ${vipGlowMeta.color}99`
               : `1px solid ${rarity.border}44`,
             borderRadius: 16,
             overflow: 'hidden',
-            boxShadow: listing?.promoted
-              ? `0 0 40px rgba(59,130,246,0.35), 0 20px 60px rgba(0,0,0,0.5)`
+            boxShadow: isPromoted
+              ? `0 0 40px ${vipGlowMeta.glowNormal}, 0 20px 60px rgba(0,0,0,0.5)`
               : isVip
               ? `0 0 40px ${vipGlowMeta.glowNormal}, inset 0 0 0 1px ${vipGlowMeta.color}22, 0 20px 60px rgba(0,0,0,0.5)`
               : `0 0 40px ${rarity.glow}66, 0 20px 60px rgba(0,0,0,0.5)`,
