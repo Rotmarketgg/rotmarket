@@ -16,7 +16,8 @@ function isUuid(value = '') {
 
 export async function POST(_request, { params }) {
   try {
-    const id = params?.id
+    const resolvedParams = typeof params?.then === 'function' ? await params : params
+    const id = resolvedParams?.id
     if (!isUuid(id)) return Response.json({ ok: false }, { status: 400 })
 
     const admin = createAdminClient()
@@ -54,4 +55,3 @@ export async function POST(_request, { params }) {
     return Response.json({ ok: false }, { status: 500 })
   }
 }
-

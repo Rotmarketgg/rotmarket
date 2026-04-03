@@ -382,6 +382,7 @@ export default function ListingPageClient({ id: idProp, initialListing = null })
   const [confirmError, setConfirmError] = useState('')
   const [sellerPayout, setSellerPayout] = useState(null)
   const hydratedFromServerRef = useRef(initialListing !== null)
+  const viewPingedRef = useRef(false)
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
@@ -416,6 +417,16 @@ export default function ListingPageClient({ id: idProp, initialListing = null })
   }, [id])
 
   useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    if (!id || !listing || viewPingedRef.current) return
+    if (listing.user_id && user?.id && listing.user_id === user.id) {
+      viewPingedRef.current = true
+      return
+    }
+    viewPingedRef.current = true
+    fetch(`/api/listing/${id}/view`, { method: 'POST' }).catch(() => {})
+  }, [id, listing, user])
 
   // Silent refresh on tab return — fires after rotmarket:tab-visible (600ms delay)
   // so the Supabase client has been verified healthy before we hit the DB.
