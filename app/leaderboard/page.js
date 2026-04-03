@@ -122,13 +122,7 @@ export default function LeaderboardPage() {
           ))}
         </div>
 
-        {/* Referrals tab banner */}
-        {tab === 'referrals' && (
-          <div style={{
-            background: 'rgba(74,222,128,0.05)', border: '1px solid rgba(74,222,128,0.2)',
-            borderRadius: 10, padding: '12px 16px', marginBottom: 20,
-            display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
-          }}>
+
 
         {loading ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -205,6 +199,7 @@ export default function LeaderboardPage() {
                 const traderBadges = trader.badges?.length ? trader.badges : trader.badge ? [trader.badge] : []
                 const primaryBadge = getPrimaryBadge(traderBadges)
                 const badge = primaryBadge ? BADGE_STYLES[primaryBadge] : null
+                const valueColor = tab === 'referrals' ? '#4ade80' : '#f9fafb'
                 return (
                   <Link key={trader.id} href={`/profile/${trader.username}`} style={{ textDecoration: 'none' }}>
                     <div style={{
@@ -252,7 +247,7 @@ export default function LeaderboardPage() {
                         </div>
                       </div>
                       <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                        <div style={{ fontSize: 18, fontWeight: 900, color: tab === 'referrals' ? '#4ade80' : '#f9fafb' }}>
+                        <div style={{ fontSize: 18, fontWeight: 900, color: valueColor }}>
                           {getValue(trader)}
                         </div>
                         <div style={{ fontSize: 10, color: '#6b7280' }}>{getLabel()}</div>
