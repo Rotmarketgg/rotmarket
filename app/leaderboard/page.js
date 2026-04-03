@@ -129,17 +129,6 @@ export default function LeaderboardPage() {
             borderRadius: 10, padding: '12px 16px', marginBottom: 20,
             display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
           }}>
-            <span style={{ fontSize: 20 }}>🔗</span>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#4ade80' }}>Referral Rewards</div>
-              <div style={{ fontSize: 11, color: '#6b7280' }}>
-                Earn a <strong style={{ color: '#f59e0b' }}>VIP badge</strong> at 5 referrals.
-                Each person you refer gets a <strong style={{ color: '#4ade80' }}>Verified Trader</strong> badge.
-                Share your code from Settings.
-              </div>
-            </div>
-          </div>
-        )}
 
         {loading ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
