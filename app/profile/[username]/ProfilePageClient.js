@@ -605,7 +605,8 @@ export default function ProfilePageClient({ username: usernameProp, initialProfi
                 : <div className="listing-grid">
                     {sortedActiveListings.map(l => {
                       const days = daysUntilExpiry(l)
-                      const expiringSoon = days !== null && days <= 5
+                      const isPermanentListing = days === null
+                      const expiringSoon = !isPermanentListing && days <= 5
                       return (
                         <div key={l.id} style={{ display: 'flex', flexDirection: 'column' }}>
                           <div style={{ flex: 1, position: 'relative' }}>
