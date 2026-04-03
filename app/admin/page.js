@@ -775,6 +775,25 @@ export default function AdminPage() {
     })
   }
 
+  async function renewListing(listingId) {
+    setModal({
+      title: 'Renew Listing?',
+      message: 'This will set the listing back to active and extend its expiry.',
+      danger: false,
+      confirmLabel: 'Renew Listing',
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase.rpc('renew_listing', { listing_id: listingId })
+          if (error) throw error
+          loadListings(listingsPage); loadStats()
+          showToast('Listing renewed')
+        } catch (err) {
+          showToast('Failed to renew listing: ' + err.message, 'error')
+        }
+      },
+    })
+  }
+
   async function createAccount() {
     if (!createForm.email || !createForm.password || !createForm.username) {
       showToast('All fields required.', 'error'); return
@@ -1418,6 +1437,9 @@ export default function AdminPage() {
                             {' · '}{l.views} views{' · '}{timeAgo(l.created_at)}
                           </div>
                         </div>
+                        {l.status !== 'active' && (
+                          <button onClick={() => renewListing(l.id)} style={S.actionBtn('#4ade80')}>↻ Renew</button>
+                        )}
                         <button onClick={() => deleteListing(l.id)} style={S.actionBtn('#f87171')}>🗑 Delete</button>
                       </div>
                     </div>
