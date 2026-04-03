@@ -8,30 +8,43 @@ import { getInitial, withTimeout } from '@/lib/utils'
 import { BADGE_META, BADGE_HIERARCHY, getPrimaryBadge } from '@/lib/constants'
 
 const BADGE_STYLES = BADGE_META
-
 const MEDALS = ['🥇', '🥈', '🥉']
 const MEDAL_COLORS = ['#f59e0b', '#9ca3af', '#cd7c2f']
+
+const TABS = [
+  { id: 'trades', label: '🔄 Most Trades' },
+  { id: 'rating', label: '⭐ Highest Rated' },
+  { id: 'referrals', label: '🔗 Top Referrers' },
+]
 
 export default function LeaderboardPage() {
   const [traders, setTraders] = useState([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('trades')
 
-  // Hoisted as useCallback so the visibilitychange handler can reference it
-  // without a stale closure. Previously load() was defined inside a useEffect,
-  // making it invisible to the separate visibility useEffect — causing a
-  // ReferenceError crash when returning to the tab from another page.
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const baseQuery = supabase
-        .from('profiles')
-        .select('id, username, trade_count, rating, review_count, badge, badges, avatar_url')
-        .not('username', 'is', null)
+      let query
 
-      const query = tab === 'trades'
-        ? baseQuery.gt('trade_count', 0).order('trade_count', { ascending: false }).limit(10)
-        : baseQuery.gt('review_count', 0).order('rating', { ascending: false }).order('review_count', { ascending: false }).limit(10)
+      if (tab === 'referrals') {
+        query = supabase
+          .from('profiles')
+          .select('id, username, avatar_url, badge, badges, referral_count')
+          .not('username', 'is', null)
+          .gt('referral_count', 0)
+          .order('referral_count', { ascending: false })
+          .limit(10)
+      } else {
+        const baseQuery = supabase
+          .from('profiles')
+          .select('id, username, trade_count, rating, review_count, badge, badges, avatar_url')
+          .not('username', 'is', null)
+
+        query = tab === 'trades'
+          ? baseQuery.gt('trade_count', 0).order('trade_count', { ascending: false }).limit(10)
+          : baseQuery.gt('review_count', 0).order('rating', { ascending: false }).order('review_count', { ascending: false }).limit(10)
+      }
 
       const { data, error } = await withTimeout(query)
       if (error) throw error
@@ -43,28 +56,27 @@ export default function LeaderboardPage() {
     }
   }, [tab])
 
-  // Run whenever tab filter changes
   useEffect(() => { load() }, [load])
 
-  // Refetch when tab becomes visible again.
-  // rotmarket:tab-visible fires after a 600ms network-recovery delay (lib/supabase.js).
-  // Retries once after 2s if the connection is still waking up.
   useEffect(() => {
     const onVisible = async () => {
-      try {
-        await load()
-      } catch {
-        setTimeout(() => load(), 2000)
-      }
+      try { await load() } catch { setTimeout(() => load(), 2000) }
     }
     window.addEventListener('rotmarket:tab-visible', onVisible)
     return () => window.removeEventListener('rotmarket:tab-visible', onVisible)
   }, [load])
 
-  const getValue = (trader) => tab === 'trades' ? trader.trade_count : trader.rating
-  const getLabel = () => tab === 'trades' ? 'trades' : 'avg rating'
+  const getValue = (trader) => {
+    if (tab === 'trades') return trader.trade_count
+    if (tab === 'rating') return trader.rating
+    return trader.referral_count
+  }
+  const getLabel = () => {
+    if (tab === 'trades') return 'trades'
+    if (tab === 'rating') return 'avg rating'
+    return 'referrals'
+  }
 
-  // Podium: show top 3 in 2nd/1st/3rd order
   const podiumOrder = traders.length >= 3
     ? [traders[1], traders[0], traders[2]]
     : traders.length === 2
@@ -73,11 +85,10 @@ export default function LeaderboardPage() {
     ? [null, traders[0], null]
     : []
 
-  const podiumRanks = [1, 0, 2] // which rank each podium slot is
+  const podiumRanks = [1, 0, 2]
 
   return (
     <div style={{ minHeight: '100vh' }}>
-
       <div style={{
         background: 'linear-gradient(180deg, rgba(245,158,11,0.06) 0%, transparent 100%)',
         borderBottom: '1px solid #1f2937',
@@ -99,11 +110,8 @@ export default function LeaderboardPage() {
       <div style={{ maxWidth: 800, margin: '0 auto', padding: '32px 16px' }}>
 
         {/* Tabs */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
-          {[
-            { id: 'trades', label: '🔄 Most Trades' },
-            { id: 'rating', label: '⭐ Highest Rated' },
-          ].map(t => (
+        <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
+          {TABS.map(t => (
             <button key={t.id} onClick={() => setTab(t.id)} style={{
               padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
               background: tab === t.id ? 'rgba(245,158,11,0.15)' : '#111118',
@@ -114,18 +122,41 @@ export default function LeaderboardPage() {
           ))}
         </div>
 
+        {/* Referrals tab banner */}
+        {tab === 'referrals' && (
+          <div style={{
+            background: 'rgba(74,222,128,0.05)', border: '1px solid rgba(74,222,128,0.2)',
+            borderRadius: 10, padding: '12px 16px', marginBottom: 20,
+            display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+          }}>
+            <span style={{ fontSize: 20 }}>🔗</span>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#4ade80' }}>Referral Rewards</div>
+              <div style={{ fontSize: 11, color: '#6b7280' }}>
+                Earn a <strong style={{ color: '#f59e0b' }}>VIP badge</strong> at 5 referrals.
+                Each person you refer gets a <strong style={{ color: '#4ade80' }}>Verified Trader</strong> badge.
+                Share your code from Settings.
+              </div>
+            </div>
+          </div>
+        )}
+
         {loading ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {[1, 2, 3].map(i => <div key={i} className="skeleton" style={{ height: 60, borderRadius: 10 }} />)}
           </div>
         ) : traders.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '80px 0', color: '#6b7280' }}>
-            <div style={{ fontSize: 48, marginBottom: 12 }}>🏆</div>
-            <p>No traders yet. Complete your first trade to appear here!</p>
+            <div style={{ fontSize: 48, marginBottom: 12 }}>{tab === 'referrals' ? '🔗' : '🏆'}</div>
+            <p>
+              {tab === 'referrals'
+                ? 'No referrals yet. Share your code from Settings to climb this board!'
+                : 'No traders yet. Complete your first trade to appear here!'}
+            </p>
           </div>
         ) : (
           <>
-            {/* Podium — only show if at least 1 trader */}
+            {/* Podium */}
             {podiumOrder.some(t => t !== null) && (
               <div style={{ display: 'flex', gap: 12, marginBottom: 24, alignItems: 'flex-end' }}>
                 {podiumOrder.map((trader, i) => {
@@ -135,8 +166,7 @@ export default function LeaderboardPage() {
                     <Link key={trader.id} href={`/profile/${trader.username}`} style={{ flex: 1, textDecoration: 'none' }}>
                       <div style={{
                         background: '#111118', border: '1px solid #2d2d3f',
-                        borderRadius: 14, padding: '20px 12px',
-                        textAlign: 'center',
+                        borderRadius: 14, padding: '20px 12px', textAlign: 'center',
                         marginBottom: rank === 0 ? 0 : rank === 1 ? 16 : 24,
                         transition: 'transform 0.15s',
                       }}
@@ -147,11 +177,9 @@ export default function LeaderboardPage() {
                         <div style={{
                           width: 52, height: 52, borderRadius: '50%', margin: '0 auto 10px',
                           background: trader.avatar_url ? 'transparent' : '#1f2937',
-                          overflow: 'hidden',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center',
                           fontSize: 20, fontWeight: 900, color: MEDAL_COLORS[rank],
-                          border: `2px solid ${MEDAL_COLORS[rank]}40`,
-                          position: 'relative',
+                          border: `2px solid ${MEDAL_COLORS[rank]}40`, position: 'relative',
                         }}>
                           {trader.avatar_url
                             ? <Image src={trader.avatar_url} alt="" fill sizes="52px" style={{ objectFit: 'cover', pointerEvents: 'none' }} />
@@ -206,20 +234,17 @@ export default function LeaderboardPage() {
                           : <span style={{ fontSize: 13, fontWeight: 700, color: '#4b5563' }}>#{i + 1}</span>
                         }
                       </div>
-
                       <div style={{
                         width: 38, height: 38, borderRadius: '50%', flexShrink: 0, overflow: 'hidden',
                         background: trader.avatar_url ? 'transparent' : 'linear-gradient(135deg, #4ade80, #22c55e)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: 15, fontWeight: 900, color: '#0a0a0f',
-                        position: 'relative',
+                        fontSize: 15, fontWeight: 900, color: '#0a0a0f', position: 'relative',
                       }}>
                         {trader.avatar_url
                           ? <Image src={trader.avatar_url} alt="" fill sizes="38px" style={{ objectFit: 'cover', pointerEvents: 'none' }} />
                           : getInitial(trader.username)
                         }
                       </div>
-
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                           <span style={{ fontSize: 14, fontWeight: 700, color: '#f9fafb' }}>{trader.username}</span>
@@ -232,14 +257,15 @@ export default function LeaderboardPage() {
                           )}
                         </div>
                         <div style={{ display: 'flex', gap: 12, marginTop: 2, flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: 11, color: '#6b7280' }}>{trader.trade_count || 0} trades</span>
-                          {trader.rating > 0 && <span style={{ fontSize: 11, color: '#6b7280' }}>⭐ {trader.rating}</span>}
-                          {trader.review_count > 0 && <span style={{ fontSize: 11, color: '#6b7280' }}>{trader.review_count} reviews</span>}
+                          {tab !== 'referrals' && <span style={{ fontSize: 11, color: '#6b7280' }}>{trader.trade_count || 0} trades</span>}
+                          {trader.rating > 0 && tab !== 'referrals' && <span style={{ fontSize: 11, color: '#6b7280' }}>⭐ {trader.rating}</span>}
+                          {tab === 'referrals' && <span style={{ fontSize: 11, color: '#4ade80' }}>🔗 {trader.referral_count} referred</span>}
                         </div>
                       </div>
-
                       <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                        <div style={{ fontSize: 18, fontWeight: 900, color: '#f9fafb' }}>{getValue(trader)}</div>
+                        <div style={{ fontSize: 18, fontWeight: 900, color: tab === 'referrals' ? '#4ade80' : '#f9fafb' }}>
+                          {getValue(trader)}
+                        </div>
                         <div style={{ fontSize: 10, color: '#6b7280' }}>{getLabel()}</div>
                       </div>
                     </div>

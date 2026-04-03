@@ -29,6 +29,10 @@ function SettingsPage() {
   const [avatarPreview, setAvatarPreview] = useState(null)
   const [avatarFile, setAvatarFile] = useState(null)
   const [avatarUploading, setAvatarUploading] = useState(false)
+  const [referralCode, setReferralCode] = useState('')
+  const [referralCount, setReferralCount] = useState(0)
+  const [vipExpiresAt, setVipExpiresAt] = useState(null)
+  const [referralCopied, setReferralCopied] = useState(false)
 
   const [form, setForm] = useState({
     epic_username: '',
@@ -62,6 +66,9 @@ function SettingsPage() {
           profile_url: p.profile_url || '',
         })
         if (p.avatar_url) setAvatarPreview(p.avatar_url)
+        setReferralCode(p.referral_code || '')
+        setReferralCount(p.referral_count || 0)
+        setVipExpiresAt(p.vip_expires_at || null)
       }
       setLoading(false)
       } catch (err) {
@@ -306,6 +313,107 @@ function SettingsPage() {
               ⚠️ {error}
             </div>
           )}
+
+          {/* Referral Section */}
+          <Section title="🔗 Referral Program" hint="Invite friends, earn rewards">
+            <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.6 }}>
+              Share your unique link. Friends who sign up get a{' '}
+              <span style={{ color: '#a78bfa', fontWeight: 700 }}>Referred</span> badge.
+              You earn <span style={{ color: '#f59e0b', fontWeight: 700 }}>time-limited VIP</span> at 5, 10, and 25 referrals — with <strong style={{ color: '#f59e0b' }}>Lifetime VIP</strong> at 25.
+            </div>
+
+            {referralCode ? (
+              <>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'stretch', flexWrap: 'wrap' }}>
+                  <div style={{
+                    flex: 1, minWidth: 180,
+                    background: '#0d0d14', border: '1px solid #2d2d3f', borderRadius: 8,
+                    padding: '10px 14px', fontFamily: 'monospace', fontSize: 16,
+                    fontWeight: 800, color: '#4ade80', letterSpacing: '0.15em',
+                  }}>
+                    {referralCode}
+                  </div>
+                  <button
+                    onClick={() => {
+                      const url = `${window.location.origin}/auth/signup?ref=${referralCode}`
+                      navigator.clipboard.writeText(url).then(() => {
+                        setReferralCopied(true)
+                        setTimeout(() => setReferralCopied(false), 2000)
+                      })
+                    }}
+                    style={{
+                      padding: '10px 18px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                      background: referralCopied ? 'rgba(74,222,128,0.15)' : '#1f2937',
+                      color: referralCopied ? '#4ade80' : '#f9fafb',
+                      fontSize: 13, fontWeight: 700, transition: 'all 0.15s', whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {referralCopied ? '✓ Copied!' : '📋 Copy Link'}
+                  </button>
+                </div>
+
+                {/* Tier progress */}
+                {[
+                  { threshold: 5,  days: '30-day VIP',   label: '5 refs' },
+                  { threshold: 10, days: '90-day VIP',   label: '10 refs' },
+                  { threshold: 25, days: 'Lifetime VIP', label: '25 refs' },
+                ].map(tier => {
+                  const done = referralCount >= tier.threshold
+                  const pct = Math.min(100, Math.round((referralCount / tier.threshold) * 100))
+                  return (
+                    <div key={tier.threshold} style={{
+                      background: done ? 'rgba(245,158,11,0.07)' : '#0d0d14',
+                      border: `1px solid ${done ? 'rgba(245,158,11,0.3)' : '#1f2937'}`,
+                      borderRadius: 8, padding: '10px 14px',
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: done ? '#f59e0b' : '#6b7280' }}>
+                          {done ? '✓ ' : ''}{tier.days}
+                        </span>
+                        <span style={{ fontSize: 11, color: '#4b5563' }}>{tier.label}</span>
+                      </div>
+                      <div style={{ height: 4, background: '#1f2937', borderRadius: 2, overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${pct}%`, background: done ? '#f59e0b' : '#374151', borderRadius: 2, transition: 'width 0.4s' }} />
+                      </div>
+                      {done && tier.days === '30-day VIP' && vipExpiresAt && (
+                        <div style={{ fontSize: 10, color: '#6b7280', marginTop: 4 }}>
+                          Expires {new Date(vipExpiresAt).toLocaleDateString()}
+                        </div>
+                      )}
+                      {done && tier.days === '90-day VIP' && vipExpiresAt && (
+                        <div style={{ fontSize: 10, color: '#6b7280', marginTop: 4 }}>
+                          Expires {new Date(vipExpiresAt).toLocaleDateString()}
+                        </div>
+                      )}
+                      {done && tier.days === 'Lifetime VIP' && (
+                        <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 4, fontWeight: 700 }}>🎉 Lifetime — never expires</div>
+                      )}
+                    </div>
+                  )
+                })}
+
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  background: 'rgba(74,222,128,0.04)', border: '1px solid rgba(74,222,128,0.15)',
+                  borderRadius: 8, padding: '10px 14px',
+                }}>
+                  <div style={{ fontSize: 28 }}>🔗</div>
+                  <div>
+                    <div style={{ fontSize: 22, fontWeight: 900, color: '#4ade80' }}>{referralCount}</div>
+                    <div style={{ fontSize: 11, color: '#6b7280' }}>
+                      {referralCount === 1 ? 'person referred' : 'people referred'}
+                      {referralCount < 5 && ` · ${5 - referralCount} more for 30-day VIP`}
+                      {referralCount >= 5 && referralCount < 10 && ` · ${10 - referralCount} more for 90-day VIP`}
+                      {referralCount >= 10 && referralCount < 25 && ` · ${25 - referralCount} more for Lifetime VIP`}
+                      {referralCount >= 25 && ' · 🏆 Lifetime VIP earned!'}
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div style={{ fontSize: 12, color: '#4b5563' }}>Loading your referral code…</div>
+            )}
+          </Section>
 
           <button onClick={handleSave} disabled={saving || avatarUploading} className="btn-primary" style={{ fontSize: 14, padding: '13px 0' }} type="button">
             {avatarUploading ? 'Uploading Photo...' : saving ? 'Saving...' : saved ? '✓ Saved!' : 'Save Changes'}
