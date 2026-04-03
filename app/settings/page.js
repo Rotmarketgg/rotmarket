@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { clearProfileCache } from '@/components/Navbar'
 import { getSessionUser, getVerifiedUser, getProfile, updateProfile, supabase } from '@/lib/supabase'
 import { withTimeout, getInitial } from '@/lib/utils'
+import { getVipAccessTier } from '@/lib/constants'
 import { validateClean } from '@/lib/profanity'
 
 export default function SettingsPageWrapper() {
@@ -33,6 +34,9 @@ function SettingsPage() {
   const [referralCount, setReferralCount] = useState(0)
   const [vipExpiresAt, setVipExpiresAt] = useState(null)
   const [referralCopied, setReferralCopied] = useState(false)
+  const [profileBadges, setProfileBadges] = useState([])
+  const [wishlistInput, setWishlistInput] = useState('')
+  const [wishlistSaved, setWishlistSaved] = useState(false)
 
   const [form, setForm] = useState({
     epic_username: '',
@@ -54,6 +58,8 @@ function SettingsPage() {
       setUser(u)
       const p = await getProfile(u.id)
       if (p) {
+        const badges = p.badges?.length ? p.badges : p.badge ? [p.badge] : []
+        setProfileBadges(badges)
         setProfileUsername(p.username || '')
         setForm({
           epic_username: p.epic_username || '',
@@ -78,6 +84,39 @@ function SettingsPage() {
     }
     load()
   }, [])
+
+  const vipAccessTier = getVipAccessTier(profileBadges)
+  const canUseWishlistAlerts = vipAccessTier === 'VIP Plus' || vipAccessTier === 'VIP Max'
+
+  useEffect(() => {
+    if (!user?.id) return
+    try {
+      const raw = localStorage.getItem(`rotmarket-wishlist:${user.id}`)
+      const parsed = raw ? JSON.parse(raw) : []
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        setWishlistInput(parsed.join(', '))
+      } else {
+        setWishlistInput('')
+      }
+    } catch {
+      setWishlistInput('')
+    }
+  }, [user?.id])
+
+  const persistWishlist = () => {
+    if (!user?.id) return
+    const next = Array.from(new Set(
+      wishlistInput
+        .split(/[,\n]/)
+        .map(s => s.trim().toLowerCase())
+        .filter(Boolean)
+    )).slice(0, 20)
+    try {
+      localStorage.setItem(`rotmarket-wishlist:${user.id}`, JSON.stringify(next))
+      setWishlistSaved(true)
+      setTimeout(() => setWishlistSaved(false), 2000)
+    } catch {}
+  }
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
@@ -150,6 +189,7 @@ function SettingsPage() {
       setTimeout(() => setSaved(false), 3000)
       // Bust the Navbar profile cache so updated avatar/username shows immediately
       clearProfileCache()
+      if (canUseWishlistAlerts) persistWishlist()
     } catch (err) {
       setError(err.message || 'Failed to save. Username may already be taken.')
     } finally {
@@ -414,6 +454,42 @@ function SettingsPage() {
               <div style={{ fontSize: 12, color: '#4b5563' }}>Loading your referral code…</div>
             )}
           </Section>
+
+          {canUseWishlistAlerts && (
+            <Section title="🔔 Wishlist Alerts" hint="VIP Plus and VIP Max feature">
+              <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.6 }}>
+                Add keywords for items you want. On Browse/Home, matching listings will be highlighted for you.
+              </div>
+              <textarea
+                rows={3}
+                placeholder="e.g. tralalero, mythic, max level"
+                value={wishlistInput}
+                onChange={e => setWishlistInput(e.target.value)}
+                style={{ resize: 'vertical' }}
+              />
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+                <div style={{ fontSize: 11, color: '#4b5563' }}>
+                  Use commas to separate terms. Max 20 keywords.
+                </div>
+                <button
+                  type="button"
+                  onClick={persistWishlist}
+                  style={{
+                    border: '1px solid rgba(74,222,128,0.35)',
+                    background: wishlistSaved ? 'rgba(74,222,128,0.2)' : 'rgba(74,222,128,0.1)',
+                    color: wishlistSaved ? '#4ade80' : '#86efac',
+                    borderRadius: 8,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    padding: '6px 12px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {wishlistSaved ? '✓ Saved' : 'Save Wishlist Alerts'}
+                </button>
+              </div>
+            </Section>
+          )}
 
           <button onClick={handleSave} disabled={saving || avatarUploading} className="btn-primary" style={{ fontSize: 14, padding: '13px 0' }} type="button">
             {avatarUploading ? 'Uploading Photo...' : saving ? 'Saving...' : saved ? '✓ Saved!' : 'Save Changes'}

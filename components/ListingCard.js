@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { getRarityStyle, timeAgo, formatPrice, getInitial } from '@/lib/utils'
-import { BADGE_META, getPrimaryBadge } from '@/lib/constants'
+import { BADGE_META, getPrimaryBadge, getVipGlowTier, VIP_GLOW_META } from '@/lib/constants'
 
 const TYPE_CONFIG = {
   sale:  { label: 'FOR SALE',  bg: 'rgba(22,163,74,0.9)',  border: '#16a34a', color: '#fff' },
@@ -22,14 +22,14 @@ export default function ListingCard({ listing }) {
 
   const primaryBadge = getPrimaryBadge(badges)
   const primaryMeta = primaryBadge ? BADGE_META[primaryBadge] : null
-  const isVipMax  = badges.includes('VIP Max')  || badges.includes('Owner')
-  const isVipPlus = badges.includes('VIP Plus') || isVipMax
-  const isVip     = badges.includes('VIP')      || isVipPlus
+  const vipGlowTier = getVipGlowTier(badges)
+  const isVip = !!vipGlowTier
   const isVerified = badges.includes('Verified Trader')
 
-  const vipColor       = isVipMax ? '#ef4444' : isVipPlus ? '#a78bfa' : '#f59e0b'
-  const vipGlowNormal  = isVipMax ? 'rgba(239,68,68,0.25)'  : isVipPlus ? 'rgba(167,139,250,0.25)' : 'rgba(245,158,11,0.25)'
-  const vipGlowHover   = isVipMax ? 'rgba(239,68,68,0.4)'   : isVipPlus ? 'rgba(167,139,250,0.4)'  : 'rgba(245,158,11,0.35)'
+  const vipMeta = vipGlowTier ? VIP_GLOW_META[vipGlowTier] : null
+  const vipColor = vipMeta?.color
+  const vipGlowNormal = vipMeta?.glowNormal
+  const vipGlowHover = vipMeta?.glowHover
 
   const typeKey = listing.status === 'sold' ? 'sold' : listing.type
   const typeConf = TYPE_CONFIG[typeKey] || TYPE_CONFIG.sale

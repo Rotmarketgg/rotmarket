@@ -4,12 +4,13 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { getSessionUser, getVerifiedUser, getProfile, createListing, updateListing, uploadListingImage, supabase } from '@/lib/supabase'
-import { GAMES, RARITIES, PAYMENT_METHODS, LISTING_TYPES } from '@/lib/constants'
+import { GAMES, RARITIES, PAYMENT_METHODS, LISTING_TYPES, getVipAccessTier } from '@/lib/constants'
 import { validateListing, checkRateLimit, withTimeout } from '@/lib/utils'
 import { validateClean, validateContent } from '@/lib/profanity'
 
 const MAX_IMAGE_SIZE_MB = 10
 const MAX_IMAGE_SIZE_BYTES = MAX_IMAGE_SIZE_MB * 1024 * 1024
+const TEMPLATE_STORAGE_KEY = 'rotmarket-listing-templates'
 
 export default function CreateListingPage() {
   const router = useRouter()
@@ -20,6 +21,7 @@ export default function CreateListingPage() {
   const [errors, setErrors] = useState({})
   const [images, setImages] = useState([]) // [{file, preview}]
   const [success, setSuccess] = useState(false)
+  const [templates, setTemplates] = useState([])
 
   const [form, setForm] = useState({
     title: '',
@@ -60,6 +62,80 @@ export default function CreateListingPage() {
     }
     checkAuth()
   }, [])
+
+  const profileBadges = profile?.badges?.length
+    ? profile.badges
+    : profile?.badge
+    ? [profile.badge]
+    : []
+  const vipAccessTier = getVipAccessTier(profileBadges)
+  const canUseTemplates = vipAccessTier === 'VIP Plus' || vipAccessTier === 'VIP Max'
+
+  useEffect(() => {
+    if (!user?.id) return
+    try {
+      const raw = localStorage.getItem(`${TEMPLATE_STORAGE_KEY}:${user.id}`)
+      const parsed = raw ? JSON.parse(raw) : []
+      setTemplates(Array.isArray(parsed) ? parsed : [])
+    } catch {
+      setTemplates([])
+    }
+  }, [user?.id])
+
+  const persistTemplates = (next) => {
+    setTemplates(next)
+    if (!user?.id) return
+    try {
+      localStorage.setItem(`${TEMPLATE_STORAGE_KEY}:${user.id}`, JSON.stringify(next))
+    } catch {}
+  }
+
+  const handleSaveTemplate = () => {
+    if (!canUseTemplates) return
+    const fallback = form.title.trim() ? `${form.title.trim().slice(0, 32)}` : 'My Listing Template'
+    const name = window.prompt('Template name', fallback)
+    if (!name) return
+    const cleanName = name.trim().slice(0, 40)
+    if (!cleanName) return
+    const next = [
+      {
+        name: cleanName,
+        savedAt: new Date().toISOString(),
+        data: {
+          title: form.title,
+          game: form.game,
+          rarity: form.rarity,
+          type: form.type,
+          price: form.price,
+          description: form.description,
+          accepts: form.accepts,
+          quantity: form.quantity,
+        },
+      },
+      ...templates,
+    ].slice(0, 12)
+    persistTemplates(next)
+  }
+
+  const applyTemplate = (tpl) => {
+    const d = tpl?.data || {}
+    setForm(prev => ({
+      ...prev,
+      title: d.title || '',
+      game: d.game || 'fortnite',
+      rarity: d.rarity || '',
+      type: d.type || 'sale',
+      price: d.price || '',
+      description: d.description || '',
+      accepts: Array.isArray(d.accepts) ? d.accepts : [],
+      quantity: Math.max(1, parseInt(d.quantity, 10) || 1),
+    }))
+    setErrors({})
+  }
+
+  const deleteTemplate = (savedAt) => {
+    persistTemplates(templates.filter(t => t.savedAt !== savedAt))
+  }
 
   const set = (key, val) => setForm(f => ({ ...f, [key]: val }))
 
@@ -234,6 +310,80 @@ export default function CreateListingPage() {
           </h1>
           <p style={{ margin: 0, fontSize: 13, color: '#6b7280' }}>List your Brainrot for sale or trade.</p>
         </div>
+
+        {(canUseTemplates || templates.length > 0) && (
+          <div style={{ background: '#111118', border: '1px solid #1f2937', borderRadius: 12, padding: '12px 14px', marginBottom: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#a78bfa' }}>
+                {canUseTemplates ? '💎 VIP Templates' : '💎 Saved Templates'}
+              </div>
+              {canUseTemplates && (
+                <button
+                  type="button"
+                  onClick={handleSaveTemplate}
+                  style={{
+                    border: '1px solid rgba(167,139,250,0.4)',
+                    background: 'rgba(167,139,250,0.12)',
+                    color: '#c4b5fd',
+                    borderRadius: 7,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    padding: '5px 10px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Save Current as Template
+                </button>
+              )}
+            </div>
+            {templates.length === 0 ? (
+              <div style={{ fontSize: 11, color: '#6b7280' }}>
+                Save your common listing setup and reuse it instantly.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {templates.map(t => (
+                  <div key={t.savedAt} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={() => applyTemplate(t)}
+                      style={{
+                        border: '1px solid #2d2d3f',
+                        background: '#0d0d14',
+                        color: '#d1d5db',
+                        borderRadius: 7,
+                        fontSize: 11,
+                        fontWeight: 700,
+                        padding: '6px 10px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Apply: {t.name}
+                    </button>
+                    {canUseTemplates && (
+                      <button
+                        type="button"
+                        onClick={() => deleteTemplate(t.savedAt)}
+                        style={{
+                          border: '1px solid rgba(239,68,68,0.3)',
+                          background: 'rgba(239,68,68,0.08)',
+                          color: '#f87171',
+                          borderRadius: 7,
+                          fontSize: 11,
+                          fontWeight: 700,
+                          padding: '6px 8px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Delete
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Profile incomplete warning — shown passively before submit */}
         {profile && (() => {

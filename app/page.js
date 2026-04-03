@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { withTimeout } from '@/lib/utils'
 import ListingCard, { ListingCardSkeleton } from '@/components/ListingCard'
-import { getListings } from '@/lib/supabase'
+import { getListings, getSessionUser, getProfile } from '@/lib/supabase'
+import { getVipAccessTier } from '@/lib/constants'
 import Link from 'next/link'
 
 const PAGE_SIZE = 20
@@ -11,6 +12,7 @@ const PAGE_SIZE = 20
 export default function HomePage() {
   const [listings, setListings] = useState([])
   const [loading, setLoading]   = useState(true)
+  const [wishlistTerms, setWishlistTerms] = useState([])
 
   const fetchListings = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
@@ -31,6 +33,27 @@ export default function HomePage() {
 
   useEffect(() => { fetchListings() }, [fetchListings])
 
+  const loadWishlist = useCallback(async () => {
+    try {
+      const user = await getSessionUser()
+      if (!user?.id) { setWishlistTerms([]); return }
+      const p = await getProfile(user.id)
+      const badges = p?.badges?.length ? p.badges : p?.badge ? [p.badge] : []
+      const tier = getVipAccessTier(badges)
+      if (!['VIP Plus', 'VIP Max'].includes(tier)) {
+        setWishlistTerms([])
+        return
+      }
+      const raw = localStorage.getItem(`rotmarket-wishlist:${user.id}`)
+      const parsed = raw ? JSON.parse(raw) : []
+      setWishlistTerms(Array.isArray(parsed) ? parsed : [])
+    } catch {
+      setWishlistTerms([])
+    }
+  }, [])
+
+  useEffect(() => { loadWishlist() }, [loadWishlist])
+
   // Silent refresh on tab return — debounced to 30s to avoid hammering storage CDN
   useEffect(() => {
     let lastRefresh = 0
@@ -40,10 +63,30 @@ export default function HomePage() {
       lastRefresh = now
       try { await fetchListings(true) }
       catch { setTimeout(() => fetchListings(true), 2000) }
+      loadWishlist()
     }
     window.addEventListener('rotmarket:tab-visible', onVisible)
     return () => window.removeEventListener('rotmarket:tab-visible', onVisible)
-  }, [fetchListings])
+  }, [fetchListings, loadWishlist])
+
+  const wishlistMatchIds = useMemo(() => {
+    if (!wishlistTerms.length) return new Set()
+    const ids = new Set()
+    for (const l of listings) {
+      const haystack = `${l.title || ''} ${l.rarity || ''} ${l.game || ''}`.toLowerCase()
+      if (wishlistTerms.some(t => t && haystack.includes(t))) ids.add(l.id)
+    }
+    return ids
+  }, [listings, wishlistTerms])
+
+  const spotlightListings = useMemo(() => {
+    return listings
+      .filter(l => {
+        const badges = l?.profiles?.badges?.length ? l.profiles.badges : l?.profiles?.badge ? [l.profiles.badge] : []
+        return badges.includes('VIP Max')
+      })
+      .slice(0, 4)
+  }, [listings])
 
   return (
     <div className="noise" style={{ minHeight: '100vh' }}>
@@ -84,6 +127,39 @@ export default function HomePage() {
 
       {/* Latest listings */}
       <div style={{ maxWidth: 1240, margin: '0 auto', padding: '28px 16px 0' }}>
+        {spotlightListings.length > 0 && (
+          <div style={{ marginBottom: 28 }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              marginBottom: 12, flexWrap: 'wrap', gap: 8,
+            }}>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#ef4444' }}>
+                🔴 VIP Max Spotlight
+              </h2>
+              <div style={{ fontSize: 12, color: '#6b7280' }}>Featured top-tier sellers</div>
+            </div>
+            <div className="listing-grid">
+              {spotlightListings.map(listing => (
+                <ListingCard key={`spot-${listing.id}`} listing={listing} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {wishlistTerms.length > 0 && wishlistMatchIds.size > 0 && (
+          <div style={{
+            background: 'rgba(167,139,250,0.08)',
+            border: '1px solid rgba(167,139,250,0.35)',
+            borderRadius: 10,
+            padding: '10px 14px',
+            marginBottom: 14,
+            fontSize: 12,
+            color: '#c4b5fd',
+            fontWeight: 700,
+          }}>
+            🔔 Wishlist Alert: {wishlistMatchIds.size} matching listing{wishlistMatchIds.size !== 1 ? 's' : ''} in the latest feed.
+          </div>
+        )}
 
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -124,7 +200,17 @@ export default function HomePage() {
           <>
             <div className="listing-grid animate-fade-in">
               {listings.map((listing, i) => (
-                <div key={listing.id} style={{ animationDelay: `${Math.min(i * 20, 200)}ms` }} className="animate-slide-up">
+                <div key={listing.id} style={{ animationDelay: `${Math.min(i * 20, 200)}ms`, position: 'relative' }} className="animate-slide-up">
+                  {wishlistMatchIds.has(listing.id) && (
+                    <div style={{
+                      position: 'absolute', top: 8, right: 8, zIndex: 3,
+                      background: 'rgba(167,139,250,0.9)', color: '#fff',
+                      borderRadius: 999, fontSize: 10, fontWeight: 800,
+                      padding: '3px 8px', letterSpacing: '0.04em',
+                    }}>
+                      Wishlist Match
+                    </div>
+                  )}
                   <ListingCard listing={listing} />
                 </div>
               ))}

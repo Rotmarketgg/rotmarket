@@ -99,7 +99,7 @@ function SignupForm() {
             onKeyDown={handleKeyDown} maxLength={12} autoComplete="off"
             style={{ fontFamily: 'monospace', letterSpacing: '0.1em' }} />
           <div style={{ fontSize: 11, color: '#4b5563', marginTop: 3 }}>
-            🎁 Using a referral code gives you a <span style={{ color: '#4ade80' }}>Verified Trader</span> badge instantly.
+            🎁 Using a referral code gives you a <span style={{ color: '#a78bfa' }}>Referred</span> badge instantly.
           </div>
         </Field>
         {error && (

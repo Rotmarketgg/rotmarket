@@ -9,7 +9,7 @@ import ReportButton from '@/components/ReportButton'
 import ConfirmModal from '@/components/ConfirmModal'
 import { getListing, getReviews, getSessionUser, getVerifiedUser, createReview, supabase } from '@/lib/supabase'
 import { getRarityStyle, timeAgo, formatPrice, getInitial, checkRateLimit, withTimeout } from '@/lib/utils'
-import { BADGE_HIERARCHY, BADGE_META, getPrimaryBadge, PAYMENT_METHODS } from '@/lib/constants'
+import { BADGE_HIERARCHY, BADGE_META, getPrimaryBadge, PAYMENT_METHODS, getVipGlowTier, VIP_GLOW_META } from '@/lib/constants'
 import { isClean } from '@/lib/profanity'
 
 // ─── TRADE HELPERS ────────────────────────────────────────────────
@@ -433,11 +433,13 @@ export default function ListingPageClient({ id: idProp, initialListing = null })
   const seller = listing?.profiles
   const isSeller = user && seller && user.id === seller.id
 
-  // VIP / Owner glow — mirrors ListingCard behaviour
+  // VIP glow by paid tier only (Owner/Admin intentionally excluded).
   const sellerBadgesForGlow = seller?.badges?.length ? seller.badges
     : seller?.badge ? [seller.badge]
     : []
-  const isVip = sellerBadgesForGlow.includes('VIP') || sellerBadgesForGlow.includes('Owner')
+  const vipGlowTier = getVipGlowTier(sellerBadgesForGlow)
+  const isVip = !!vipGlowTier
+  const vipGlowMeta = vipGlowTier ? VIP_GLOW_META[vipGlowTier] : null
   // Allow reviewing the same seller multiple times (different listings)
   // but not the same listing twice
   const alreadyReviewedThisListing = reviews.some(
@@ -661,14 +663,14 @@ export default function ListingPageClient({ id: idProp, initialListing = null })
             border: listing?.promoted
               ? '2px solid rgba(59,130,246,0.7)'
               : isVip
-              ? '2px solid rgba(245,158,11,0.6)'
+              ? `2px solid ${vipGlowMeta.color}99`
               : `1px solid ${rarity.border}44`,
             borderRadius: 16,
             overflow: 'hidden',
             boxShadow: listing?.promoted
               ? `0 0 40px rgba(59,130,246,0.35), 0 20px 60px rgba(0,0,0,0.5)`
               : isVip
-              ? `0 0 40px rgba(245,158,11,0.3), inset 0 0 0 1px rgba(245,158,11,0.1), 0 20px 60px rgba(0,0,0,0.5)`
+              ? `0 0 40px ${vipGlowMeta.glowNormal}, inset 0 0 0 1px ${vipGlowMeta.color}22, 0 20px 60px rgba(0,0,0,0.5)`
               : `0 0 40px ${rarity.glow}66, 0 20px 60px rgba(0,0,0,0.5)`,
           }}>
 

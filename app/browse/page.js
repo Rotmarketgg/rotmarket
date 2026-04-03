@@ -3,9 +3,9 @@
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import ListingCard, { ListingCardSkeleton } from '@/components/ListingCard'
-import { getListings } from '@/lib/supabase'
+import { getListings, getSessionUser, getProfile } from '@/lib/supabase'
 import { withTimeout } from '@/lib/utils'
-import { GAMES } from '@/lib/constants'
+import { GAMES, getVipAccessTier } from '@/lib/constants'
 import Link from 'next/link'
 
 const PAGE_SIZE = 24
@@ -39,6 +39,7 @@ function BrowsePage() {
   const [listings, setListings] = useState([])
   const [total, setTotal]       = useState(0)
   const [loading, setLoading]   = useState(true)
+  const [wishlistTerms, setWishlistTerms] = useState([])
 
   // Local state mirrors URL params — updated on user interaction then pushed to URL
   const [game, setGame]         = useState(gameParam)
@@ -96,6 +97,25 @@ function BrowsePage() {
     }
   }, [gameParam, typeParam, searchParam, pageParam])
 
+  const loadWishlist = useCallback(async () => {
+    try {
+      const user = await getSessionUser()
+      if (!user?.id) { setWishlistTerms([]); return }
+      const p = await getProfile(user.id)
+      const badges = p?.badges?.length ? p.badges : p?.badge ? [p.badge] : []
+      const tier = getVipAccessTier(badges)
+      if (!['VIP Plus', 'VIP Max'].includes(tier)) {
+        setWishlistTerms([])
+        return
+      }
+      const raw = localStorage.getItem(`rotmarket-wishlist:${user.id}`)
+      const parsed = raw ? JSON.parse(raw) : []
+      setWishlistTerms(Array.isArray(parsed) ? parsed : [])
+    } catch {
+      setWishlistTerms([])
+    }
+  }, [])
+
   useEffect(() => {
     // Sync local state with URL when navigating back/forward
     setGame(gameParam)
@@ -103,9 +123,10 @@ function BrowsePage() {
     setSearch(searchParam)
     setDebSearch(searchParam)
     fetchListings()
+    loadWishlist()
     // Scroll to top of listing grid on page change
     window.scrollTo({ top: 0, behavior: 'smooth' })
-  }, [fetchListings])
+  }, [fetchListings, loadWishlist])
 
   // Silent refresh on tab return — debounced to 30s to avoid hammering storage CDN
   useEffect(() => {
@@ -116,10 +137,21 @@ function BrowsePage() {
       lastRefresh = now
       try { await fetchListings(true) }
       catch { setTimeout(() => fetchListings(true), 2000) }
+      loadWishlist()
     }
     window.addEventListener('rotmarket:tab-visible', onVisible)
     return () => window.removeEventListener('rotmarket:tab-visible', onVisible)
-  }, [fetchListings])
+  }, [fetchListings, loadWishlist])
+
+  const wishlistMatchIds = (() => {
+    if (!wishlistTerms.length) return new Set()
+    const ids = new Set()
+    for (const l of listings) {
+      const haystack = `${l.title || ''} ${l.rarity || ''} ${l.game || ''}`.toLowerCase()
+      if (wishlistTerms.some(t => t && haystack.includes(t))) ids.add(l.id)
+    }
+    return ids
+  })()
 
   // When a filter changes, reset to page 1
   const handleGameChange = (g) => {
@@ -235,6 +267,21 @@ function BrowsePage() {
         </div>
 
         {/* Grid */}
+        {wishlistTerms.length > 0 && wishlistMatchIds.size > 0 && !loading && (
+          <div style={{
+            background: 'rgba(167,139,250,0.08)',
+            border: '1px solid rgba(167,139,250,0.35)',
+            borderRadius: 10,
+            padding: '10px 14px',
+            marginBottom: 14,
+            fontSize: 12,
+            color: '#c4b5fd',
+            fontWeight: 700,
+          }}>
+            🔔 Wishlist Alert: {wishlistMatchIds.size} listing{wishlistMatchIds.size !== 1 ? 's' : ''} match your keywords.
+          </div>
+        )}
+
         {loading ? (
           <div className="listing-grid">
             {Array.from({ length: PAGE_SIZE }).map((_, i) => <ListingCardSkeleton key={i} />)}
@@ -244,7 +291,17 @@ function BrowsePage() {
         ) : (
           <div className="listing-grid animate-fade-in">
             {listings.map((listing, i) => (
-              <div key={listing.id} style={{ animationDelay: `${Math.min(i * 20, 200)}ms` }} className="animate-slide-up">
+              <div key={listing.id} style={{ animationDelay: `${Math.min(i * 20, 200)}ms`, position: 'relative' }} className="animate-slide-up">
+                {wishlistMatchIds.has(listing.id) && (
+                  <div style={{
+                    position: 'absolute', top: 8, right: 8, zIndex: 3,
+                    background: 'rgba(167,139,250,0.9)', color: '#fff',
+                    borderRadius: 999, fontSize: 10, fontWeight: 800,
+                    padding: '3px 8px', letterSpacing: '0.04em',
+                  }}>
+                    Wishlist Match
+                  </div>
+                )}
                 <ListingCard listing={listing} />
               </div>
             ))}

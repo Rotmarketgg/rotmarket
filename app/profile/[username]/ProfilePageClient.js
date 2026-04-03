@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -11,7 +11,7 @@ import ConfirmModal from '@/components/ConfirmModal'
 import { getProfileByUsername, getSessionUser, getUserListings, getReviews, deleteListing, supabase } from '@/lib/supabase'
 
 import { timeAgo, getInitial, withTimeout } from '@/lib/utils'
-import { BADGE_HIERARCHY, BADGE_META, getPrimaryBadge } from '@/lib/constants'
+import { BADGE_HIERARCHY, BADGE_META, getPrimaryBadge, getVipAccessTier } from '@/lib/constants'
 
 // Extend shared BADGE_META with profile-specific desc field
 const BADGE_CONFIG = {
@@ -36,7 +36,9 @@ export default function ProfilePageClient({ username: usernameProp, initialProfi
   const [listingOffers, setListingOffers] = useState({}) // listingId -> pending offer count
   const [buyerOffers, setBuyerOffers] = useState([]) // offers this user sent as a buyer
   const [renewError, setRenewError] = useState('')
+  const [autoRelistInfo, setAutoRelistInfo] = useState('')
   const [modal, setModal] = useState(null)
+  const autoRelistKeyRef = useRef('')
 
   const load = useCallback(async (silent = false, skipProfileFetch = false) => {
     if (!silent) setLoading(true)
@@ -152,10 +154,19 @@ export default function ProfilePageClient({ username: usernameProp, initialProfi
     : profile?.badge ? [profile.badge]
     : []
   const primaryBadgeName = getPrimaryBadge(profileBadges)
+  const vipAccessTier = getVipAccessTier(profileBadges)
   const badge = primaryBadgeName ? BADGE_CONFIG[primaryBadgeName] : null
   const activeListings = listings.filter(l => l.status === 'active')
   const expiredListings = listings.filter(l => l.status === 'expired')
   const soldListings = listings.filter(l => l.status === 'sold')
+  const totalViews = listings.reduce((sum, l) => sum + (l.views || 0), 0)
+  const activeViews = activeListings.reduce((sum, l) => sum + (l.views || 0), 0)
+  const avgViewsPerListing = listings.length ? Math.round(totalViews / listings.length) : 0
+  const sellThroughRate = listings.length ? Math.round((soldListings.length / listings.length) * 100) : 0
+  const topListing = listings.reduce((best, l) => {
+    if (!best) return l
+    return (l.views || 0) > (best.views || 0) ? l : best
+  }, null)
   const starDist = [5, 4, 3, 2, 1].map(s => ({
     star: s,
     count: reviews.filter(r => r.rating === s).length,
@@ -167,6 +178,37 @@ export default function ProfilePageClient({ username: usernameProp, initialProfi
     const days = Math.ceil((new Date(listing.expires_at) - new Date()) / 86400000)
     return days
   }
+
+  useEffect(() => {
+    if (!isOwn) return
+    if (!['VIP Plus', 'VIP Max'].includes(vipAccessTier)) return
+    if (expiredListings.length === 0) return
+    const key = `${vipAccessTier}:${expiredListings.map(l => l.id).sort().join(',')}`
+    if (!key || autoRelistKeyRef.current === key) return
+    autoRelistKeyRef.current = key
+
+    let cancelled = false
+    const run = async () => {
+      const results = await Promise.allSettled(
+        expiredListings.map(l => supabase.rpc('renew_listing', { listing_id: l.id }))
+      )
+      if (cancelled) return
+      const renewedIds = expiredListings
+        .filter((_, idx) => results[idx].status === 'fulfilled' && !results[idx].value?.error)
+        .map(l => l.id)
+      if (renewedIds.length === 0) return
+
+      const days = vipAccessTier === 'VIP Max' ? null : 60
+      setListings(prev => prev.map(l => renewedIds.includes(l.id)
+        ? { ...l, status: 'active', expires_at: days === null ? null : new Date(Date.now() + days * 86400000).toISOString() }
+        : l
+      ))
+      setAutoRelistInfo(`Auto-relisted ${renewedIds.length} expired listing${renewedIds.length !== 1 ? 's' : ''}.`)
+      setTimeout(() => setAutoRelistInfo(''), 3500)
+    }
+    run()
+    return () => { cancelled = true }
+  }, [isOwn, vipAccessTier, expiredListings])
 
   const handleDelete = async (id) => {
     setModal({
@@ -446,6 +488,39 @@ export default function ProfilePageClient({ username: usernameProp, initialProfi
               </div>
             </div>
 
+            {isOwn && vipAccessTier === 'VIP Max' && (
+              <div style={{ background: '#111118', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 14, overflow: 'hidden' }}>
+                <div style={{ padding: '12px 16px', borderBottom: '1px solid #1f2937' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                    🔴 Full Analytics
+                  </div>
+                </div>
+                <div style={{ padding: '10px 12px', display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
+                  <div style={{ background: '#0d0d14', border: '1px solid #1f2937', borderRadius: 8, padding: 8 }}>
+                    <div style={{ fontSize: 10, color: '#6b7280' }}>Total Views</div>
+                    <div style={{ fontSize: 16, fontWeight: 900, color: '#fca5a5' }}>{totalViews}</div>
+                  </div>
+                  <div style={{ background: '#0d0d14', border: '1px solid #1f2937', borderRadius: 8, padding: 8 }}>
+                    <div style={{ fontSize: 10, color: '#6b7280' }}>Active Views</div>
+                    <div style={{ fontSize: 16, fontWeight: 900, color: '#fca5a5' }}>{activeViews}</div>
+                  </div>
+                  <div style={{ background: '#0d0d14', border: '1px solid #1f2937', borderRadius: 8, padding: 8 }}>
+                    <div style={{ fontSize: 10, color: '#6b7280' }}>Avg Views / Listing</div>
+                    <div style={{ fontSize: 16, fontWeight: 900, color: '#fca5a5' }}>{avgViewsPerListing}</div>
+                  </div>
+                  <div style={{ background: '#0d0d14', border: '1px solid #1f2937', borderRadius: 8, padding: 8 }}>
+                    <div style={{ fontSize: 10, color: '#6b7280' }}>Sell-through</div>
+                    <div style={{ fontSize: 16, fontWeight: 900, color: '#fca5a5' }}>{sellThroughRate}%</div>
+                  </div>
+                </div>
+                {topListing && (
+                  <div style={{ padding: '0 12px 12px', fontSize: 11, color: '#9ca3af' }}>
+                    Top listing by views: <strong style={{ color: '#f9fafb' }}>{topListing.title}</strong> ({topListing.views || 0} views)
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Review distribution — only show if they have reviews */}
             {reviews.length > 0 && (
               <div style={{ background: '#111118', border: '1px solid #1f2937', borderRadius: 14, overflow: 'hidden' }}>
@@ -588,6 +663,11 @@ export default function ProfilePageClient({ username: usernameProp, initialProfi
               expiredListings.length === 0
                 ? <EmptyState icon="⏰" title="No expired listings" message="Listings expire after 30 days." />
                 : <div>
+                    {['VIP Plus', 'VIP Max'].includes(vipAccessTier) && autoRelistInfo && (
+                      <div style={{ background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.25)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#4ade80', marginBottom: 10, fontWeight: 700 }}>
+                        ✓ {autoRelistInfo}
+                      </div>
+                    )}
                     <div style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 10, padding: '10px 16px', marginBottom: 16, fontSize: 13, color: '#fbbf24' }}>
                       ⏰ These listings have expired. Renew them to make them active again for another{' '}
                       {['VIP Max', 'Owner'].includes(primaryBadgeName) ? 'permanent (no expiry)'
