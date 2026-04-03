@@ -12,16 +12,20 @@ import ConfirmModal from '@/components/ConfirmModal'
 
 const BADGE_COLORS = {
   'Verified Trader': '#4ade80',
-  'VIP': '#f59e0b',
-  'Moderator': '#60a5fa',
-  'Owner': '#ef4444',
+  'VIP':             '#f59e0b',
+  'VIP Plus':        '#a78bfa',
+  'VIP Max':         '#ef4444',
+  'Moderator':       '#60a5fa',
+  'Owner':           '#ef4444',
 }
 
 const BADGE_ICONS = {
   'Verified Trader': '✓',
-  'VIP': '⭐',
-  'Moderator': '🛡️',
-  'Owner': '👑',
+  'VIP':             '⭐',
+  'VIP Plus':        '💎',
+  'VIP Max':         '🔴',
+  'Moderator':       '🛡️',
+  'Owner':           '👑',
 }
 
 const REASON_LABELS = {
@@ -907,8 +911,8 @@ export default function AdminPage() {
           <div style={{ marginBottom: 14 }}>
             <label style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Role</label>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {['VIP', 'Moderator', 'Verified Trader'].map(r => (
-                <button key={r} onClick={() => setPromoteForm(p => ({ ...p, role: r, duration: r === 'Moderator' || r === 'Verified Trader' ? null : 30 }))} style={{
+              {['VIP', 'VIP Plus', 'VIP Max', 'Moderator', 'Verified Trader'].map(r => (
+                <button key={r} onClick={() => setPromoteForm(p => ({ ...p, role: r, duration: (r === 'Moderator' || r === 'Verified Trader') ? null : 30 }))} style={{
                   padding: '7px 14px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700,
                   background: promoteForm.role === r ? `${BADGE_COLORS[r]}22` : '#1f2937',
                   color: promoteForm.role === r ? BADGE_COLORS[r] : '#6b7280',
@@ -920,7 +924,7 @@ export default function AdminPage() {
             </div>
           </div>
 
-          {(promoteForm.role === 'VIP') && (
+          {(['VIP', 'VIP Plus', 'VIP Max'].includes(promoteForm.role)) && (
             <div style={{ marginBottom: 14 }}>
               <label style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Duration</label>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -1234,7 +1238,7 @@ export default function AdminPage() {
           <div>
             <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {['all', 'active', 'VIP', 'Moderator', 'Verified Trader', 'expired'].map(f => (
+                {['all', 'active', 'VIP', 'VIP Plus', 'VIP Max', 'Moderator', 'Verified Trader', 'expired'].map(f => (
                   <button key={f} onClick={() => setPromoFilter(f)} style={S.pill(BADGE_COLORS[f] || '#4ade80', promoFilter === f)}>
                     {f}
                   </button>
