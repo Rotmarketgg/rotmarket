@@ -66,6 +66,7 @@ const VIP_DURATIONS = [
   { label: '1 Year', days: 365 },
   { label: 'Lifetime', days: null },
 ]
+const ADMIN_PAGE_SIZE = 25
 
 // ─── STYLES ───────────────────────────────────────────────────────────────────
 
@@ -210,24 +211,37 @@ export default function AdminPage() {
   const [reports, setReports] = useState([])
   const [reportsLoading, setReportsLoading] = useState(false)
   const [reportFilter, setReportFilter] = useState('pending')
+  const [reportPage, setReportPage] = useState(1)
+  const [reportTotal, setReportTotal] = useState(0)
   const [users, setUsers] = useState([])
   const [usersLoading, setUsersLoading] = useState(false)
   const [userSearch, setUserSearch] = useState('')
+  const [usersPage, setUsersPage] = useState(1)
+  const [usersTotal, setUsersTotal] = useState(0)
   const [showEmails, setShowEmails] = useState(false)
   const [userEmails, setUserEmails] = useState({}) // { userId: email }
   const [emailsLoading, setEmailsLoading] = useState(false)
   const [reviews, setReviews] = useState([])
   const [reviewsLoading, setReviewsLoading] = useState(false)
   const [reviewSearch, setReviewSearch] = useState('')
+  const [reviewsPage, setReviewsPage] = useState(1)
+  const [reviewsTotal, setReviewsTotal] = useState(0)
   const [listings, setListings] = useState([])
   const [listingsLoading, setListingsLoading] = useState(false)
+  const [listingsPage, setListingsPage] = useState(1)
+  const [listingsTotal, setListingsTotal] = useState(0)
   const [promotions, setPromotions] = useState([])
   const [promotionsLoading, setPromotionsLoading] = useState(false)
   const [promoFilter, setPromoFilter] = useState('all')
+  const [promotionsPage, setPromotionsPage] = useState(1)
   const [trades, setTrades] = useState([])
   const [tradesLoading, setTradesLoading] = useState(false)
   const [tradeSearch, setTradeSearch] = useState('')
   const [tradeStatusFilter, setTradeStatusFilter] = useState('all')
+  const [tradesPage, setTradesPage] = useState(1)
+  const [tradesTotal, setTradesTotal] = useState(0)
+  const [disputesPage, setDisputesPage] = useState(1)
+  const [disputesTotal, setDisputesTotal] = useState(0)
 
   const [viewUser, setViewUser] = useState(null)
   const [inspectData, setInspectData] = useState(null)
@@ -292,12 +306,12 @@ export default function AdminPage() {
   }, [router])
 
   useEffect(() => {
-    if (tab === 'users') loadUsers('')
-    if (tab === 'reviews') loadReviews('')
-    if (tab === 'listings') loadListings()
-    if (tab === 'disputes') loadDisputes()
+    if (tab === 'users') loadUsers(userSearch, usersPage)
+    if (tab === 'reviews') loadReviews(reviewSearch, reviewsPage)
+    if (tab === 'listings') loadListings(listingsPage)
+    if (tab === 'disputes') loadDisputes(disputesPage)
     if (tab === 'promotions') loadPromotions()
-    if (tab === 'trades') loadTrades()
+    if (tab === 'trades') loadTrades(tradeSearch, tradesPage, tradeStatusFilter)
   }, [tab])
 
   // ─── LOADERS ─────────────────────────────────────────────────────
@@ -323,17 +337,21 @@ export default function AdminPage() {
     })
   }
 
-  async function loadReports(status) {
+  async function loadReports(status = reportFilter, page = reportPage) {
     setReportsLoading(true)
     try {
+      const from = (Math.max(1, page) - 1) * ADMIN_PAGE_SIZE
+      const to = from + ADMIN_PAGE_SIZE - 1
       let q = supabase
         .from('reports')
-        .select('*')
+        .select('*', { count: 'exact' })
         .order('created_at', { ascending: false })
-        .limit(100)
+        .range(from, to)
       if (status !== 'all') q = q.eq('status', status)
-      const { data: rawReports, error } = await q
+      const { data: rawReports, error, count } = await q
       if (error) throw error
+      setReportTotal(count || 0)
+      setReportPage(page)
       if (!rawReports?.length) { setReports([]); return }
 
       // Collect unique user IDs and listing IDs, then batch fetch
@@ -370,18 +388,22 @@ export default function AdminPage() {
     }
   }
 
-  async function loadUsers(search) {
+  async function loadUsers(search = userSearch, page = usersPage) {
     setUsersLoading(true)
     try {
+      const from = (Math.max(1, page) - 1) * ADMIN_PAGE_SIZE
+      const to = from + ADMIN_PAGE_SIZE - 1
       let q = supabase
         .from('profiles')
-        .select('id, username, badge, badges, banned, ban_reason, trade_count, rating, review_count, created_at, avatar_url, epic_username, roblox_username')
+        .select('id, username, badge, badges, banned, ban_reason, trade_count, rating, review_count, created_at, avatar_url, epic_username, roblox_username', { count: 'exact' })
         .not('username', 'is', null)
         .order('created_at', { ascending: false })
-        .limit(100)
+        .range(from, to)
       if (search) q = q.ilike('username', `%${search}%`)
-      const { data, error } = await q
+      const { data, error, count } = await q
       if (error) throw error
+      setUsersTotal(count || 0)
+      setUsersPage(page)
       setUsers(data || [])
       // Clear cached emails when user list refreshes
       if (!showEmails) setUserEmails({})
@@ -413,22 +435,36 @@ export default function AdminPage() {
     }
   }
 
-  async function loadReviews(search) {
+  async function loadReviews(search = reviewSearch, page = reviewsPage) {
     setReviewsLoading(true)
     try {
+      const from = (Math.max(1, page) - 1) * ADMIN_PAGE_SIZE
+      const to = from + ADMIN_PAGE_SIZE - 1
       let q = supabase
         .from('reviews')
-        .select(`*, reviewer:profiles!reviews_reviewer_id_fkey(id,username), seller:profiles!reviews_seller_id_fkey(id,username), listings(id,title)`)
+        .select(`*, reviewer:profiles!reviews_reviewer_id_fkey(id,username), seller:profiles!reviews_seller_id_fkey(id,username), listings(id,title)`, { count: 'exact' })
         .order('created_at', { ascending: false })
-        .limit(100)
-      const { data, error } = await q
+      if (search) {
+        const { data: matchedProfiles } = await supabase
+          .from('profiles')
+          .select('id')
+          .ilike('username', `%${search}%`)
+          .limit(200)
+        const ids = (matchedProfiles || []).map(p => p.id)
+        if (ids.length === 0) {
+          setReviews([])
+          setReviewsTotal(0)
+          setReviewsPage(1)
+          return
+        }
+        q = q.or(`reviewer_id.in.(${ids.join(',')}),seller_id.in.(${ids.join(',')})`)
+      }
+      q = q.range(from, to)
+      const { data, error, count } = await q
       if (error) throw error
-      let filtered = data || []
-      if (search) filtered = filtered.filter(r =>
-        r.reviewer?.username?.toLowerCase().includes(search.toLowerCase()) ||
-        r.seller?.username?.toLowerCase().includes(search.toLowerCase())
-      )
-      setReviews(filtered)
+      setReviewsTotal(count || 0)
+      setReviewsPage(page)
+      setReviews(data || [])
     } catch (err) {
       showToast('Error loading reviews: ' + err.message, 'error')
     } finally {
@@ -436,16 +472,20 @@ export default function AdminPage() {
     }
   }
 
-  async function loadListings() {
+  async function loadListings(page = listingsPage) {
     setListingsLoading(true)
     try {
-      const { data, error } = await supabase
+      const from = (Math.max(1, page) - 1) * ADMIN_PAGE_SIZE
+      const to = from + ADMIN_PAGE_SIZE - 1
+      const { data, error, count } = await supabase
         .from('listings')
-        .select(`id, title, game, rarity, type, price, status, created_at, views, user_id, profiles(id, username)`)
+        .select(`id, title, game, rarity, type, price, status, created_at, views, user_id, profiles(id, username)`, { count: 'exact' })
         .neq('status', 'deleted')
         .order('created_at', { ascending: false })
-        .limit(100)
+        .range(from, to)
       if (error) throw error
+      setListingsTotal(count || 0)
+      setListingsPage(page)
       setListings(data || [])
     } catch (err) {
       showToast('Error loading listings: ' + err.message, 'error')
@@ -454,15 +494,19 @@ export default function AdminPage() {
     }
   }
 
-  async function loadDisputes() {
+  async function loadDisputes(page = disputesPage) {
     setDisputesLoading(true)
     try {
-      const { data, error } = await supabase
+      const from = (Math.max(1, page) - 1) * ADMIN_PAGE_SIZE
+      const to = from + ADMIN_PAGE_SIZE - 1
+      const { data, error, count } = await supabase
         .from('disputes')
-        .select(`*, opener:profiles!disputes_opened_by_fkey(id, username, avatar_url), against:profiles!disputes_against_user_id_fkey(id, username, avatar_url), listings(id, title)`)
+        .select(`*, opener:profiles!disputes_opened_by_fkey(id, username, avatar_url), against:profiles!disputes_against_user_id_fkey(id, username, avatar_url), listings(id, title)`, { count: 'exact' })
         .order('created_at', { ascending: false })
-        .limit(100)
+        .range(from, to)
       if (error) throw error
+      setDisputesTotal(count || 0)
+      setDisputesPage(page)
       setDisputes(data || [])
     } catch (err) {
       showToast('Error loading disputes: ' + err.message, 'error')
@@ -478,6 +522,7 @@ export default function AdminPage() {
       const { data, error } = await supabase.rpc('admin_list_promotions')
       if (error) throw error
       setPromotions(data || [])
+      setPromotionsPage(1)
     } catch (err) {
       showToast('Error loading promotions: ' + err.message, 'error')
     } finally {
@@ -485,9 +530,11 @@ export default function AdminPage() {
     }
   }
 
-  async function loadTrades(search = '') {
+  async function loadTrades(search = tradeSearch, page = tradesPage, status = tradeStatusFilter) {
     setTradesLoading(true)
     try {
+      const from = (Math.max(1, page) - 1) * ADMIN_PAGE_SIZE
+      const to = from + ADMIN_PAGE_SIZE - 1
       let q = supabase
         .from('trade_requests')
         .select(`
@@ -495,14 +542,37 @@ export default function AdminPage() {
           buyer:profiles!trade_requests_buyer_id_fkey(id, username, avatar_url, badge, badges, banned),
           seller:profiles!trade_requests_seller_id_fkey(id, username, avatar_url, badge, badges, banned),
           listing:listings(id, title, type, price, game, rarity)
-        `)
+        `, { count: 'exact' })
         .order('created_at', { ascending: false })
-        .limit(200)
+      if (status !== 'all') q = q.eq('status', status)
       if (search) {
-        // Can't ilike on a joined column directly — filter client-side after fetch
+        const [profilesRes, listingsRes] = await Promise.all([
+          supabase.from('profiles').select('id').ilike('username', `%${search}%`).limit(200),
+          supabase.from('listings').select('id').ilike('title', `%${search}%`).limit(200),
+        ])
+        const profileIds = (profilesRes.data || []).map(r => r.id)
+        const listingIds = (listingsRes.data || []).map(r => r.id)
+        const orClauses = []
+        if (profileIds.length > 0) {
+          orClauses.push(`buyer_id.in.(${profileIds.join(',')})`)
+          orClauses.push(`seller_id.in.(${profileIds.join(',')})`)
+        }
+        if (listingIds.length > 0) {
+          orClauses.push(`listing_id.in.(${listingIds.join(',')})`)
+        }
+        if (orClauses.length === 0) {
+          setTrades([])
+          setTradesTotal(0)
+          setTradesPage(1)
+          return
+        }
+        q = q.or(orClauses.join(','))
       }
-      const { data, error } = await q
+      q = q.range(from, to)
+      const { data, error, count } = await q
       if (error) throw error
+      setTradesTotal(count || 0)
+      setTradesPage(page)
       setTrades(data || [])
     } catch (err) {
       showToast('Error loading trades: ' + err.message, 'error')
@@ -511,7 +581,7 @@ export default function AdminPage() {
     }
   }
 
-  // ─── ACTIONS ─────────────────────────────────────────────────────
+  // --- ACTIONS -------------------------------------------------
 
   async function openInspect(user) {
     setViewUser(user)
@@ -838,6 +908,12 @@ export default function AdminPage() {
     if (promoFilter === 'expired') return !p.active || (p.expires_at && new Date(p.expires_at) < new Date())
     return p.role === promoFilter
   })
+  const promotionTotalPages = Math.max(1, Math.ceil(filteredPromotions.length / ADMIN_PAGE_SIZE))
+  const safePromotionsPage = Math.min(promotionsPage, promotionTotalPages)
+  const paginatedPromotions = filteredPromotions.slice(
+    (safePromotionsPage - 1) * ADMIN_PAGE_SIZE,
+    safePromotionsPage * ADMIN_PAGE_SIZE
+  )
 
   return (
     <div style={S.page}>
@@ -1169,7 +1245,7 @@ export default function AdminPage() {
           <div>
             <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
               {['pending', 'reviewed', 'resolved', 'dismissed', 'all'].map(s => (
-                <button key={s} onClick={() => { setReportFilter(s); loadReports(s) }}
+                <button key={s} onClick={() => { setReportFilter(s); loadReports(s, 1) }}
                   style={S.pill('#4ade80', reportFilter === s)}>{s}</button>
               ))}
             </div>
@@ -1181,6 +1257,12 @@ export default function AdminPage() {
                   {reports.map(r => <ReportCard key={r.id} report={r} onUpdate={updateReport} />)}
                 </div>
             }
+            <PaginationControls
+              page={reportPage}
+              pageSize={ADMIN_PAGE_SIZE}
+              total={reportTotal}
+              onChange={(next) => loadReports(reportFilter, next)}
+            />
           </div>
         )}
 
@@ -1190,9 +1272,9 @@ export default function AdminPage() {
             <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
               <input type="text" placeholder="Search username..." value={userSearch}
                 onChange={e => setUserSearch(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && loadUsers(userSearch)}
+                onKeyDown={e => e.key === 'Enter' && loadUsers(userSearch, 1)}
                 style={{ ...S.input, maxWidth: 280 }} />
-              <button onClick={() => loadUsers(userSearch)} style={{
+              <button onClick={() => loadUsers(userSearch, 1)} style={{
                 padding: '10px 16px', borderRadius: 8, border: 'none', background: 'rgba(74,222,128,0.15)',
                 color: '#4ade80', fontSize: 12, fontWeight: 700, cursor: 'pointer',
               }}>Search</button>
@@ -1210,7 +1292,7 @@ export default function AdminPage() {
                 {emailsLoading ? '...' : showEmails ? '🔒 Hide Emails' : '📧 Show Emails'}
               </button>
 
-              <span style={{ fontSize: 11, color: '#4b5563', marginLeft: 'auto' }}>{users.length} users</span>
+              <span style={{ fontSize: 11, color: '#4b5563', marginLeft: 'auto' }}>{usersTotal} users</span>
             </div>
 
             {usersLoading
@@ -1230,6 +1312,12 @@ export default function AdminPage() {
                   ))}
                 </div>
             }
+            <PaginationControls
+              page={usersPage}
+              pageSize={ADMIN_PAGE_SIZE}
+              total={usersTotal}
+              onChange={(next) => loadUsers(userSearch, next)}
+            />
           </div>
         )}
 
@@ -1239,7 +1327,7 @@ export default function AdminPage() {
             <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 {['all', 'active', 'VIP', 'VIP Plus', 'VIP Max', 'Moderator', 'Verified Trader', 'expired'].map(f => (
-                  <button key={f} onClick={() => setPromoFilter(f)} style={S.pill(BADGE_COLORS[f] || '#4ade80', promoFilter === f)}>
+                  <button key={f} onClick={() => { setPromoFilter(f); setPromotionsPage(1) }} style={S.pill(BADGE_COLORS[f] || '#4ade80', promoFilter === f)}>
                     {f}
                   </button>
                 ))}
@@ -1252,11 +1340,17 @@ export default function AdminPage() {
               : filteredPromotions.length === 0
               ? <EmptyState icon="🎖️" message="No promotions found" />
               : <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {filteredPromotions.map(p => (
+                  {paginatedPromotions.map(p => (
                     <PromotionRow key={p.id} promo={p} onRevoke={revokePromotion} />
                   ))}
                 </div>
             }
+            <PaginationControls
+              page={safePromotionsPage}
+              pageSize={ADMIN_PAGE_SIZE}
+              total={filteredPromotions.length}
+              onChange={setPromotionsPage}
+            />
           </div>
         )}
 
@@ -1265,7 +1359,7 @@ export default function AdminPage() {
           <div>
             <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
               <input type="text" placeholder="Search by username..." value={reviewSearch}
-                onChange={e => { setReviewSearch(e.target.value); loadReviews(e.target.value) }}
+                onChange={e => { setReviewSearch(e.target.value); loadReviews(e.target.value, 1) }}
                 style={{ ...S.input, maxWidth: 320 }} />
             </div>
             {reviewsLoading
@@ -1291,6 +1385,12 @@ export default function AdminPage() {
                   ))}
                 </div>
             }
+            <PaginationControls
+              page={reviewsPage}
+              pageSize={ADMIN_PAGE_SIZE}
+              total={reviewsTotal}
+              onChange={(next) => loadReviews(reviewSearch, next)}
+            />
           </div>
         )}
 
@@ -1324,6 +1424,12 @@ export default function AdminPage() {
                   ))}
                 </div>
             }
+            <PaginationControls
+              page={listingsPage}
+              pageSize={ADMIN_PAGE_SIZE}
+              total={listingsTotal}
+              onChange={(next) => loadListings(next)}
+            />
           </div>
         )}
 
@@ -1338,6 +1444,12 @@ export default function AdminPage() {
                   {disputes.map(d => <DisputeCard key={d.id} dispute={d} onUpdate={updateDispute} />)}
                 </div>
             }
+            <PaginationControls
+              page={disputesPage}
+              pageSize={ADMIN_PAGE_SIZE}
+              total={disputesTotal}
+              onChange={(next) => loadDisputes(next)}
+            />
           </div>
         )}
 
@@ -1360,23 +1472,13 @@ export default function AdminPage() {
                 <option value="declined">Declined</option>
                 <option value="cancelled">Cancelled</option>
               </select>
-              <button onClick={() => loadTrades()} style={{ padding: '8px 14px', background: '#1a1a2e', border: '1px solid #2d2d3f', borderRadius: 8, color: '#9ca3af', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-                ↻ Refresh
+              <button onClick={() => loadTrades(tradeSearch, 1, tradeStatusFilter)} style={{ padding: '8px 14px', background: '#1a1a2e', border: '1px solid #2d2d3f', borderRadius: 8, color: '#9ca3af', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                Apply
               </button>
             </div>
 
             {tradesLoading ? <Loader /> : (() => {
-              const filtered = trades.filter(t => {
-                const matchStatus = tradeStatusFilter === 'all' || t.status === tradeStatusFilter
-                const q = tradeSearch.toLowerCase().trim()
-                const matchSearch = !q ||
-                  t.buyer?.username?.toLowerCase().includes(q) ||
-                  t.seller?.username?.toLowerCase().includes(q) ||
-                  t.listing?.title?.toLowerCase().includes(q)
-                return matchStatus && matchSearch
-              })
-
-              if (filtered.length === 0) return <EmptyState icon="🔄" message="No trades match your filters" />
+              if (trades.length === 0) return <EmptyState icon="🔄" message="No trades match your filters" />
 
               const statusColor = { pending: '#f59e0b', accepted: '#60a5fa', completed: '#4ade80', declined: '#ef4444', cancelled: '#6b7280' }
               const statusIcon  = { pending: '⏳', accepted: '✓', completed: '🎉', declined: '✕', cancelled: '—' }
@@ -1384,10 +1486,10 @@ export default function AdminPage() {
               return (
                 <div>
                   <div style={{ fontSize: 11, color: '#4b5563', marginBottom: 10 }}>
-                    Showing {filtered.length} of {trades.length} trades
+                    Showing {trades.length} of {tradesTotal} trades
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {filtered.map(t => {
+                    {trades.map(t => {
                       const buyerBanned  = t.buyer?.banned
                       const sellerBanned = t.seller?.banned
                       const isFlagged    = buyerBanned || sellerBanned
@@ -1495,6 +1597,12 @@ export default function AdminPage() {
                 </div>
               )
             })()}
+            <PaginationControls
+              page={tradesPage}
+              pageSize={ADMIN_PAGE_SIZE}
+              total={tradesTotal}
+              onChange={(next) => loadTrades(tradeSearch, next, tradeStatusFilter)}
+            />
           </div>
         )}
 
@@ -2013,6 +2121,49 @@ function ChatAndActivity({ chatLogs, userActivity, username }) {
 
 // ─── SHARED COMPONENTS ────────────────────────────────────────────────────────
 
+function PaginationControls({ page, pageSize, total, onChange }) {
+  const totalPages = Math.max(1, Math.ceil((total || 0) / pageSize))
+  const canPrev = page > 1
+  const canNext = page < totalPages
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
+      <div style={{ fontSize: 11, color: '#6b7280' }}>
+        Page {Math.min(page, totalPages)} of {totalPages} {total ? `· ${total} total` : ''}
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button
+          type="button"
+          onClick={() => canPrev && onChange(page - 1)}
+          disabled={!canPrev}
+          style={{
+            padding: '6px 10px', borderRadius: 8,
+            border: '1px solid #2d2d3f',
+            background: canPrev ? '#1a1a2e' : '#111118',
+            color: canPrev ? '#d1d5db' : '#4b5563',
+            fontSize: 11, fontWeight: 700, cursor: canPrev ? 'pointer' : 'not-allowed',
+          }}
+        >
+          Prev
+        </button>
+        <button
+          type="button"
+          onClick={() => canNext && onChange(page + 1)}
+          disabled={!canNext}
+          style={{
+            padding: '6px 10px', borderRadius: 8,
+            border: '1px solid #2d2d3f',
+            background: canNext ? '#1a1a2e' : '#111118',
+            color: canNext ? '#d1d5db' : '#4b5563',
+            fontSize: 11, fontWeight: 700, cursor: canNext ? 'pointer' : 'not-allowed',
+          }}
+        >
+          Next
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function InspectSection({ title, accent, children }) {
   return (
     <div>
@@ -2064,3 +2215,6 @@ function EmptyState({ icon, message }) {
     </div>
   )
 }
+
+
+
