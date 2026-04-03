@@ -44,7 +44,7 @@ export default function CreateListingPage() {
         // Clear rate limit entries for privileged users — stale sessionStorage
         // from before their role was assigned would otherwise block them
         const badges = p?.badges?.length ? p.badges : p?.badge ? [p.badge] : []
-        if (badges.some(b => ['VIP', 'Owner', 'Admin', 'Moderator'].includes(b))) {
+        if (badges.some(b => ['VIP', 'VIP Plus', 'VIP Max', 'Owner', 'Admin', 'Moderator'].includes(b))) {
           // Clear ALL listing rate-limit keys for privileged users
           sessionStorage.removeItem('rl_listing')
           sessionStorage.removeItem('rl_listing_day')
@@ -140,16 +140,31 @@ export default function CreateListingPage() {
       : activeProfile?.badge
       ? [activeProfile.badge]
       : []
-    const isPrivileged = profileBadges.some(b => ['Owner', 'VIP', 'Moderator', 'Admin'].includes(b))
+    const isVipMax    = profileBadges.some(b => ['VIP Max', 'Owner'].includes(b))
+    const isVipPlus   = profileBadges.includes('VIP Plus') || isVipMax
+    const isVip       = profileBadges.includes('VIP') || isVipPlus
+    const isMod       = profileBadges.some(b => ['Moderator', 'Admin'].includes(b))
+    const isVerified  = profileBadges.includes('Verified Trader')
+    const isPrivileged = isVip || isMod
     if (isPrivileged) {
       Object.keys(sessionStorage)
         .filter(k => k.startsWith('rl_listing'))
         .forEach(k => sessionStorage.removeItem(k))
     }
-    const rl = checkRateLimit('listing', '', isPrivileged)
-    if (rl) { setErrors({ general: rl }); return }
-    const rlDay = checkRateLimit('listing_daily', '', isPrivileged)
-    if (rlDay) { setErrors({ general: rlDay }); return }
+    // VIP Max: skip all rate limits entirely
+    if (isVipMax) {
+      // no cooldown, no daily limit
+    } else {
+      const rl = checkRateLimit('listing', '', isPrivileged)
+      if (rl) { setErrors({ general: rl }); return }
+      // Pick the right daily limit bucket based on tier
+      const dailyType = isVipPlus ? 'listing_daily_vipplus'
+        : isVip       ? 'listing_daily_vip'
+        : isVerified  ? 'listing_daily_verified'
+        : 'listing_daily'
+      const rlDay = checkRateLimit(dailyType, '', false)
+      if (rlDay) { setErrors({ general: rlDay }); return }
+    }
     setErrors({})
     setLoading(true)
 

@@ -8,9 +8,9 @@ import { getPrimaryBadge } from '@/lib/constants'
 
 const CASHAPP = '$tdowdy94'
 const VENMO   = '@davari'
-const PAYPAL  = 'paypal.me/rotmarket' // update with your real PayPal link
+const PAYPAL  = 'paypal.me/rotmarket' // ← update with your real link
 
-// ─── TIER DEFINITIONS ─────────────────────────────────────────────────────────
+// ─── DATA ─────────────────────────────────────────────────────────────────────
 
 const TIERS = [
   {
@@ -93,61 +93,71 @@ const TIERS = [
 ]
 
 const COMPARISON = [
-  { label: 'Listings/day',       vip: '10',      plus: '25',      max: 'Unlimited' },
-  { label: 'Listing life',       vip: '30 days', plus: '60 days', max: 'Permanent' },
-  { label: 'Auto-relist',        vip: '—',       plus: '✓',       max: '✓' },
-  { label: 'View counts',        vip: '—',       plus: '✓',       max: '✓' },
-  { label: 'Full analytics',     vip: '—',       plus: '—',       max: '✓' },
-  { label: 'Price history',      vip: '—',       plus: '—',       max: '✓' },
-  { label: 'Homepage spotlight', vip: '—',       plus: '—',       max: '✓' },
-  { label: 'Custom banner',      vip: '—',       plus: '✓',       max: '✓' },
-  { label: 'Wishlist alerts',    vip: '—',       plus: '✓',       max: '✓' },
-  { label: 'Referral bonus',     vip: '1×',      plus: '2×',      max: '3×' },
-  { label: 'Giveaway entries',   vip: '×1',      plus: '×2',      max: '×5' },
-  { label: 'Price/month',        vip: '$10',     plus: '$20',     max: '$40', priceRow: true },
+  { label: 'Listings/day',        vip: '10',      plus: '25',      max: 'Unlimited' },
+  { label: 'Listing life',        vip: '30 days', plus: '60 days', max: 'Permanent' },
+  { label: 'No cooldown',         vip: '✓',       plus: '✓',       max: '✓' },
+  { label: 'Auto-relist',         vip: '—',       plus: '✓',       max: '✓' },
+  { label: 'View counts',         vip: '—',       plus: '✓',       max: '✓' },
+  { label: 'Wishlist alerts',     vip: '—',       plus: '✓',       max: '✓' },
+  { label: 'Full analytics',      vip: '—',       plus: '—',       max: '✓' },
+  { label: 'Price history',       vip: '—',       plus: '—',       max: '✓' },
+  { label: 'Homepage spotlight',  vip: '—',       plus: '—',       max: '✓' },
+  { label: 'Custom banner',       vip: '—',       plus: '✓',       max: '✓' },
+  { label: 'Referral multiplier', vip: '1×',      plus: '2×',      max: '3×' },
+  { label: 'Giveaway entries',    vip: '×1',      plus: '×2',      max: '×5' },
+  { label: 'Price/month',         vip: '$10',     plus: '$20',     max: '$40', priceRow: true },
 ]
 
 const PAYMENT_METHODS = [
   { id: 'cashapp', label: 'Cash App', icon: '🟢', value: CASHAPP, note: 'Recommended' },
   { id: 'venmo',   label: 'Venmo',    icon: '💙', value: VENMO },
-  { id: 'paypal',  label: 'PayPal',   icon: '🔵', value: PAYPAL, note: 'Goods & Services' },
+  { id: 'paypal',  label: 'PayPal',   icon: '🔵', value: PAYPAL,  note: 'Goods & Services' },
 ]
 
-// ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
+// ─── COMPONENT ────────────────────────────────────────────────────────────────
 
 export default function VIPPage() {
   const router = useRouter()
-  const [profile, setProfile]     = useState(null)
+
+  // Auth state — null = loading, false = not logged in, object = user
+  const [user, setUser]       = useState(null)
+  const [profile, setProfile] = useState(null)
+  const [authReady, setAuthReady] = useState(false)
+
+  // UI state
   const [billing, setBilling]     = useState('monthly')
   const [selected, setSelected]   = useState(null)
   const [payMethod, setPayMethod] = useState(null)
   const [copied, setCopied]       = useState('')
   const [step, setStep]           = useState(1)
-  const [loggedIn, setLoggedIn]   = useState(false)
 
   useEffect(() => {
     async function init() {
       try {
-        const { getSessionUser } = await import('@/lib/supabase')
         const u = await getSessionUser()
         if (u) {
-          setLoggedIn(true)
-          const { getProfile } = await import('@/lib/supabase')
+          setUser(u)
           const p = await getProfile(u.id)
           setProfile(p)
         }
-      } catch (err) { console.error('VIP init:', err) }
+      } catch (err) {
+        console.error('VIP page init error:', err)
+      } finally {
+        setAuthReady(true)
+      }
     }
     init()
   }, [])
 
-  const badges      = profile?.badges?.length ? profile.badges : profile?.badge ? [profile.badge] : []
-  const primary     = getPrimaryBadge(badges)
-  const isVipMax    = primary === 'VIP Max'  || primary === 'Owner'
-  const isVipPlus   = primary === 'VIP Plus' || isVipMax
-  const isVip       = primary === 'VIP'      || isVipPlus
+  // Badge detection — only runs after auth is ready
+  const badges    = profile?.badges?.length ? profile.badges : profile?.badge ? [profile.badge] : []
+  const primary   = getPrimaryBadge(badges)
+  const isVipMax  = primary === 'VIP Max'  || primary === 'Owner'
+  const isVipPlus = primary === 'VIP Plus' || isVipMax
+  const isVip     = primary === 'VIP'      || isVipPlus
 
   const isOwned = (id) => {
+    if (!authReady || !user) return false  // not logged in → never "owned"
     if (id === 'VIP Max')  return isVipMax
     if (id === 'VIP Plus') return isVipPlus
     if (id === 'VIP')      return isVip
@@ -161,21 +171,23 @@ export default function VIPPage() {
   }
 
   const openPayment = (tierId) => {
-    if (!loggedIn) { router.push('/auth/login'); return }
-    setSelected(tierId); setPayMethod(null); setStep(1)
+    if (!authReady) return
+    if (!user) { router.push('/auth/login'); return }
+    setSelected(tierId)
+    setPayMethod(null)
+    setStep(1)
   }
 
   const closePayment = () => { setSelected(null); setPayMethod(null); setStep(1) }
 
-  const tier   = TIERS.find(t => t.id === selected)
-  const price  = tier ? (billing === 'yearly' ? tier.yearlyPrice : tier.price) : 0
-  const method = PAYMENT_METHODS.find(m => m.id === payMethod)
+  const activeTier   = TIERS.find(t => t.id === selected)
+  const activePrice  = activeTier ? (billing === 'yearly' ? activeTier.yearlyPrice : activeTier.price) : 0
+  const activeMethod = PAYMENT_METHODS.find(m => m.id === payMethod)
 
-  // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div style={{ minHeight: '100vh' }}>
 
-      {/* Hero */}
+      {/* ── Hero ──────────────────────────────────────────────────────────── */}
       <div style={{
         background: 'linear-gradient(180deg,rgba(245,158,11,0.07) 0%,transparent 100%)',
         borderBottom: '1px solid #1f2937',
@@ -190,7 +202,7 @@ export default function VIPPage() {
           <span style={{ color: '#f59e0b' }}>VIP</span> Membership
         </h1>
         <p style={{ margin: '0 auto 24px', maxWidth: 500, fontSize: 15, color: '#9ca3af', lineHeight: 1.7 }}>
-          Sell faster, post more, stand out. Support RotMarket and get the best trading experience.
+          Sell faster, post more, stand out. Support RotMarket and unlock the best trading experience.
         </p>
 
         {/* Billing toggle */}
@@ -204,6 +216,7 @@ export default function VIPPage() {
               fontSize: 13, fontWeight: 700,
               background: billing === b ? '#1f2937' : 'transparent',
               color: billing === b ? '#f9fafb' : '#6b7280',
+              transition: 'all 0.15s',
             }}>
               {b === 'monthly' ? 'Monthly' : 'Yearly'}
               {b === 'yearly' && (
@@ -227,15 +240,15 @@ export default function VIPPage() {
           </div>
         )}
 
-        {/* Tier cards */}
+        {/* ── Tier cards ─────────────────────────────────────────────────── */}
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))',
           gap: 16, marginBottom: 32,
         }}>
           {TIERS.map(t => {
-            const owned      = isOwned(t.id)
-            const tierPrice  = billing === 'yearly' ? t.yearlyPrice : t.price
+            const owned     = isOwned(t.id)
+            const tierPrice = billing === 'yearly' ? t.yearlyPrice : t.price
             const yearlySave = (t.price * 12) - t.yearlyPrice
             return (
               <div key={t.id} style={{
@@ -251,16 +264,11 @@ export default function VIPPage() {
                     background: t.color, textAlign: 'center',
                     fontSize: 10, fontWeight: 800, color: '#fff',
                     padding: '5px', letterSpacing: '0.08em', textTransform: 'uppercase',
-                  }}>
-                    Most Popular
-                  </div>
+                  }}>Most Popular</div>
                 )}
 
-                {/* Card header */}
-                <div style={{
-                  padding: '22px 22px 16px', borderBottom: '1px solid #1f2937',
-                  background: t.colorBg,
-                }}>
+                {/* Header */}
+                <div style={{ padding: '22px 22px 16px', borderBottom: '1px solid #1f2937', background: t.colorBg }}>
                   <div style={{
                     display: 'inline-flex', alignItems: 'center', gap: 6,
                     background: `${t.color}18`, border: `1px solid ${t.color}40`,
@@ -277,14 +285,12 @@ export default function VIPPage() {
                   </div>
                   {billing === 'monthly' && (
                     <div style={{ fontSize: 12, color: '#4b5563', marginTop: 4 }}>
-                      or{' '}
-                      <span style={{ color: '#4ade80', fontWeight: 700 }}>${t.yearlyPrice}/yr</span>
-                      {' '}— save ${yearlySave}
+                      or <span style={{ color: '#4ade80', fontWeight: 700 }}>${t.yearlyPrice}/yr</span> — save ${yearlySave}
                     </div>
                   )}
                 </div>
 
-                {/* Perks list */}
+                {/* Perks */}
                 <div style={{ padding: '16px 22px', flex: 1 }}>
                   {t.perks.map((p, i) => p.section
                     ? (
@@ -292,9 +298,7 @@ export default function VIPPage() {
                         fontSize: 10, fontWeight: 800, textTransform: 'uppercase',
                         letterSpacing: '0.1em', color: '#4b5563',
                         marginTop: i === 0 ? 0 : 14, marginBottom: 4,
-                      }}>
-                        {p.section}
-                      </div>
+                      }}>{p.section}</div>
                     )
                     : (
                       <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, paddingBottom: 6 }}>
@@ -313,39 +317,43 @@ export default function VIPPage() {
 
                 {/* CTA */}
                 <div style={{ padding: '16px 22px', borderTop: '1px solid #1f2937' }}>
-                  {owned
-                    ? (
-                      <div style={{ textAlign: 'center', padding: '10px', fontSize: 13, fontWeight: 700, color: t.color }}>
-                        {t.icon} Current Plan
-                      </div>
-                    )
-                    : (
-                      <button onClick={() => openPayment(t.id)} style={{
+                  {owned ? (
+                    <div style={{
+                      textAlign: 'center', padding: '11px',
+                      fontSize: 13, fontWeight: 700,
+                      color: t.color, background: `${t.color}12`,
+                      borderRadius: 9, border: `1px solid ${t.color}30`,
+                    }}>
+                      {t.icon} Current Plan
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => openPayment(t.id)}
+                      style={{
                         width: '100%', padding: '11px', borderRadius: 9,
                         border: 'none', cursor: 'pointer',
                         background: t.featured ? t.color : `${t.color}22`,
                         color: t.featured ? '#fff' : t.color,
                         fontSize: 13, fontWeight: 800,
-                      }}>
-                        Get {t.id} →
-                      </button>
-                    )
-                  }
+                        transition: 'opacity 0.15s',
+                      }}
+                    >
+                      Get {t.id} →
+                    </button>
+                  )}
                 </div>
               </div>
             )
           })}
         </div>
 
-        {/* Comparison table */}
+        {/* ── Comparison table ───────────────────────────────────────────── */}
         <div style={{ background: '#111118', border: '1px solid #1f2937', borderRadius: 14, overflow: 'hidden' }}>
           <div style={{
             padding: '12px 20px', borderBottom: '1px solid #1f2937',
             fontSize: 11, fontWeight: 800, color: '#4b5563',
             letterSpacing: '0.1em', textTransform: 'uppercase',
-          }}>
-            Plan Comparison
-          </div>
+          }}>Plan Comparison</div>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 380 }}>
               <thead>
@@ -376,11 +384,7 @@ export default function VIPPage() {
                     ].map((cell, ci) => (
                       <td key={ci} style={{
                         padding: '9px 20px', textAlign: 'center',
-                        color: cell.val === '—'
-                          ? '#2d2d3f'
-                          : row.priceRow || cell.val === '✓'
-                            ? cell.color
-                            : '#d1d5db',
+                        color: cell.val === '—' ? '#2d2d3f' : (row.priceRow || cell.val === '✓') ? cell.color : '#d1d5db',
                         fontWeight: row.priceRow || cell.val === '✓' ? 800 : 500,
                       }}>
                         {cell.val}
@@ -395,12 +399,12 @@ export default function VIPPage() {
 
       </div>
 
-      {/* ── Payment Modal ──────────────────────────────────────────────────────── */}
-      {selected && tier && (
+      {/* ── Payment Modal ─────────────────────────────────────────────────── */}
+      {selected && activeTier && (
         <div
           onClick={closePayment}
           style={{
-            position: 'fixed', inset: 0, zIndex: 50,
+            position: 'fixed', inset: 0, zIndex: 9999,
             background: 'rgba(0,0,0,0.8)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             padding: 16,
@@ -410,28 +414,30 @@ export default function VIPPage() {
             onClick={e => e.stopPropagation()}
             style={{
               background: '#111118',
-              border: `1px solid ${tier.colorBorder}`,
+              border: `1px solid ${activeTier.colorBorder}`,
               borderRadius: 18, padding: '28px 24px',
               width: '100%', maxWidth: 440,
-              boxShadow: `0 0 60px ${tier.color}20`,
+              maxHeight: '90vh', overflowY: 'auto',
+              boxShadow: `0 0 60px ${activeTier.color}20`,
             }}
           >
-            {/* Modal header */}
+            {/* Header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
               <div>
                 <div style={{ fontSize: 10, fontWeight: 800, color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>
                   Upgrade to
                 </div>
-                <div style={{ fontSize: 20, fontWeight: 900, color: tier.color }}>
-                  {tier.icon} {tier.id}
+                <div style={{ fontSize: 20, fontWeight: 900, color: activeTier.color }}>
+                  {activeTier.icon} {activeTier.id}
                 </div>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 28, fontWeight: 900, color: '#fff' }}>${price}</div>
+                <div style={{ fontSize: 28, fontWeight: 900, color: '#fff' }}>${activePrice}</div>
                 <div style={{ fontSize: 12, color: '#4b5563' }}>/ {billing === 'yearly' ? 'year' : 'month'}</div>
               </div>
             </div>
 
+            {/* Step 1 — Choose method */}
             {step === 1 && (
               <>
                 <div style={{ fontSize: 11, fontWeight: 800, color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>
@@ -444,10 +450,11 @@ export default function VIPPage() {
                       onClick={() => setPayMethod(m.id)}
                       style={{
                         display: 'flex', alignItems: 'center', gap: 12,
-                        padding: '12px 14px', borderRadius: 10,
-                        border: payMethod === m.id ? `1px solid ${tier.color}` : '1px solid #1f2937',
-                        background: payMethod === m.id ? `${tier.color}12` : '#0d0d14',
-                        cursor: 'pointer', textAlign: 'left', width: '100%',
+                        padding: '12px 14px', borderRadius: 10, width: '100%',
+                        border: payMethod === m.id ? `1px solid ${activeTier.color}` : '1px solid #1f2937',
+                        background: payMethod === m.id ? `${activeTier.color}12` : '#0d0d14',
+                        cursor: 'pointer', textAlign: 'left',
+                        transition: 'all 0.15s',
                       }}
                     >
                       <span style={{ fontSize: 22 }}>{m.icon}</span>
@@ -455,9 +462,7 @@ export default function VIPPage() {
                         <div style={{ fontSize: 13, fontWeight: 700, color: '#f9fafb' }}>{m.label}</div>
                         {m.note && <div style={{ fontSize: 11, color: '#4ade80' }}>{m.note}</div>}
                       </div>
-                      {payMethod === m.id && (
-                        <span style={{ fontSize: 16, color: tier.color }}>✓</span>
-                      )}
+                      {payMethod === m.id && <span style={{ fontSize: 16, color: activeTier.color }}>✓</span>}
                     </button>
                   ))}
                 </div>
@@ -466,10 +471,11 @@ export default function VIPPage() {
                   disabled={!payMethod}
                   style={{
                     width: '100%', padding: '12px', borderRadius: 10, border: 'none',
-                    background: payMethod ? tier.color : '#1f2937',
+                    background: payMethod ? activeTier.color : '#1f2937',
                     color: payMethod ? '#fff' : '#4b5563',
                     fontSize: 14, fontWeight: 800,
-                    cursor: payMethod ? 'pointer' : 'default',
+                    cursor: payMethod ? 'pointer' : 'not-allowed',
+                    transition: 'all 0.15s',
                   }}
                 >
                   Continue →
@@ -477,7 +483,8 @@ export default function VIPPage() {
               </>
             )}
 
-            {step === 2 && method && (
+            {/* Step 2 — Send payment */}
+            {step === 2 && activeMethod && (
               <>
                 <div style={{ fontSize: 11, fontWeight: 800, color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>
                   Send payment
@@ -485,34 +492,42 @@ export default function VIPPage() {
 
                 {/* Amount */}
                 <div style={{
-                  background: `${tier.color}12`, border: `1px solid ${tier.color}30`,
-                  borderRadius: 10, padding: '14px 16px', marginBottom: 14, textAlign: 'center',
+                  background: `${activeTier.color}12`, border: `1px solid ${activeTier.color}30`,
+                  borderRadius: 10, padding: '16px', marginBottom: 14, textAlign: 'center',
                 }}>
                   <div style={{ fontSize: 13, color: '#9ca3af', marginBottom: 2 }}>Send exactly</div>
-                  <div style={{ fontSize: 32, fontWeight: 900, color: tier.color }}>${price}</div>
-                  <div style={{ fontSize: 12, color: '#4b5563' }}>via {method.label}</div>
+                  <div style={{ fontSize: 36, fontWeight: 900, color: activeTier.color, lineHeight: 1 }}>${activePrice}</div>
+                  <div style={{ fontSize: 12, color: '#4b5563', marginTop: 4 }}>
+                    via {activeMethod.label} · {billing} plan
+                  </div>
                 </div>
 
-                {/* Payment handle */}
+                {/* Handle row */}
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: 10,
                   background: '#0d0d14', border: '1px solid #1f2937',
                   borderRadius: 10, padding: '12px 14px', marginBottom: 14,
                 }}>
-                  <span style={{ fontSize: 22 }}>{method.icon}</span>
+                  <span style={{ fontSize: 22 }}>{activeMethod.icon}</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 11, color: '#4b5563', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{method.label}</div>
+                    <div style={{ fontSize: 11, color: '#4b5563', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      {activeMethod.label}
+                    </div>
                     <div style={{ fontSize: 14, fontWeight: 800, color: '#f9fafb', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {method.value}
+                      {activeMethod.value}
                     </div>
                   </div>
-                  <button onClick={() => copy(method.value, method.id)} style={{
-                    padding: '6px 12px', borderRadius: 7, border: '1px solid #2d2d3f',
-                    background: copied === method.id ? 'rgba(74,222,128,0.12)' : 'transparent',
-                    color: copied === method.id ? '#4ade80' : '#6b7280',
-                    fontSize: 12, fontWeight: 700, cursor: 'pointer', flexShrink: 0,
-                  }}>
-                    {copied === method.id ? '✓ Copied' : 'Copy'}
+                  <button
+                    onClick={() => copy(activeMethod.value, activeMethod.id)}
+                    style={{
+                      padding: '6px 12px', borderRadius: 7,
+                      border: '1px solid #2d2d3f',
+                      background: copied === activeMethod.id ? 'rgba(74,222,128,0.12)' : 'transparent',
+                      color: copied === activeMethod.id ? '#4ade80' : '#6b7280',
+                      fontSize: 12, fontWeight: 700, cursor: 'pointer', flexShrink: 0,
+                    }}
+                  >
+                    {copied === activeMethod.id ? '✓ Copied' : 'Copy'}
                   </button>
                 </div>
 
@@ -520,40 +535,54 @@ export default function VIPPage() {
                 <div style={{
                   background: 'rgba(74,222,128,0.05)', border: '1px solid rgba(74,222,128,0.15)',
                   borderRadius: 8, padding: '12px 14px', marginBottom: 20,
-                  fontSize: 12, color: '#9ca3af', lineHeight: 1.7,
+                  fontSize: 12, color: '#9ca3af', lineHeight: 1.8,
                 }}>
                   <strong style={{ color: '#4ade80' }}>After paying:</strong>{' '}
                   Go to the{' '}
-                  <Link href="/contact" style={{ color: '#4ade80', textDecoration: 'none' }}>Contact page</Link>
-                  {' '}and send your username, plan (<strong style={{ color: '#f9fafb' }}>{tier.id} — {billing}</strong>), and payment confirmation. We'll activate your badge within 24 hours.
+                  <Link href="/contact" onClick={closePayment} style={{ color: '#4ade80', textDecoration: 'none', fontWeight: 700 }}>
+                    Contact page
+                  </Link>{' '}
+                  and send your <strong style={{ color: '#f9fafb' }}>username</strong>,{' '}
+                  plan (<strong style={{ color: activeTier.color }}>{activeTier.id} — {billing}</strong>),
+                  and payment confirmation screenshot.
+                  We'll activate your badge within <strong style={{ color: '#f9fafb' }}>24 hours</strong>.
                 </div>
 
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <button onClick={() => setStep(1)} style={{
-                    flex: 1, padding: '11px', borderRadius: 10,
-                    border: '1px solid #1f2937', background: 'transparent',
-                    color: '#6b7280', fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                  }}>
+                  <button
+                    onClick={() => setStep(1)}
+                    style={{
+                      flex: 1, padding: '11px', borderRadius: 10,
+                      border: '1px solid #1f2937', background: 'transparent',
+                      color: '#6b7280', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                    }}
+                  >
                     ← Back
                   </button>
-                  <Link href="/contact" style={{
-                    flex: 2, padding: '11px', borderRadius: 10, border: 'none',
-                    textDecoration: 'none',
-                    background: tier.color, color: '#fff',
-                    fontSize: 13, fontWeight: 800, cursor: 'pointer',
-                    textAlign: 'center', display: 'block',
-                  }}>
-                    Confirm on Contact page →
+                  <Link
+                    href="/contact"
+                    onClick={closePayment}
+                    style={{
+                      flex: 2, padding: '11px', borderRadius: 10,
+                      textDecoration: 'none', textAlign: 'center', display: 'block',
+                      background: activeTier.color, color: '#fff',
+                      fontSize: 13, fontWeight: 800,
+                    }}
+                  >
+                    Confirm via Contact →
                   </Link>
                 </div>
               </>
             )}
 
-            <button onClick={closePayment} style={{
-              display: 'block', margin: '14px auto 0',
-              background: 'none', border: 'none',
-              color: '#4b5563', fontSize: 12, cursor: 'pointer',
-            }}>
+            <button
+              onClick={closePayment}
+              style={{
+                display: 'block', margin: '16px auto 0',
+                background: 'none', border: 'none',
+                color: '#4b5563', fontSize: 12, cursor: 'pointer',
+              }}
+            >
               Cancel
             </button>
           </div>

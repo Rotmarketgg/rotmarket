@@ -22,8 +22,14 @@ export default function ListingCard({ listing }) {
 
   const primaryBadge = getPrimaryBadge(badges)
   const primaryMeta = primaryBadge ? BADGE_META[primaryBadge] : null
-  const isVip = badges.includes('VIP') || badges.includes('Owner')
+  const isVipMax  = badges.includes('VIP Max')  || badges.includes('Owner')
+  const isVipPlus = badges.includes('VIP Plus') || isVipMax
+  const isVip     = badges.includes('VIP')      || isVipPlus
   const isVerified = badges.includes('Verified Trader')
+
+  const vipColor       = isVipMax ? '#ef4444' : isVipPlus ? '#a78bfa' : '#f59e0b'
+  const vipGlowNormal  = isVipMax ? 'rgba(239,68,68,0.25)'  : isVipPlus ? 'rgba(167,139,250,0.25)' : 'rgba(245,158,11,0.25)'
+  const vipGlowHover   = isVipMax ? 'rgba(239,68,68,0.4)'   : isVipPlus ? 'rgba(167,139,250,0.4)'  : 'rgba(245,158,11,0.35)'
 
   const typeKey = listing.status === 'sold' ? 'sold' : listing.type
   const typeConf = TYPE_CONFIG[typeKey] || TYPE_CONFIG.sale
@@ -52,12 +58,12 @@ export default function ListingCard({ listing }) {
           outline: listing.promoted
             ? '2px solid rgba(59,130,246,0.7)'
             : isVip
-            ? '2px solid rgba(245,158,11,0.6)'
+            ? `2px solid ${vipColor}99`
             : `1px solid ${rarity.border}44`,
           boxShadow: listing.promoted
             ? `0 0 20px rgba(59,130,246,0.3), inset 0 0 0 1px rgba(59,130,246,0.15)`
             : isVip
-            ? `0 0 20px rgba(245,158,11,0.25), inset 0 0 0 1px rgba(245,158,11,0.1)`
+            ? `0 0 20px ${vipGlowNormal}, inset 0 0 0 1px ${vipColor}18`
             : `0 2px 8px rgba(0,0,0,0.4)`,
         }}
         onMouseEnter={e => {
@@ -65,7 +71,7 @@ export default function ListingCard({ listing }) {
           e.currentTarget.style.boxShadow = listing.promoted
             ? `0 12px 32px rgba(59,130,246,0.45), inset 0 0 0 1px rgba(59,130,246,0.2)`
             : isVip
-            ? `0 12px 32px rgba(245,158,11,0.35), inset 0 0 0 1px rgba(245,158,11,0.15)`
+            ? `0 12px 32px ${vipGlowHover}, inset 0 0 0 1px ${vipColor}25`
             : `0 12px 28px rgba(0,0,0,0.5), 0 0 0 1px ${rarity.border}66`
         }}
         onMouseLeave={e => {
@@ -73,7 +79,7 @@ export default function ListingCard({ listing }) {
           e.currentTarget.style.boxShadow = listing.promoted
             ? `0 0 20px rgba(59,130,246,0.3), inset 0 0 0 1px rgba(59,130,246,0.15)`
             : isVip
-            ? `0 0 20px rgba(245,158,11,0.25), inset 0 0 0 1px rgba(245,158,11,0.1)`
+            ? `0 0 20px ${vipGlowNormal}, inset 0 0 0 1px ${vipColor}18`
             : `0 2px 8px rgba(0,0,0,0.4)`
         }}
       >

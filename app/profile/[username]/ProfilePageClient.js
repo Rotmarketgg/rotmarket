@@ -17,6 +17,8 @@ import { BADGE_HIERARCHY, BADGE_META, getPrimaryBadge } from '@/lib/constants'
 const BADGE_CONFIG = {
   'Owner':           { ...BADGE_META['Owner'],           desc: 'RotMarket owner' },
   'Moderator':       { ...BADGE_META['Moderator'],       desc: 'Community moderator' },
+  'VIP Max':         { ...BADGE_META['VIP Max'],         desc: 'VIP Max — top tier supporter' },
+  'VIP Plus':        { ...BADGE_META['VIP Plus'],        desc: 'VIP Plus supporter of RotMarket' },
   'VIP':             { ...BADGE_META['VIP'],             desc: 'VIP supporter of RotMarket' },
   'Verified Trader': { ...BADGE_META['Verified Trader'], desc: 'Trusted trader — 25 five-star reviews' },
 }
@@ -184,9 +186,13 @@ export default function ProfilePageClient({ username: usernameProp, initialProfi
       const { error } = await supabase.rpc('renew_listing', { listing_id: listingId })
       if (error) throw error
       const primary = primaryBadgeName
-      const days = primary === 'VIP' || primary === 'Owner' ? 30 : primary === 'Verified Trader' ? 14 : 7
+      const days = ['VIP Max', 'Owner'].includes(primary) ? null
+        : primary === 'VIP Plus'         ? 60
+        : primary === 'VIP'              ? 30
+        : primary === 'Verified Trader'  ? 14
+        : 7
       setListings(prev => prev.map(l => l.id === listingId
-        ? { ...l, status: 'active', expires_at: new Date(Date.now() + days * 86400000).toISOString() }
+        ? { ...l, status: 'active', expires_at: days === null ? null : new Date(Date.now() + days * 86400000).toISOString() }
         : l
       ))
     } catch (err) {
@@ -584,7 +590,11 @@ export default function ProfilePageClient({ username: usernameProp, initialProfi
                 : <div>
                     <div style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 10, padding: '10px 16px', marginBottom: 16, fontSize: 13, color: '#fbbf24' }}>
                       ⏰ These listings have expired. Renew them to make them active again for another{' '}
-                      {primaryBadgeName === 'VIP' || primaryBadgeName === 'Owner' ? '30' : primaryBadgeName === 'Verified Trader' ? '14' : '7'} days.
+                      {['VIP Max', 'Owner'].includes(primaryBadgeName) ? 'permanent (no expiry)'
+                        : primaryBadgeName === 'VIP Plus'        ? '60 days'
+                        : primaryBadgeName === 'VIP'             ? '30 days'
+                        : primaryBadgeName === 'Verified Trader' ? '14 days'
+                        : '7 days'}.
                     </div>
                     {renewError && (
                       <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#f87171', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
