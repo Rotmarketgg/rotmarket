@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { withTimeout } from '@/lib/utils'
 import ListingCard, { ListingCardSkeleton } from '@/components/ListingCard'
 import { getListings, getSessionUser, getProfile } from '@/lib/supabase'
-import { getVipAccessTier } from '@/lib/constants'
 import Link from 'next/link'
 
 const PAGE_SIZE = 20
@@ -37,14 +36,16 @@ export default function HomePage() {
     try {
       const user = await getSessionUser()
       if (!user?.id) { setWishlistTerms([]); return }
+      const storageKey = `rotmarket-wishlist:${user.id}`
       const p = await getProfile(user.id)
       const badges = p?.badges?.length ? p.badges : p?.badge ? [p.badge] : []
-      const tier = getVipAccessTier(badges)
-      if (!['VIP Plus', 'VIP Max'].includes(tier)) {
+      const canUseWishlist = badges.includes('VIP Plus') || badges.includes('VIP Max')
+      if (!canUseWishlist) {
+        localStorage.removeItem(storageKey)
         setWishlistTerms([])
         return
       }
-      const raw = localStorage.getItem(`rotmarket-wishlist:${user.id}`)
+      const raw = localStorage.getItem(storageKey)
       const parsed = raw ? JSON.parse(raw) : []
       setWishlistTerms(Array.isArray(parsed) ? parsed : [])
     } catch {
@@ -79,13 +80,14 @@ export default function HomePage() {
     return ids
   }, [listings, wishlistTerms])
 
-  const spotlightListings = useMemo(() => {
-    return listings
-      .filter(l => {
-        const badges = l?.profiles?.badges?.length ? l.profiles.badges : l?.profiles?.badge ? [l.profiles.badge] : []
-        return badges.includes('VIP Max')
-      })
-      .slice(0, 4)
+  const promotedListings = useMemo(() => {
+    const promoted = listings.filter(l => !!l.promoted)
+    if (promoted.length <= 4) return promoted
+    const now = new Date()
+    const daySeed = Math.floor((Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) - Date.UTC(now.getUTCFullYear(), 0, 0)) / 86400000)
+    const rotation = (daySeed * 24 + now.getUTCHours()) % promoted.length
+    const rotated = [...promoted.slice(rotation), ...promoted.slice(0, rotation)]
+    return rotated.slice(0, 4)
   }, [listings])
 
   return (
@@ -127,19 +129,19 @@ export default function HomePage() {
 
       {/* Latest listings */}
       <div style={{ maxWidth: 1240, margin: '0 auto', padding: '28px 16px 0' }}>
-        {spotlightListings.length > 0 && (
+        {promotedListings.length > 0 && (
           <div style={{ marginBottom: 28 }}>
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               marginBottom: 12, flexWrap: 'wrap', gap: 8,
             }}>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#ef4444' }}>
-                🔴 VIP Max Spotlight
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#60a5fa' }}>
+                ⚡ Promoted Listings
               </h2>
-              <div style={{ fontSize: 12, color: '#6b7280' }}>Featured top-tier sellers</div>
+              <div style={{ fontSize: 12, color: '#6b7280' }}>Rotates hourly when more than 4 are promoted</div>
             </div>
             <div className="listing-grid">
-              {spotlightListings.map(listing => (
+              {promotedListings.map(listing => (
                 <ListingCard key={`spot-${listing.id}`} listing={listing} />
               ))}
             </div>

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { getSessionUser, getVerifiedUser, getProfile, createListing, updateListing, uploadListingImage, supabase } from '@/lib/supabase'
-import { GAMES, RARITIES, PAYMENT_METHODS, LISTING_TYPES, getVipAccessTier } from '@/lib/constants'
+import { GAMES, RARITIES, PAYMENT_METHODS, LISTING_TYPES } from '@/lib/constants'
 import { validateListing, checkRateLimit, withTimeout } from '@/lib/utils'
 import { validateClean, validateContent } from '@/lib/profanity'
 
@@ -68,8 +68,7 @@ export default function CreateListingPage() {
     : profile?.badge
     ? [profile.badge]
     : []
-  const vipAccessTier = getVipAccessTier(profileBadges)
-  const canUseTemplates = vipAccessTier === 'VIP Plus' || vipAccessTier === 'VIP Max'
+  const canUseTemplates = profileBadges.includes('VIP Plus') || profileBadges.includes('VIP Max')
 
   useEffect(() => {
     if (!user?.id) return

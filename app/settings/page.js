@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { clearProfileCache } from '@/components/Navbar'
 import { getSessionUser, getVerifiedUser, getProfile, updateProfile, supabase } from '@/lib/supabase'
 import { withTimeout, getInitial } from '@/lib/utils'
-import { getVipAccessTier } from '@/lib/constants'
 import { validateClean } from '@/lib/profanity'
 
 export default function SettingsPageWrapper() {
@@ -85,13 +84,18 @@ function SettingsPage() {
     load()
   }, [])
 
-  const vipAccessTier = getVipAccessTier(profileBadges)
-  const canUseWishlistAlerts = vipAccessTier === 'VIP Plus' || vipAccessTier === 'VIP Max'
+  const canUseWishlistAlerts = profileBadges.includes('VIP Plus') || profileBadges.includes('VIP Max')
 
   useEffect(() => {
     if (!user?.id) return
     try {
-      const raw = localStorage.getItem(`rotmarket-wishlist:${user.id}`)
+      const storageKey = `rotmarket-wishlist:${user.id}`
+      if (!canUseWishlistAlerts) {
+        localStorage.removeItem(storageKey)
+        setWishlistInput('')
+        return
+      }
+      const raw = localStorage.getItem(storageKey)
       const parsed = raw ? JSON.parse(raw) : []
       if (Array.isArray(parsed) && parsed.length > 0) {
         setWishlistInput(parsed.join(', '))
@@ -101,7 +105,7 @@ function SettingsPage() {
     } catch {
       setWishlistInput('')
     }
-  }, [user?.id])
+  }, [user?.id, canUseWishlistAlerts])
 
   const persistWishlist = () => {
     if (!user?.id) return

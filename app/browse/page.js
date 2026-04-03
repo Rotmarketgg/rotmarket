@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import ListingCard, { ListingCardSkeleton } from '@/components/ListingCard'
 import { getListings, getSessionUser, getProfile } from '@/lib/supabase'
 import { withTimeout } from '@/lib/utils'
-import { GAMES, getVipAccessTier } from '@/lib/constants'
+import { GAMES } from '@/lib/constants'
 import Link from 'next/link'
 
 const PAGE_SIZE = 24
@@ -101,14 +101,16 @@ function BrowsePage() {
     try {
       const user = await getSessionUser()
       if (!user?.id) { setWishlistTerms([]); return }
+      const storageKey = `rotmarket-wishlist:${user.id}`
       const p = await getProfile(user.id)
       const badges = p?.badges?.length ? p.badges : p?.badge ? [p.badge] : []
-      const tier = getVipAccessTier(badges)
-      if (!['VIP Plus', 'VIP Max'].includes(tier)) {
+      const canUseWishlist = badges.includes('VIP Plus') || badges.includes('VIP Max')
+      if (!canUseWishlist) {
+        localStorage.removeItem(storageKey)
         setWishlistTerms([])
         return
       }
-      const raw = localStorage.getItem(`rotmarket-wishlist:${user.id}`)
+      const raw = localStorage.getItem(storageKey)
       const parsed = raw ? JSON.parse(raw) : []
       setWishlistTerms(Array.isArray(parsed) ? parsed : [])
     } catch {
