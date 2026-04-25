@@ -6,7 +6,6 @@ import { clearProfileCache } from '@/components/Navbar'
 import { getSessionUser, getVerifiedUser, getProfile, updateProfile, supabase } from '@/lib/supabase'
 import { withTimeout, getInitial } from '@/lib/utils'
 import { validateClean } from '@/lib/profanity'
-import { useSiteConfig } from '@/lib/hooks/useSiteConfig'
 
 export default function SettingsPageWrapper() {
   return (
