@@ -9,7 +9,8 @@ import ReportButton from '@/components/ReportButton'
 import ConfirmModal from '@/components/ConfirmModal'
 import { getListing, getReviews, getSessionUser, getVerifiedUser, createReview, supabase } from '@/lib/supabase'
 import { getRarityStyle, timeAgo, formatPrice, getInitial, checkRateLimit, withTimeout } from '@/lib/utils'
-import { BADGE_HIERARCHY, BADGE_META, getPrimaryBadge, PAYMENT_METHODS, getVipGlowTier, VIP_GLOW_META } from '@/lib/constants'
+import { BADGE_HIERARCHY, BADGE_META, getPrimaryBadge, DEFAULT_PAYMENT_METHODS, getVipGlowTier, VIP_GLOW_META } from '@/lib/constants'
+import { useSiteConfig } from '@/lib/hooks/useSiteConfig'
 import { isClean } from '@/lib/profanity'
 
 // ─── TRADE HELPERS ────────────────────────────────────────────────
@@ -301,21 +302,33 @@ function BuyerTradePanel({ myOffer, listing, seller, sellerPayout, listingId, co
           <div style={{ fontSize: 10, fontWeight: 700, color: '#6b7280', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.08em' }}>💳 Payment Info</div>
           {(() => {
             const accepts = listing?.accepts || []
-            const showPaypal = sellerPayout?.paypal_email && accepts.some(a => a.toLowerCase().includes('paypal'))
-            const showCashapp = sellerPayout?.cashapp_handle && accepts.some(a => a.toLowerCase().includes('cash app') || a.toLowerCase().includes('cashapp'))
-            const showVenmo = sellerPayout?.venmo_handle && accepts.some(a => a.toLowerCase().includes('venmo'))
-            const showRevolut = sellerPayout?.revolut_handle && accepts.some(a => a.toLowerCase().includes('revolut'))
-            return (
-              <>
-                {showPaypal && <div style={{ fontSize: 12, color: '#d1d5db', marginBottom: 3 }}>🔵 PayPal: <strong>{sellerPayout.paypal_email}</strong></div>}
-                {showCashapp && <div style={{ fontSize: 12, color: '#d1d5db', marginBottom: 3 }}>🟢 Cash App: <strong>{sellerPayout.cashapp_handle}</strong></div>}
-                {showVenmo && <div style={{ fontSize: 12, color: '#d1d5db', marginBottom: 3 }}>💙 Venmo: <strong>{sellerPayout.venmo_handle}</strong></div>}
-                {showRevolut && <div style={{ fontSize: 12, color: '#d1d5db', marginBottom: 3 }}>🟣 Revolut: <strong>{sellerPayout.revolut_handle}</strong></div>}
-                {!showPaypal && !showCashapp && !showVenmo && !showRevolut && (
-                  <div style={{ fontSize: 12, color: '#4b5563' }}>Message the seller for payment details.</div>
-                )}
-              </>
+            // Dynamically build payment rows from site config + payout handles
+            const PAYOUT_FIELD_MAP = {
+              paypal: { field: 'paypal_email', display: v => v },
+              cashapp: { field: 'cashapp_handle', display: v => v },
+              venmo: { field: 'venmo_handle', display: v => v },
+              revolut: { field: 'revolut_handle', display: v => v },
+            }
+            const activePayments = siteConfig.allPaymentMethods || DEFAULT_PAYMENT_METHODS
+            const rows = activePayments
+              .filter(pm => pm.enabled !== false)
+              .map(pm => {
+                const map = PAYOUT_FIELD_MAP[pm.id]
+                if (!map) return null
+                const handle = sellerPayout?.[map.field]
+                const accepted = accepts.some(a => a.toLowerCase().includes(pm.label.toLowerCase()))
+                if (!handle || !accepted) return null
+                return { pm, value: map.display(handle) }
+              })
+              .filter(Boolean)
+            if (rows.length === 0) return (
+              <div style={{ fontSize: 12, color: '#4b5563' }}>Message the seller for payment details.</div>
             )
+            return rows.map(({ pm, value }) => (
+              <div key={pm.id} style={{ fontSize: 12, color: '#d1d5db', marginBottom: 3 }}>
+                {pm.emoji} {pm.label}: <strong>{value}</strong>
+              </div>
+            ))
           })()}
           <div style={{ marginTop: 8, fontSize: 10, color: '#4b5563', borderTop: '1px solid #1f2937', paddingTop: 6 }}>
             Memo: <strong style={{ color: '#9ca3af' }}>{listingId.slice(0, 8)}</strong>
@@ -357,6 +370,7 @@ export default function ListingPageClient({ id: idProp, initialListing = null })
   const params = useParams()
   const id = idProp ?? params?.id
   const router = useRouter()
+  const { config: siteConfig } = useSiteConfig()
 
   const [listing, setListing] = useState(initialListing)
   const [reviews, setReviews] = useState([])
@@ -695,7 +709,7 @@ export default function ListingPageClient({ id: idProp, initialListing = null })
           <div style={{ background: `linear-gradient(90deg, ${rarity.bg}66, transparent)`, borderBottom: `1px solid ${rarity.border}33`, padding: '10px 20px', display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: rarity.text, background: `${rarity.bg}88`, border: `1px solid ${rarity.border}88`, borderRadius: 4, padding: '3px 9px' }}>{listing.rarity?.replace('_', ' ')}</span>
             <span style={{ fontSize: 13, color: '#475569' }}>·</span>
-            <span style={{ fontSize: 13, color: '#64748b', fontWeight: 600 }}>{listing.game === 'fortnite' ? '🎮 Fortnite Brainrot' : '🟥 Roblox Brainrot'}</span>
+            <span style={{ fontSize: 13, color: '#64748b', fontWeight: 600 }}>{siteConfig.allGames.find(g => g.id === listing.game)?.emoji || '🎮'} {siteConfig.allGames.find(g => g.id === listing.game)?.label || listing.game}</span>
             <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }} className="hide-mobile">
               <span style={{ fontSize: 12, color: '#475569' }}>👁 {listing.views}</span>
               <span style={{ fontSize: 12, color: '#374151' }}>{timeAgo(listing.created_at)}</span>
@@ -767,7 +781,7 @@ export default function ListingPageClient({ id: idProp, initialListing = null })
                 <div style={{ width: '100%' }}>
                   <div style={{ fontSize: 10, color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>Accepts</div>
                   {listing.accepts.map(method => {
-                    const pm = PAYMENT_METHODS.find(p => p.label === method)
+                    const pm = (siteConfig.allPaymentMethods || DEFAULT_PAYMENT_METHODS).find(p => p.label === method)
                     return (
                       <div key={method} style={{ fontSize: 11, color: '#d1d5db', background: '#1a1a2e', border: '1px solid #2d2d3f', borderRadius: 6, padding: '5px 10px', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                         <span>{pm?.emoji || '💳'}</span> {method}
