@@ -5,8 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import ConfirmModal from '@/components/ConfirmModal'
 import { getSessionUser, getVerifiedUser, getProfile, createListing, updateListing, uploadListingImage, supabase } from '@/lib/supabase'
-import { LISTING_TYPES } from '@/lib/constants'
-import { useSiteConfig } from '@/lib/hooks/useSiteConfig'
+import { GAMES, RARITIES, PAYMENT_METHODS, LISTING_TYPES } from '@/lib/constants'
 import { validateListing, checkRateLimit, withTimeout } from '@/lib/utils'
 import { validateClean, validateContent } from '@/lib/profanity'
 
@@ -17,7 +16,6 @@ const TEMPLATE_STORAGE_KEY = 'rotmarket-listing-templates'
 export default function CreateListingPage() {
   const router = useRouter()
   const fileInputRef = useRef(null)
-  const { config: siteConfig } = useSiteConfig()
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -296,7 +294,7 @@ export default function CreateListingPage() {
     }
   }
 
-  const rarities = (siteConfig.rarities[form.game] || siteConfig.rarities.fortnite || []).filter(r => r.enabled !== false)
+  const rarities = RARITIES[form.game] || RARITIES.fortnite
 
 
 
@@ -418,7 +416,7 @@ export default function CreateListingPage() {
           {/* Game select */}
           <Section title="Game" required>
             <div style={{ display: 'flex', gap: 10 }}>
-              {siteConfig.games.map(g => (
+              {GAMES.map(g => (
                 <GameOption key={g.id} game={g} selected={form.game === g.id} onClick={() => { set('game', g.id); set('rarity', '') }} />
               ))}
             </div>
@@ -542,7 +540,7 @@ export default function CreateListingPage() {
           {form.type === 'sale' && (
             <Section title="Accepted Payment Methods" required error={errors.accepts}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {siteConfig.payment_methods.map(pm => (
+                {PAYMENT_METHODS.map(pm => (
                   <label key={pm.id} style={{
                     display: 'flex', alignItems: 'center', gap: 12,
                     padding: '10px 14px', borderRadius: 10, cursor: 'pointer',

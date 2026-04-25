@@ -18,7 +18,6 @@ export default function SettingsPageWrapper() {
 function SettingsPage() {
   const router = useRouter()
   const avatarInputRef = useRef(null)
-  const { config: siteConfig } = useSiteConfig()
 
   const [user, setUser] = useState(null)
   const [profileUsername, setProfileUsername] = useState('')
@@ -307,40 +306,29 @@ function SettingsPage() {
             </Field>
           </Section>
 
-          {/* Payment Info — dynamic based on admin-enabled methods */}
+          {/* Payment Info */}
           <Section title="Payment Info" hint="Shown to buyers only after you accept their offer">
-            {siteConfig.payment_methods.some(pm => pm.id === 'paypal') && (
-              <Field label="PayPal Email" hint="Recommended — buyer protection">
-                <input type="email" placeholder="you@paypal.com" value={form.paypal_email} onChange={e => set('paypal_email', e.target.value)} />
-              </Field>
-            )}
-            {siteConfig.payment_methods.some(pm => pm.id === 'cashapp') && (
-              <Field label="Cash App Handle">
-                <div style={{ position: 'relative' }}>
-                  <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }}>$</span>
-                  <input type="text" placeholder="YourHandle" value={form.cashapp_handle.replace('$', '')} onChange={e => set('cashapp_handle', '$' + e.target.value.replace('$', ''))} style={{ paddingLeft: 28 }} />
-                </div>
-              </Field>
-            )}
-            {siteConfig.payment_methods.some(pm => pm.id === 'venmo') && (
-              <Field label="Venmo Handle">
-                <div style={{ position: 'relative' }}>
-                  <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }}>@</span>
-                  <input type="text" placeholder="YourHandle" value={form.venmo_handle.replace('@', '')} onChange={e => set('venmo_handle', '@' + e.target.value.replace('@', ''))} style={{ paddingLeft: 28 }} />
-                </div>
-              </Field>
-            )}
-            {siteConfig.payment_methods.some(pm => pm.id === 'revolut') && (
-              <Field label="Revolut Handle">
-                <div style={{ position: 'relative' }}>
-                  <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }}>@</span>
-                  <input type="text" placeholder="YourHandle" value={form.revolut_handle.replace('@', '')} onChange={e => set('revolut_handle', '@' + e.target.value.replace('@', ''))} style={{ paddingLeft: 28 }} />
-                </div>
-              </Field>
-            )}
-            {siteConfig.payment_methods.length === 0 && (
-              <div style={{ fontSize: 12, color: '#6b7280' }}>No payment methods are currently enabled.</div>
-            )}
+            <Field label="PayPal Email" hint="Recommended — buyer protection">
+              <input type="email" placeholder="you@paypal.com" value={form.paypal_email} onChange={e => set('paypal_email', e.target.value)} />
+            </Field>
+            <Field label="Cash App Handle">
+              <div style={{ position: 'relative' }}>
+                <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }}>$</span>
+                <input type="text" placeholder="YourHandle" value={form.cashapp_handle.replace('$', '')} onChange={e => set('cashapp_handle', '$' + e.target.value.replace('$', ''))} style={{ paddingLeft: 28 }} />
+              </div>
+            </Field>
+            <Field label="Venmo Handle">
+              <div style={{ position: 'relative' }}>
+                <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }}>@</span>
+                <input type="text" placeholder="YourHandle" value={form.venmo_handle.replace('@', '')} onChange={e => set('venmo_handle', '@' + e.target.value.replace('@', ''))} style={{ paddingLeft: 28 }} />
+              </div>
+            </Field>
+            <Field label="Revolut Handle">
+              <div style={{ position: 'relative' }}>
+                <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }}>@</span>
+                <input type="text" placeholder="YourHandle" value={form.revolut_handle.replace('@', '')} onChange={e => set('revolut_handle', '@' + e.target.value.replace('@', ''))} style={{ paddingLeft: 28 }} />
+              </div>
+            </Field>
           </Section>
 
           {/* Account */}

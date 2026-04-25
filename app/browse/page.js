@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import ListingCard, { ListingCardSkeleton } from '@/components/ListingCard'
 import { getListings, getSessionUser, getProfile } from '@/lib/supabase'
 import { withTimeout } from '@/lib/utils'
-import { useSiteConfig } from '@/lib/hooks/useSiteConfig'
+import { GAMES } from '@/lib/constants'
 import Link from 'next/link'
 
 const PAGE_SIZE = 24
@@ -27,7 +27,6 @@ export default function BrowsePageWrapper() {
 }
 
 function BrowsePage() {
-  const { config: siteConfig } = useSiteConfig()
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -214,7 +213,7 @@ function BrowsePage() {
           {/* Game filter */}
           <div style={{ display: 'flex', gap: 6, background: '#111118', border: '1px solid #1f2937', borderRadius: 10, padding: 4 }}>
             <FilterPill active={game === 'all'} onClick={() => handleGameChange('all')}>All Games</FilterPill>
-            {siteConfig.games.map(g => (
+            {GAMES.map(g => (
               <FilterPill key={g.id} active={game === g.id} onClick={() => handleGameChange(g.id)}>
                 {g.emoji} {g.label}
               </FilterPill>
