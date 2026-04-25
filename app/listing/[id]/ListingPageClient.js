@@ -9,7 +9,8 @@ import ReportButton from '@/components/ReportButton'
 import ConfirmModal from '@/components/ConfirmModal'
 import { getListing, getReviews, getSessionUser, getVerifiedUser, createReview, supabase } from '@/lib/supabase'
 import { getRarityStyle, timeAgo, formatPrice, getInitial, checkRateLimit, withTimeout } from '@/lib/utils'
-import { BADGE_HIERARCHY, BADGE_META, getPrimaryBadge, PAYMENT_METHODS, getVipGlowTier, VIP_GLOW_META } from '@/lib/constants'
+import { BADGE_HIERARCHY, BADGE_META, getPrimaryBadge, getVipGlowTier, VIP_GLOW_META } from '@/lib/constants'
+import { useMarketConfig } from '@/lib/market-config'
 import { isClean } from '@/lib/profanity'
 
 // ─── TRADE HELPERS ────────────────────────────────────────────────
@@ -241,7 +242,7 @@ function SellerOfferCard({ offer, onUpdate, onSetListing }) {
   )
 }
 
-function BuyerTradePanel({ myOffer, listing, seller, sellerPayout, listingId, copiedId, setCopiedId, handleBuyerConfirm, setMyOffer, setOfferSent, setOfferMessage, setOfferPrice, confirmError, setConfirmError }) {
+function BuyerTradePanel({ myOffer, listing, seller, sellerPayout, paymentByValue, listingId, copiedId, setCopiedId, handleBuyerConfirm, setMyOffer, setOfferSent, setOfferMessage, setOfferPrice, confirmError, setConfirmError }) {
   const [modal, setModal] = useState(null)
   if (!myOffer) return null
   const isTradeType = listing?.type === 'trade'
@@ -300,18 +301,28 @@ function BuyerTradePanel({ myOffer, listing, seller, sellerPayout, listingId, co
         <div style={{ background: '#0d0d14', border: '1px solid #2d2d3f', borderRadius: 8, padding: 12, marginBottom: 10 }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: '#6b7280', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.08em' }}>💳 Payment Info</div>
           {(() => {
-            const accepts = listing?.accepts || []
-            const showPaypal = sellerPayout?.paypal_email && accepts.some(a => a.toLowerCase().includes('paypal'))
-            const showCashapp = sellerPayout?.cashapp_handle && accepts.some(a => a.toLowerCase().includes('cash app') || a.toLowerCase().includes('cashapp'))
-            const showVenmo = sellerPayout?.venmo_handle && accepts.some(a => a.toLowerCase().includes('venmo'))
-            const showRevolut = sellerPayout?.revolut_handle && accepts.some(a => a.toLowerCase().includes('revolut'))
+            const accepts = Array.isArray(listing?.accepts) ? listing.accepts : []
+            const paymentRows = accepts.map((value) => {
+              const pm = paymentByValue?.[String(value || '').toLowerCase()]
+              const label = pm?.label || String(value || '')
+              const emoji = pm?.emoji || '💳'
+              let handleField = pm?.handle_field || null
+              const lower = String(value || '').toLowerCase()
+              if (!handleField && lower.includes('paypal')) handleField = 'paypal_email'
+              if (!handleField && (lower.includes('cash app') || lower.includes('cashapp'))) handleField = 'cashapp_handle'
+              if (!handleField && lower.includes('venmo')) handleField = 'venmo_handle'
+              if (!handleField && lower.includes('revolut')) handleField = 'revolut_handle'
+              const handleValue = handleField ? sellerPayout?.[handleField] : null
+              return { label, emoji, handleValue }
+            }).filter(row => row.label)
             return (
               <>
-                {showPaypal && <div style={{ fontSize: 12, color: '#d1d5db', marginBottom: 3 }}>🔵 PayPal: <strong>{sellerPayout.paypal_email}</strong></div>}
-                {showCashapp && <div style={{ fontSize: 12, color: '#d1d5db', marginBottom: 3 }}>🟢 Cash App: <strong>{sellerPayout.cashapp_handle}</strong></div>}
-                {showVenmo && <div style={{ fontSize: 12, color: '#d1d5db', marginBottom: 3 }}>💙 Venmo: <strong>{sellerPayout.venmo_handle}</strong></div>}
-                {showRevolut && <div style={{ fontSize: 12, color: '#d1d5db', marginBottom: 3 }}>🟣 Revolut: <strong>{sellerPayout.revolut_handle}</strong></div>}
-                {!showPaypal && !showCashapp && !showVenmo && !showRevolut && (
+                {paymentRows.filter(row => !!row.handleValue).map((row, idx) => (
+                  <div key={`${row.label}-${idx}`} style={{ fontSize: 12, color: '#d1d5db', marginBottom: 3 }}>
+                    {row.emoji} {row.label}: <strong>{row.handleValue}</strong>
+                  </div>
+                ))}
+                {!paymentRows.some(row => !!row.handleValue) && (
                   <div style={{ fontSize: 12, color: '#4b5563' }}>Message the seller for payment details.</div>
                 )}
               </>
@@ -355,6 +366,7 @@ function BuyerTradePanel({ myOffer, listing, seller, sellerPayout, listingId, co
 // useParams() call and ensures the id is available on the very first render.
 export default function ListingPageClient({ id: idProp, initialListing = null }) {
   const params = useParams()
+  const { config } = useMarketConfig()
   const id = idProp ?? params?.id
   const router = useRouter()
 
@@ -443,6 +455,8 @@ export default function ListingPageClient({ id: idProp, initialListing = null })
   }, [load])
 
   const rarity = listing ? getRarityStyle(listing.rarity) : getRarityStyle('common')
+  const paymentByValue = config?.paymentByValue || {}
+  const gameLabel = config?.gamesById?.[listing?.game]?.label || String(listing?.game || '').replace(/[_-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
   const seller = listing?.profiles
   const isSeller = user && seller && user.id === seller.id
 
@@ -695,7 +709,7 @@ export default function ListingPageClient({ id: idProp, initialListing = null })
           <div style={{ background: `linear-gradient(90deg, ${rarity.bg}66, transparent)`, borderBottom: `1px solid ${rarity.border}33`, padding: '10px 20px', display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: rarity.text, background: `${rarity.bg}88`, border: `1px solid ${rarity.border}88`, borderRadius: 4, padding: '3px 9px' }}>{listing.rarity?.replace('_', ' ')}</span>
             <span style={{ fontSize: 13, color: '#475569' }}>·</span>
-            <span style={{ fontSize: 13, color: '#64748b', fontWeight: 600 }}>{listing.game === 'fortnite' ? '🎮 Fortnite Brainrot' : '🟥 Roblox Brainrot'}</span>
+            <span style={{ fontSize: 13, color: '#64748b', fontWeight: 600 }}>{gameLabel || 'Unknown Game'}</span>
             <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }} className="hide-mobile">
               <span style={{ fontSize: 12, color: '#475569' }}>👁 {listing.views}</span>
               <span style={{ fontSize: 12, color: '#374151' }}>{timeAgo(listing.created_at)}</span>
@@ -767,10 +781,10 @@ export default function ListingPageClient({ id: idProp, initialListing = null })
                 <div style={{ width: '100%' }}>
                   <div style={{ fontSize: 10, color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>Accepts</div>
                   {listing.accepts.map(method => {
-                    const pm = PAYMENT_METHODS.find(p => p.label === method)
+                    const pm = paymentByValue[String(method || '').toLowerCase()]
                     return (
                       <div key={method} style={{ fontSize: 11, color: '#d1d5db', background: '#1a1a2e', border: '1px solid #2d2d3f', borderRadius: 6, padding: '5px 10px', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                        <span>{pm?.emoji || '💳'}</span> {method}
+                        <span>{pm?.emoji || '💳'}</span> {pm?.label || method}
                       </div>
                     )
                   })}
@@ -842,7 +856,7 @@ export default function ListingPageClient({ id: idProp, initialListing = null })
                     )}
 
                     {/* BUYER: show their offer status */}
-                    {!isSeller && <BuyerTradePanel myOffer={myOffer} listing={listing} seller={seller} sellerPayout={sellerPayout} listingId={id} copiedId={copiedId} setCopiedId={setCopiedId} handleBuyerConfirm={handleBuyerConfirm} setMyOffer={setMyOffer} setOfferSent={setOfferSent} setOfferMessage={setOfferMessage} setOfferPrice={setOfferPrice} confirmError={confirmError} setConfirmError={setConfirmError} />}
+                    {!isSeller && <BuyerTradePanel myOffer={myOffer} listing={listing} seller={seller} sellerPayout={sellerPayout} paymentByValue={paymentByValue} listingId={id} copiedId={copiedId} setCopiedId={setCopiedId} handleBuyerConfirm={handleBuyerConfirm} setMyOffer={setMyOffer} setOfferSent={setOfferSent} setOfferMessage={setOfferMessage} setOfferPrice={setOfferPrice} confirmError={confirmError} setConfirmError={setConfirmError} />}
 
                     {/* REVIEW FORM — shows in details tab after completed trade */}
                     {!isSeller && user && myOffer?.status === 'completed' && (

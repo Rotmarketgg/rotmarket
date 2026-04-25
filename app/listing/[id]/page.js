@@ -43,7 +43,7 @@ export async function generateMetadata({ params }) {
     }
   }
 
-  const gameLabel = listing.game === 'fortnite' ? 'Fortnite Brainrot' : 'Roblox Brainrot'
+  const gameLabel = String(listing.game || '').replace(/[_-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || 'Brainrot'
   const typeLabel = listing.type === 'sale' ? 'for sale' : 'for trade'
   const priceStr  = listing.price ? ` — $${Number(listing.price).toFixed(2)}` : ''
   const seller    = listing.profiles?.username ? ` by ${listing.profiles.username}` : ''

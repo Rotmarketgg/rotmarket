@@ -8,6 +8,7 @@ import { getSessionUser, getProfile, supabase } from '@/lib/supabase'
 import { withTimeout, timeAgo, getInitial } from '@/lib/utils'
 import { BADGE_HIERARCHY, BADGE_META, getPrimaryBadge } from '@/lib/constants'
 import ConfirmModal from '@/components/ConfirmModal'
+import AdminCatalogManager from '@/components/AdminCatalogManager'
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 
 const BADGE_COLORS = {
@@ -912,6 +913,7 @@ export default function AdminPage() {
 
   const TABS = [
     { id: 'dashboard', label: '📊 Dashboard' },
+    { id: 'catalog', label: '🧩 Catalog' },
     { id: 'reports', label: `🚩 Reports${stats.pendingReports > 0 ? ` (${stats.pendingReports})` : ''}` },
     { id: 'disputes', label: `⚖️ Disputes${stats.openDisputes > 0 ? ` (${stats.openDisputes})` : ''}` },
     { id: 'trades', label: '🔄 Trades' },
@@ -1260,6 +1262,10 @@ export default function AdminPage() {
         )}
 
         {/* ─── REPORTS TAB ─── */}
+        {tab === 'catalog' && (
+          <AdminCatalogManager />
+        )}
+
         {tab === 'reports' && (
           <div>
             <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
@@ -1432,7 +1438,7 @@ export default function AdminPage() {
                           </div>
                           <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
                             By <Link href={`/profile/${l.profiles?.username}`} style={{ color: '#9ca3af', textDecoration: 'none' }}>{l.profiles?.username}</Link>
-                            {' · '}{l.game === 'fortnite' ? 'Fortnite' : 'Roblox'}
+                            {' · '}{String(l.game || '').replace(/[_-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || 'Unknown Game'}
                             {l.price && ` · $${l.price}`}
                             {' · '}{l.views} views{' · '}{timeAgo(l.created_at)}
                           </div>

@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import ListingCard, { ListingCardSkeleton } from '@/components/ListingCard'
 import { getListings, getSessionUser, getProfile } from '@/lib/supabase'
 import { withTimeout } from '@/lib/utils'
-import { GAMES } from '@/lib/constants'
+import { useMarketConfig } from '@/lib/market-config'
 import Link from 'next/link'
 
 const PAGE_SIZE = 24
@@ -28,7 +28,9 @@ export default function BrowsePageWrapper() {
 
 function BrowsePage() {
   const router = useRouter()
+  const { config } = useMarketConfig()
   const searchParams = useSearchParams()
+  const games = config?.games || []
 
   // Read filters from URL so the page is shareable / bookmarkable
   const pageParam  = parseInt(searchParams.get('page')  || '1', 10)
@@ -213,7 +215,7 @@ function BrowsePage() {
           {/* Game filter */}
           <div style={{ display: 'flex', gap: 6, background: '#111118', border: '1px solid #1f2937', borderRadius: 10, padding: 4 }}>
             <FilterPill active={game === 'all'} onClick={() => handleGameChange('all')}>All Games</FilterPill>
-            {GAMES.map(g => (
+            {games.map(g => (
               <FilterPill key={g.id} active={game === g.id} onClick={() => handleGameChange(g.id)}>
                 {g.emoji} {g.label}
               </FilterPill>

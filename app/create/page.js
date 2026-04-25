@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import ConfirmModal from '@/components/ConfirmModal'
 import { getSessionUser, getVerifiedUser, getProfile, createListing, updateListing, uploadListingImage, supabase } from '@/lib/supabase'
-import { GAMES, RARITIES, PAYMENT_METHODS, LISTING_TYPES } from '@/lib/constants'
+import { LISTING_TYPES } from '@/lib/constants'
+import { useMarketConfig } from '@/lib/market-config'
 import { validateListing, checkRateLimit, withTimeout } from '@/lib/utils'
 import { validateClean, validateContent } from '@/lib/profanity'
 
@@ -15,6 +16,7 @@ const TEMPLATE_STORAGE_KEY = 'rotmarket-listing-templates'
 
 export default function CreateListingPage() {
   const router = useRouter()
+  const { config } = useMarketConfig()
   const fileInputRef = useRef(null)
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
@@ -35,6 +37,39 @@ export default function CreateListingPage() {
     accepts: [],
     quantity: 1,
   })
+
+  const games = config?.games || []
+  const paymentMethods = config?.payments || []
+
+  useEffect(() => {
+    if (!games.length) return
+    const hasGame = games.some(g => g.id === form.game)
+    if (!hasGame) {
+      setForm(prev => ({ ...prev, game: games[0].id, rarity: '' }))
+    }
+  }, [games, form.game])
+
+  const rarities = config?.raritiesByGame?.[form.game] || []
+  useEffect(() => {
+    if (!form.rarity) return
+    if (rarities.some(r => r.id === form.rarity)) return
+    setForm(prev => ({ ...prev, rarity: '' }))
+  }, [form.rarity, rarities])
+
+  useEffect(() => {
+    if (!paymentMethods.length) return
+    const allowed = new Set(paymentMethods.map(pm => pm.id))
+    const paymentByValue = config?.paymentByValue || {}
+    setForm(prev => {
+      const prevAccepts = prev.accepts || []
+      const nextAccepts = (prev.accepts || [])
+        .map(value => paymentByValue[String(value || '').toLowerCase()]?.id || value)
+        .filter(id => allowed.has(id))
+      const unchanged = nextAccepts.length === prevAccepts.length && nextAccepts.every((v, i) => v === prevAccepts[i])
+      if (unchanged) return prev
+      return { ...prev, accepts: nextAccepts }
+    })
+  }, [paymentMethods, config?.paymentByValue])
 
   useEffect(() => {
     async function checkAuth() {
@@ -177,6 +212,15 @@ export default function CreateListingPage() {
 
   const handleSubmit = async () => {
     const errs = validateListing(form)
+    const activeGameIds = new Set(games.map(g => g.id))
+    const allowedRarityIds = new Set(rarities.map(r => r.id))
+    const allowedPaymentIds = new Set(paymentMethods.map(pm => pm.id))
+    if (games.length && !activeGameIds.has(form.game)) errs.game = 'Select an active game'
+    if (rarities.length && !allowedRarityIds.has(form.rarity)) errs.rarity = 'Select an active rarity'
+    if (form.type === 'sale') {
+      const normalized = (form.accepts || []).filter(id => allowedPaymentIds.has(id))
+      if (normalized.length === 0) errs.accepts = 'Select at least one active payment method'
+    }
     const titleErr = validateClean(form.title, 'Title')
     const descErr = validateClean(form.description, 'Description')
     if (titleErr) errs.title = titleErr
@@ -206,7 +250,7 @@ export default function CreateListingPage() {
     const hasGameId = !!(activeProfile?.epic_username || activeProfile?.roblox_username)
     if (!hasPayment || !hasGameId) {
       const missing = []
-      if (!hasPayment) missing.push('a payment method (PayPal, Cash App, Venmo, or Revolut)')
+      if (!hasPayment) missing.push('a payment method')
       if (!hasGameId) missing.push('a game username (Epic or Roblox)')
       setErrors({
         general: `Complete your profile before posting: add ${missing.join(' and ')}. Update in Settings.`,
@@ -262,7 +306,7 @@ export default function CreateListingPage() {
         type: form.type,
         price: form.type === 'sale' ? parseFloat(form.price) : null,
         description: form.description.trim(),
-        accepts: form.type === 'sale' ? form.accepts : [],
+        accepts: form.type === 'sale' ? (form.accepts || []).filter(id => paymentMethods.some(pm => pm.id === id)) : [],
         quantity: form.type === 'sale' ? Math.max(1, parseInt(form.quantity) || 1) : 1,
         images: [],
       })
@@ -293,10 +337,6 @@ export default function CreateListingPage() {
       setLoading(false)
     }
   }
-
-  const rarities = RARITIES[form.game] || RARITIES.fortnite
-
-
 
   if (success) return (
     <div style={{ minHeight: '100vh' }}>
@@ -416,10 +456,11 @@ export default function CreateListingPage() {
           {/* Game select */}
           <Section title="Game" required>
             <div style={{ display: 'flex', gap: 10 }}>
-              {GAMES.map(g => (
+              {games.map(g => (
                 <GameOption key={g.id} game={g} selected={form.game === g.id} onClick={() => { set('game', g.id); set('rarity', '') }} />
               ))}
             </div>
+            {games.length === 0 && <div style={{ fontSize: 11, color: '#f59e0b', marginTop: 6 }}>No active games configured. Enable one in Admin → Catalog.</div>}
           </Section>
 
           {/* Title */}
@@ -452,6 +493,7 @@ export default function CreateListingPage() {
                 </button>
               ))}
             </div>
+            {rarities.length === 0 && <div style={{ fontSize: 11, color: '#f59e0b', marginTop: 6 }}>No active rarities for this game. Add one in Admin → Catalog.</div>}
           </Section>
 
           {/* Type */}
@@ -540,18 +582,18 @@ export default function CreateListingPage() {
           {form.type === 'sale' && (
             <Section title="Accepted Payment Methods" required error={errors.accepts}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {PAYMENT_METHODS.map(pm => (
+                {paymentMethods.map(pm => (
                   <label key={pm.id} style={{
                     display: 'flex', alignItems: 'center', gap: 12,
                     padding: '10px 14px', borderRadius: 10, cursor: 'pointer',
-                    background: form.accepts.includes(pm.label) ? 'rgba(74,222,128,0.08)' : '#0d0d14',
-                    border: form.accepts.includes(pm.label) ? '1px solid rgba(74,222,128,0.3)' : '1px solid #2d2d3f',
+                    background: form.accepts.includes(pm.id) ? 'rgba(74,222,128,0.08)' : '#0d0d14',
+                    border: form.accepts.includes(pm.id) ? '1px solid rgba(74,222,128,0.3)' : '1px solid #2d2d3f',
                     transition: 'all 0.15s',
                   }}>
                     <input
                       type="checkbox"
-                      checked={form.accepts.includes(pm.label)}
-                      onChange={() => togglePayment(pm.label)}
+                      checked={form.accepts.includes(pm.id)}
+                      onChange={() => togglePayment(pm.id)}
                       style={{ width: 'auto', margin: 0 }}
                     />
                     <span style={{ fontSize: 16 }}>{pm.emoji}</span>
@@ -561,6 +603,7 @@ export default function CreateListingPage() {
                     </div>
                   </label>
                 ))}
+                {paymentMethods.length === 0 && <div style={{ fontSize: 11, color: '#f59e0b' }}>No active payment methods configured. Enable one in Admin → Catalog.</div>}
               </div>
             </Section>
           )}

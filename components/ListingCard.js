@@ -4,6 +4,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { getRarityStyle, timeAgo, formatPrice, getInitial } from '@/lib/utils'
 import { BADGE_META, getPrimaryBadge, getVipGlowTier, VIP_GLOW_META } from '@/lib/constants'
+import { useMarketConfig } from '@/lib/market-config'
 
 const TYPE_CONFIG = {
   sale:  { label: 'FOR SALE',  bg: 'rgba(22,163,74,0.9)',  border: '#16a34a', color: '#fff' },
@@ -12,6 +13,7 @@ const TYPE_CONFIG = {
 }
 
 export default function ListingCard({ listing }) {
+  useMarketConfig()
   const rarity = getRarityStyle(listing.rarity)
   const profile = listing.profiles
 
