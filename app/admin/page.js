@@ -2249,85 +2249,52 @@ function EmptyState({ icon, message }) {
 
 
 // ─── SITE SETTINGS TAB ────────────────────────────────────────────────────────
-// Writes directly to site_config via the supabase client (admin's own session).
-// Requires RLS policy: owners can insert/update site_config.
-// Fallback: if site_config table doesn't exist, shows defaults and saves locally.
+// Allows admins to manage games, rarities, and payment methods dynamically.
+// Changes are saved to the site_config Supabase table via /api/admin/site-config.
 
 function SiteSettingsTab() {
   const [config, setConfig] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
+  const [saving, setSaving] = useState(null) // 'games' | 'rarities' | 'payment_methods'
   const [msg, setMsg] = useState(null)
 
-  const [gameModal, setGameModal] = useState(null)
-  const [rarityModal, setRarityModal] = useState(null)
-  const [pmModal, setPmModal] = useState(null)
+  // Modals
+  const [gameModal, setGameModal] = useState(null)   // null | 'add' | game object
+  const [rarityModal, setRarityModal] = useState(null) // null | { gameId, rarity|null }
+  const [pmModal, setPmModal] = useState(null)       // null | 'add' | pm object
   const [selectedGame, setSelectedGame] = useState(null)
 
-  // Load config directly from supabase
   useEffect(() => {
-    async function load() {
-      try {
-        const { data, error } = await supabase
-          .from('site_config')
-          .select('key, value')
-
-        if (error || !data || data.length === 0) {
-          // Table missing or empty — use hardcoded defaults
-          setConfig({
-            games: DEFAULT_GAMES,
-            rarities: DEFAULT_RARITIES,
-            payment_methods: DEFAULT_PAYMENT_METHODS,
-          })
-          setSelectedGame(DEFAULT_GAMES[0]?.id || 'fortnite')
-          setMsg({ type: 'warn', text: 'site_config table empty or missing — run the SQL migration first. Changes shown locally only.' })
-        } else {
-          const cfg = Object.fromEntries(data.map(r => [r.key, r.value]))
-          const merged = {
-            games:           cfg.games           ?? DEFAULT_GAMES,
-            rarities:        cfg.rarities        ?? DEFAULT_RARITIES,
-            payment_methods: cfg.payment_methods ?? DEFAULT_PAYMENT_METHODS,
-          }
-          setConfig(merged)
-          setSelectedGame(merged.games?.[0]?.id || 'fortnite')
-        }
-      } catch (e) {
-        setConfig({ games: DEFAULT_GAMES, rarities: DEFAULT_RARITIES, payment_methods: DEFAULT_PAYMENT_METHODS })
-        setSelectedGame(DEFAULT_GAMES[0]?.id || 'fortnite')
-        setMsg({ type: 'err', text: 'Could not load config: ' + e.message })
-      } finally {
+    fetch('/api/admin/site-config')
+      .then(r => r.json())
+      .then(cfg => {
+        setConfig(cfg)
+        setSelectedGame(cfg.games?.[0]?.id || 'fortnite')
         setLoading(false)
-      }
-    }
-    load()
+      })
+      .catch(() => setLoading(false))
   }, [])
 
-  async function saveKey(key, newConfig) {
-    setSaving(true)
+  async function saveKey(key, value) {
+    setSaving(key)
     setMsg(null)
-    const value = newConfig[key]
     try {
-      const { error } = await supabase
-        .from('site_config')
-        .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' })
-
-      if (error) throw new Error(error.message)
-
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      const res = await fetch('/api/admin/site-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ key, value }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Save failed')
       invalidateSiteConfig()
-      setMsg({ type: 'ok', text: `Saved ${key.replace(/_/g, ' ')} ✓` })
-    } catch (e) {
-      setMsg({ type: 'err', text: 'Save failed: ' + e.message + ' — check RLS or run SQL migration.' })
+      setMsg({ type: 'ok', text: `${key.replace('_', ' ')} saved!` })
+    } catch (err) {
+      setMsg({ type: 'err', text: err.message })
     } finally {
-      setSaving(false)
+      setSaving(null)
     }
-  }
-
-  function updateAndSave(key, updater) {
-    setConfig(prev => {
-      const next = { ...prev, [key]: updater(prev[key]) }
-      saveKey(key, next)
-      return next
-    })
   }
 
   if (loading) return <Loader />
@@ -2338,24 +2305,99 @@ function SiteSettingsTab() {
   const paymentMethods = config.payment_methods || DEFAULT_PAYMENT_METHODS
   const activeGameRarities = rarities[selectedGame] || []
 
+  // ── helpers ──
+  const toggleGame = (gameId) => {
+    const updated = games.map(g => g.id === gameId ? { ...g, enabled: !g.enabled } : g)
+    setConfig(c => ({ ...c, games: updated }))
+    saveKey('games', updated)
+  }
+
+  const deleteGame = (gameId) => {
+    const updated = games.filter(g => g.id !== gameId)
+    const updatedRarities = { ...rarities }
+    delete updatedRarities[gameId]
+    setConfig(c => ({ ...c, games: updated, rarities: updatedRarities }))
+    saveKey('games', updated)
+    saveKey('rarities', updatedRarities)
+  }
+
+  const saveGame = (gameData) => {
+    const isEdit = games.some(g => g.id === gameData.id)
+    const updated = isEdit
+      ? games.map(g => g.id === gameData.id ? { ...g, ...gameData } : g)
+      : [...games, { ...gameData, enabled: true }]
+    if (!isEdit) {
+      const updatedRarities = { ...rarities, [gameData.id]: rarities.fortnite || [] }
+      setConfig(c => ({ ...c, games: updated, rarities: updatedRarities }))
+      saveKey('rarities', updatedRarities)
+    } else {
+      setConfig(c => ({ ...c, games: updated }))
+    }
+    saveKey('games', updated)
+    setGameModal(null)
+  }
+
+  const toggleRarity = (gameId, rarityId) => {
+    const gameRarities = (rarities[gameId] || []).map(r =>
+      r.id === rarityId ? { ...r, enabled: !r.enabled } : r
+    )
+    const updated = { ...rarities, [gameId]: gameRarities }
+    setConfig(c => ({ ...c, rarities: updated }))
+    saveKey('rarities', updated)
+  }
+
+  const deleteRarity = (gameId, rarityId) => {
+    const gameRarities = (rarities[gameId] || []).filter(r => r.id !== rarityId)
+    const updated = { ...rarities, [gameId]: gameRarities }
+    setConfig(c => ({ ...c, rarities: updated }))
+    saveKey('rarities', updated)
+  }
+
+  const saveRarity = (gameId, rarityData) => {
+    const existing = rarities[gameId] || []
+    const isEdit = existing.some(r => r.id === rarityData.id)
+    const updated = isEdit
+      ? existing.map(r => r.id === rarityData.id ? { ...r, ...rarityData } : r)
+      : [...existing, { ...rarityData, enabled: true }]
+    const updatedRarities = { ...rarities, [gameId]: updated }
+    setConfig(c => ({ ...c, rarities: updatedRarities }))
+    saveKey('rarities', updatedRarities)
+    setRarityModal(null)
+  }
+
+  const togglePm = (pmId) => {
+    const updated = paymentMethods.map(p => p.id === pmId ? { ...p, enabled: !p.enabled } : p)
+    setConfig(c => ({ ...c, payment_methods: updated }))
+    saveKey('payment_methods', updated)
+  }
+
+  const deletePm = (pmId) => {
+    const updated = paymentMethods.filter(p => p.id !== pmId)
+    setConfig(c => ({ ...c, payment_methods: updated }))
+    saveKey('payment_methods', updated)
+  }
+
+  const savePm = (pmData) => {
+    const isEdit = paymentMethods.some(p => p.id === pmData.id)
+    const updated = isEdit
+      ? paymentMethods.map(p => p.id === pmData.id ? { ...p, ...pmData } : p)
+      : [...paymentMethods, { ...pmData, enabled: true }]
+    setConfig(c => ({ ...c, payment_methods: updated }))
+    saveKey('payment_methods', updated)
+    setPmModal(null)
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
       {msg && (
         <div style={{
           padding: '10px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600,
-          background: msg.type === 'ok' ? 'rgba(74,222,128,0.1)' : msg.type === 'warn' ? 'rgba(245,158,11,0.1)' : 'rgba(239,68,68,0.1)',
-          border: `1px solid ${msg.type === 'ok' ? 'rgba(74,222,128,0.3)' : msg.type === 'warn' ? 'rgba(245,158,11,0.3)' : 'rgba(239,68,68,0.3)'}`,
-          color: msg.type === 'ok' ? '#4ade80' : msg.type === 'warn' ? '#f59e0b' : '#f87171',
+          background: msg.type === 'ok' ? 'rgba(74,222,128,0.1)' : 'rgba(239,68,68,0.1)',
+          border: `1px solid ${msg.type === 'ok' ? 'rgba(74,222,128,0.3)' : 'rgba(239,68,68,0.3)'}`,
+          color: msg.type === 'ok' ? '#4ade80' : '#f87171',
         }}>
-          {msg.text}
-        </div>
-      )}
-
-      {saving && (
-        <div style={{ fontSize: 11, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <div style={{ width: 10, height: 10, border: '2px solid #2d2d3f', borderTopColor: '#4ade80', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-          Saving…
+          {msg.type === 'ok' ? '✓ ' : '✕ '}{msg.text}
         </div>
       )}
 
@@ -2369,31 +2411,29 @@ function SiteSettingsTab() {
           {games.map(g => (
             <div key={g.id} style={{
               display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
-              background: '#0d0d14', border: `1px solid ${g.enabled !== false ? g.color + '33' : '#2d2d3f'}`, borderRadius: 8,
+              background: '#0d0d14', border: `1px solid ${g.enabled ? g.color + '33' : '#2d2d3f'}`, borderRadius: 8,
             }}>
               <span style={{ fontSize: 20 }}>{g.emoji}</span>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: g.enabled !== false ? g.color : '#6b7280' }}>{g.label}</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: g.enabled ? g.color : '#6b7280' }}>{g.label}</div>
                 <div style={{ fontSize: 10, color: '#4b5563' }}>ID: {g.id}</div>
               </div>
               <div style={{
                 fontSize: 9, fontWeight: 800, padding: '2px 8px', borderRadius: 10,
-                background: g.enabled !== false ? 'rgba(74,222,128,0.1)' : 'rgba(107,114,128,0.1)',
-                color: g.enabled !== false ? '#4ade80' : '#6b7280',
-                border: `1px solid ${g.enabled !== false ? 'rgba(74,222,128,0.3)' : '#2d2d3f'}`,
-              }}>{g.enabled !== false ? 'ENABLED' : 'DISABLED'}</div>
+                background: g.enabled ? 'rgba(74,222,128,0.1)' : 'rgba(107,114,128,0.1)',
+                color: g.enabled ? '#4ade80' : '#6b7280',
+                border: `1px solid ${g.enabled ? 'rgba(74,222,128,0.3)' : '#2d2d3f'}`,
+              }}>
+                {g.enabled ? 'ENABLED' : 'DISABLED'}
+              </div>
               <button onClick={() => setGameModal(g)} style={S.actionBtn('#60a5fa')}>✏️ Edit</button>
-              <button
-                onClick={() => updateAndSave('games', gs => gs.map(x => x.id === g.id ? { ...x, enabled: x.enabled === false } : x))}
-                style={S.actionBtn(g.enabled !== false ? '#f59e0b' : '#4ade80')}
-              >{g.enabled !== false ? '⏸ Disable' : '▶ Enable'}</button>
-              <button
-                onClick={() => updateAndSave('games', gs => gs.filter(x => x.id !== g.id))}
-                style={S.actionBtn('#f87171')}
-              >🗑</button>
+              <button onClick={() => toggleGame(g.id)} style={S.actionBtn(g.enabled ? '#f59e0b' : '#4ade80')}>
+                {g.enabled ? '⏸ Disable' : '▶ Enable'}
+              </button>
+              <button onClick={() => deleteGame(g.id)} style={S.actionBtn('#f87171')}>🗑</button>
             </div>
           ))}
-          {games.length === 0 && <div style={{ fontSize: 12, color: '#4b5563', textAlign: 'center', padding: 16 }}>No games — click + Add Game</div>}
+          {games.length === 0 && <div style={{ fontSize: 12, color: '#4b5563', textAlign: 'center', padding: 16 }}>No games configured</div>}
         </div>
       </div>
 
@@ -2403,42 +2443,50 @@ function SiteSettingsTab() {
           <div style={{ fontSize: 13, fontWeight: 800, color: '#f9fafb' }}>💎 Rarities</div>
           <button onClick={() => setRarityModal({ gameId: selectedGame, rarity: null })} style={S.actionBtn('#a78bfa')}>+ Add Rarity</button>
         </div>
+
+        {/* Game selector for rarities */}
         <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
           {games.map(g => (
-            <button key={g.id} onClick={() => setSelectedGame(g.id)} style={{
-              padding: '4px 12px', borderRadius: 16, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 700,
-              background: selectedGame === g.id ? `${g.color}18` : '#111118',
-              color: selectedGame === g.id ? g.color : '#6b7280',
-              boxShadow: selectedGame === g.id ? `0 0 0 1px ${g.color}40` : '0 0 0 1px #2d2d3f',
-            }}>{g.emoji} {g.label}</button>
+            <button
+              key={g.id}
+              onClick={() => setSelectedGame(g.id)}
+              style={{
+                padding: '4px 12px', borderRadius: 16, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 700,
+                background: selectedGame === g.id ? `${g.color}18` : '#111118',
+                color: selectedGame === g.id ? g.color : '#6b7280',
+                boxShadow: selectedGame === g.id ? `0 0 0 1px ${g.color}40` : '0 0 0 1px #2d2d3f',
+              }}
+            >
+              {g.emoji} {g.label}
+            </button>
           ))}
         </div>
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {activeGameRarities.map(r => (
             <div key={r.id} style={{
               display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
-              background: '#0d0d14', border: `1px solid ${r.enabled !== false ? r.color + '33' : '#2d2d3f'}`, borderRadius: 8,
+              background: '#0d0d14', border: `1px solid ${r.enabled ? r.color + '33' : '#2d2d3f'}`, borderRadius: 8,
             }}>
+              {/* Color swatch */}
               <div style={{ width: 16, height: 16, borderRadius: 4, background: r.color, flexShrink: 0 }} />
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: r.enabled !== false ? r.color : '#6b7280' }}>{r.label}</div>
-                <div style={{ fontSize: 10, color: '#4b5563' }}>ID: {r.id}</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: r.enabled ? r.color : '#6b7280' }}>{r.label}</div>
+                <div style={{ fontSize: 10, color: '#4b5563' }}>ID: {r.id} · BG: {r.bg}</div>
               </div>
               <div style={{
                 fontSize: 9, fontWeight: 800, padding: '2px 8px', borderRadius: 10,
-                background: r.enabled !== false ? 'rgba(74,222,128,0.1)' : 'rgba(107,114,128,0.1)',
-                color: r.enabled !== false ? '#4ade80' : '#6b7280',
-                border: `1px solid ${r.enabled !== false ? 'rgba(74,222,128,0.3)' : '#2d2d3f'}`,
-              }}>{r.enabled !== false ? 'ON' : 'OFF'}</div>
+                background: r.enabled ? 'rgba(74,222,128,0.1)' : 'rgba(107,114,128,0.1)',
+                color: r.enabled ? '#4ade80' : '#6b7280',
+                border: `1px solid ${r.enabled ? 'rgba(74,222,128,0.3)' : '#2d2d3f'}`,
+              }}>
+                {r.enabled ? 'ON' : 'OFF'}
+              </div>
               <button onClick={() => setRarityModal({ gameId: selectedGame, rarity: r })} style={S.actionBtn('#60a5fa')}>✏️</button>
-              <button
-                onClick={() => updateAndSave('rarities', rs => ({ ...rs, [selectedGame]: (rs[selectedGame] || []).map(x => x.id === r.id ? { ...x, enabled: x.enabled === false } : x) }))}
-                style={S.actionBtn(r.enabled !== false ? '#f59e0b' : '#4ade80')}
-              >{r.enabled !== false ? '⏸' : '▶'}</button>
-              <button
-                onClick={() => updateAndSave('rarities', rs => ({ ...rs, [selectedGame]: (rs[selectedGame] || []).filter(x => x.id !== r.id) }))}
-                style={S.actionBtn('#f87171')}
-              >🗑</button>
+              <button onClick={() => toggleRarity(selectedGame, r.id)} style={S.actionBtn(r.enabled ? '#f59e0b' : '#4ade80')}>
+                {r.enabled ? '⏸' : '▶'}
+              </button>
+              <button onClick={() => deleteRarity(selectedGame, r.id)} style={S.actionBtn('#f87171')}>🗑</button>
             </div>
           ))}
           {activeGameRarities.length === 0 && <div style={{ fontSize: 12, color: '#4b5563', textAlign: 'center', padding: 16 }}>No rarities for this game</div>}
@@ -2455,72 +2503,56 @@ function SiteSettingsTab() {
           {paymentMethods.map(pm => (
             <div key={pm.id} style={{
               display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
-              background: '#0d0d14', border: `1px solid ${pm.enabled !== false ? '#2d2d3f' : '#1a1a1a'}`, borderRadius: 8,
+              background: '#0d0d14', border: `1px solid ${pm.enabled ? '#2d2d3f' : '#1a1a1a'}`, borderRadius: 8,
             }}>
               <span style={{ fontSize: 20 }}>{pm.emoji}</span>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: pm.enabled !== false ? '#d1d5db' : '#6b7280' }}>{pm.label}</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: pm.enabled ? '#d1d5db' : '#6b7280' }}>{pm.label}</div>
                 <div style={{ fontSize: 10, color: '#4b5563' }}>ID: {pm.id}</div>
               </div>
               <div style={{
                 fontSize: 9, fontWeight: 800, padding: '2px 8px', borderRadius: 10,
-                background: pm.enabled !== false ? 'rgba(74,222,128,0.1)' : 'rgba(107,114,128,0.1)',
-                color: pm.enabled !== false ? '#4ade80' : '#6b7280',
-                border: `1px solid ${pm.enabled !== false ? 'rgba(74,222,128,0.3)' : '#2d2d3f'}`,
-              }}>{pm.enabled !== false ? 'ENABLED' : 'DISABLED'}</div>
+                background: pm.enabled ? 'rgba(74,222,128,0.1)' : 'rgba(107,114,128,0.1)',
+                color: pm.enabled ? '#4ade80' : '#6b7280',
+                border: `1px solid ${pm.enabled ? 'rgba(74,222,128,0.3)' : '#2d2d3f'}`,
+              }}>
+                {pm.enabled ? 'ENABLED' : 'DISABLED'}
+              </div>
               <button onClick={() => setPmModal(pm)} style={S.actionBtn('#60a5fa')}>✏️ Edit</button>
-              <button
-                onClick={() => updateAndSave('payment_methods', pms => pms.map(x => x.id === pm.id ? { ...x, enabled: x.enabled === false } : x))}
-                style={S.actionBtn(pm.enabled !== false ? '#f59e0b' : '#4ade80')}
-              >{pm.enabled !== false ? '⏸ Disable' : '▶ Enable'}</button>
-              <button
-                onClick={() => updateAndSave('payment_methods', pms => pms.filter(x => x.id !== pm.id))}
-                style={S.actionBtn('#f87171')}
-              >🗑</button>
+              <button onClick={() => togglePm(pm.id)} style={S.actionBtn(pm.enabled ? '#f59e0b' : '#4ade80')}>
+                {pm.enabled ? '⏸ Disable' : '▶ Enable'}
+              </button>
+              <button onClick={() => deletePm(pm.id)} style={S.actionBtn('#f87171')}>🗑</button>
             </div>
           ))}
+          {paymentMethods.length === 0 && <div style={{ fontSize: 12, color: '#4b5563', textAlign: 'center', padding: 16 }}>No payment methods configured</div>}
         </div>
       </div>
 
-      {/* ── MODALS ── */}
+      {/* ── GAME MODAL ── */}
       {gameModal && (
         <GameFormModal
           initial={gameModal === 'add' ? null : gameModal}
-          onSave={(gameData) => {
-            updateAndSave('games', gs => {
-              const isEdit = gs.some(g => g.id === gameData.id)
-              return isEdit ? gs.map(g => g.id === gameData.id ? { ...g, ...gameData } : g) : [...gs, { ...gameData, enabled: true }]
-            })
-            setGameModal(null)
-          }}
+          onSave={saveGame}
           onClose={() => setGameModal(null)}
         />
       )}
+
+      {/* ── RARITY MODAL ── */}
       {rarityModal && (
         <RarityFormModal
           gameId={rarityModal.gameId}
           initial={rarityModal.rarity}
-          onSave={(gameId, rarityData) => {
-            updateAndSave('rarities', rs => {
-              const existing = rs[gameId] || []
-              const isEdit = existing.some(r => r.id === rarityData.id)
-              return { ...rs, [gameId]: isEdit ? existing.map(r => r.id === rarityData.id ? { ...r, ...rarityData } : r) : [...existing, { ...rarityData, enabled: true }] }
-            })
-            setRarityModal(null)
-          }}
+          onSave={saveRarity}
           onClose={() => setRarityModal(null)}
         />
       )}
+
+      {/* ── PAYMENT METHOD MODAL ── */}
       {pmModal && (
         <PmFormModal
           initial={pmModal === 'add' ? null : pmModal}
-          onSave={(pmData) => {
-            updateAndSave('payment_methods', pms => {
-              const isEdit = pms.some(p => p.id === pmData.id)
-              return isEdit ? pms.map(p => p.id === pmData.id ? { ...p, ...pmData } : p) : [...pms, { ...pmData, enabled: true }]
-            })
-            setPmModal(null)
-          }}
+          onSave={savePm}
           onClose={() => setPmModal(null)}
         />
       )}
@@ -2530,16 +2562,22 @@ function SiteSettingsTab() {
 
 // ── Game Add/Edit Modal ──
 function GameFormModal({ initial, onSave, onClose }) {
-  const [form, setForm] = useState({ id: initial?.id || '', label: initial?.label || '', emoji: initial?.emoji || '🎮', color: initial?.color || '#4ade80' })
+  const [form, setForm] = useState({
+    id: initial?.id || '',
+    label: initial?.label || '',
+    emoji: initial?.emoji || '🎮',
+    color: initial?.color || '#4ade80',
+  })
   const isEdit = !!initial
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
   return (
     <Modal title={isEdit ? 'Edit Game' : 'Add Game'} onClose={onClose}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {!isEdit && (
           <div>
-            <label style={{ fontSize: 11, color: '#6b7280', marginBottom: 4, display: 'block' }}>Game ID (lowercase, no spaces)</label>
-            <input value={form.id} onChange={e => set('id', e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))} placeholder="e.g. minecraft" />
+            <label style={{ fontSize: 11, color: '#6b7280', marginBottom: 4, display: 'block' }}>Game ID (slug, no spaces)</label>
+            <input value={form.id} onChange={e => set('id', e.target.value.toLowerCase().replace(/\s+/g, '_'))} placeholder="e.g. minecraft" />
           </div>
         )}
         <div>
@@ -2551,15 +2589,18 @@ function GameFormModal({ initial, onSave, onClose }) {
           <input value={form.emoji} onChange={e => set('emoji', e.target.value)} placeholder="🎮" maxLength={4} />
         </div>
         <div>
-          <label style={{ fontSize: 11, color: '#6b7280', marginBottom: 4, display: 'block' }}>Accent Color</label>
+          <label style={{ fontSize: 11, color: '#6b7280', marginBottom: 4, display: 'block' }}>Accent Color (hex)</label>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <input value={form.color} onChange={e => set('color', e.target.value)} placeholder="#4ade80" style={{ flex: 1 }} />
-            <input type="color" value={form.color.match(/^#[0-9a-f]{6}$/i) ? form.color : '#4ade80'} onChange={e => set('color', e.target.value)} style={{ width: 40, height: 36, padding: 2, borderRadius: 6, border: '1px solid #2d2d3f', background: '#0d0d14', cursor: 'pointer' }} />
+            <input type="color" value={form.color} onChange={e => set('color', e.target.value)} style={{ width: 40, height: 36, padding: 2, borderRadius: 6, border: '1px solid #2d2d3f', background: '#0d0d14', cursor: 'pointer' }} />
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
           <button onClick={onClose} style={{ flex: 1, padding: '9px 0', borderRadius: 8, border: '1px solid #2d2d3f', background: 'transparent', color: '#6b7280', fontWeight: 700, cursor: 'pointer' }}>Cancel</button>
-          <button onClick={() => { if (!form.id || !form.label) return; onSave(form) }} style={{ flex: 2, padding: '9px 0', borderRadius: 8, border: 'none', background: '#4ade8018', color: '#4ade80', fontWeight: 800, cursor: 'pointer', boxShadow: '0 0 0 1px rgba(74,222,128,0.3)' }}>
+          <button
+            onClick={() => { if (!form.id || !form.label) return; onSave(form) }}
+            style={{ flex: 2, padding: '9px 0', borderRadius: 8, border: 'none', background: '#4ade8018', color: '#4ade80', fontWeight: 800, cursor: 'pointer', boxShadow: '0 0 0 1px rgba(74,222,128,0.3)' }}
+          >
             {isEdit ? 'Save Changes' : 'Add Game'}
           </button>
         </div>
@@ -2570,16 +2611,23 @@ function GameFormModal({ initial, onSave, onClose }) {
 
 // ── Rarity Add/Edit Modal ──
 function RarityFormModal({ gameId, initial, onSave, onClose }) {
-  const [form, setForm] = useState({ id: initial?.id || '', label: initial?.label || '', color: initial?.color || '#a78bfa', bg: initial?.bg || '#1a0040', glow: initial?.glow || 'rgba(167,139,250,0.3)' })
+  const [form, setForm] = useState({
+    id: initial?.id || '',
+    label: initial?.label || '',
+    color: initial?.color || '#a78bfa',
+    bg: initial?.bg || '#1a0040',
+    glow: initial?.glow || 'rgba(167,139,250,0.3)',
+  })
   const isEdit = !!initial
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
   return (
     <Modal title={isEdit ? 'Edit Rarity' : 'Add Rarity'} onClose={onClose}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {!isEdit && (
           <div>
             <label style={{ fontSize: 11, color: '#6b7280', marginBottom: 4, display: 'block' }}>Rarity ID (slug)</label>
-            <input value={form.id} onChange={e => set('id', e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))} placeholder="e.g. divine" />
+            <input value={form.id} onChange={e => set('id', e.target.value.toLowerCase().replace(/\s+/g, '_'))} placeholder="e.g. divine" />
           </div>
         )}
         <div>
@@ -2590,26 +2638,35 @@ function RarityFormModal({ gameId, initial, onSave, onClose }) {
           <label style={{ fontSize: 11, color: '#6b7280', marginBottom: 4, display: 'block' }}>Border / Text Color</label>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <input value={form.color} onChange={e => set('color', e.target.value)} placeholder="#a78bfa" style={{ flex: 1 }} />
-            <input type="color" value={form.color.match(/^#[0-9a-f]{6}$/i) ? form.color : '#a78bfa'} onChange={e => set('color', e.target.value)} style={{ width: 40, height: 36, padding: 2, borderRadius: 6, border: '1px solid #2d2d3f', background: '#0d0d14', cursor: 'pointer' }} />
+            <input type="color" value={form.color.startsWith('#') ? form.color : '#a78bfa'} onChange={e => set('color', e.target.value)} style={{ width: 40, height: 36, padding: 2, borderRadius: 6, border: '1px solid #2d2d3f', background: '#0d0d14', cursor: 'pointer' }} />
           </div>
         </div>
         <div>
           <label style={{ fontSize: 11, color: '#6b7280', marginBottom: 4, display: 'block' }}>Background Color</label>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <input value={form.bg} onChange={e => set('bg', e.target.value)} placeholder="#1a0040" style={{ flex: 1 }} />
-            <input type="color" value={form.bg.match(/^#[0-9a-f]{6}$/i) ? form.bg : '#1a0040'} onChange={e => set('bg', e.target.value)} style={{ width: 40, height: 36, padding: 2, borderRadius: 6, border: '1px solid #2d2d3f', background: '#0d0d14', cursor: 'pointer' }} />
+            <input type="color" value={form.bg.startsWith('#') ? form.bg : '#1a0040'} onChange={e => set('bg', e.target.value)} style={{ width: 40, height: 36, padding: 2, borderRadius: 6, border: '1px solid #2d2d3f', background: '#0d0d14', cursor: 'pointer' }} />
           </div>
         </div>
         <div>
-          <label style={{ fontSize: 11, color: '#6b7280', marginBottom: 4, display: 'block' }}>Glow (rgba string)</label>
+          <label style={{ fontSize: 11, color: '#6b7280', marginBottom: 4, display: 'block' }}>Glow (rgba)</label>
           <input value={form.glow} onChange={e => set('glow', e.target.value)} placeholder="rgba(167,139,250,0.3)" />
         </div>
-        <div style={{ padding: '8px 12px', borderRadius: 8, border: `1px solid ${form.color}88`, background: form.bg, color: form.color, fontSize: 12, fontWeight: 800, textAlign: 'center', letterSpacing: '0.1em', textTransform: 'uppercase', boxShadow: `0 0 12px ${form.glow}` }}>
+        {/* Preview */}
+        <div style={{
+          padding: '8px 12px', borderRadius: 8, border: `1px solid ${form.color}88`,
+          background: form.bg, color: form.color, fontSize: 12, fontWeight: 800,
+          textAlign: 'center', letterSpacing: '0.1em', textTransform: 'uppercase',
+          boxShadow: `0 0 12px ${form.glow}`,
+        }}>
           {form.label || 'Preview'}
         </div>
         <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
           <button onClick={onClose} style={{ flex: 1, padding: '9px 0', borderRadius: 8, border: '1px solid #2d2d3f', background: 'transparent', color: '#6b7280', fontWeight: 700, cursor: 'pointer' }}>Cancel</button>
-          <button onClick={() => { if (!form.id || !form.label) return; onSave(gameId, form) }} style={{ flex: 2, padding: '9px 0', borderRadius: 8, border: 'none', background: '#a78bfa18', color: '#a78bfa', fontWeight: 800, cursor: 'pointer', boxShadow: '0 0 0 1px rgba(167,139,250,0.3)' }}>
+          <button
+            onClick={() => { if (!form.id || !form.label) return; onSave(gameId, form) }}
+            style={{ flex: 2, padding: '9px 0', borderRadius: 8, border: 'none', background: '#a78bfa18', color: '#a78bfa', fontWeight: 800, cursor: 'pointer', boxShadow: '0 0 0 1px rgba(167,139,250,0.3)' }}
+          >
             {isEdit ? 'Save Changes' : 'Add Rarity'}
           </button>
         </div>
@@ -2620,16 +2677,21 @@ function RarityFormModal({ gameId, initial, onSave, onClose }) {
 
 // ── Payment Method Add/Edit Modal ──
 function PmFormModal({ initial, onSave, onClose }) {
-  const [form, setForm] = useState({ id: initial?.id || '', label: initial?.label || '', emoji: initial?.emoji || '💳' })
+  const [form, setForm] = useState({
+    id: initial?.id || '',
+    label: initial?.label || '',
+    emoji: initial?.emoji || '💳',
+  })
   const isEdit = !!initial
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
   return (
     <Modal title={isEdit ? 'Edit Payment Method' : 'Add Payment Method'} onClose={onClose}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {!isEdit && (
           <div>
             <label style={{ fontSize: 11, color: '#6b7280', marginBottom: 4, display: 'block' }}>Method ID (slug)</label>
-            <input value={form.id} onChange={e => set('id', e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))} placeholder="e.g. zelle" />
+            <input value={form.id} onChange={e => set('id', e.target.value.toLowerCase().replace(/\s+/g, '_'))} placeholder="e.g. zelle" />
           </div>
         )}
         <div>
@@ -2641,11 +2703,14 @@ function PmFormModal({ initial, onSave, onClose }) {
           <input value={form.emoji} onChange={e => set('emoji', e.target.value)} placeholder="💳" maxLength={4} />
         </div>
         <div style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', fontSize: 11, color: '#d97706' }}>
-          ⚠️ New payment methods with custom IDs need a matching column in the <code>profiles</code> table to store user handles.
+          ⚠️ New payment methods need a matching DB column in the <code>profiles</code> table (e.g. <code>zelle_handle</code>) and settings page field to work end-to-end.
         </div>
         <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
           <button onClick={onClose} style={{ flex: 1, padding: '9px 0', borderRadius: 8, border: '1px solid #2d2d3f', background: 'transparent', color: '#6b7280', fontWeight: 700, cursor: 'pointer' }}>Cancel</button>
-          <button onClick={() => { if (!form.id || !form.label) return; onSave(form) }} style={{ flex: 2, padding: '9px 0', borderRadius: 8, border: 'none', background: '#60a5fa18', color: '#60a5fa', fontWeight: 800, cursor: 'pointer', boxShadow: '0 0 0 1px rgba(96,165,250,0.3)' }}>
+          <button
+            onClick={() => { if (!form.id || !form.label) return; onSave(form) }}
+            style={{ flex: 2, padding: '9px 0', borderRadius: 8, border: 'none', background: '#60a5fa18', color: '#60a5fa', fontWeight: 800, cursor: 'pointer', boxShadow: '0 0 0 1px rgba(96,165,250,0.3)' }}
+          >
             {isEdit ? 'Save Changes' : 'Add Method'}
           </button>
         </div>
