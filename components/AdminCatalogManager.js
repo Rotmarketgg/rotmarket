@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { clearMarketConfigCache } from '@/lib/market-config'
+import { bumpMarketConfigVersion, clearMarketConfigCache } from '@/lib/market-config'
 
 const BOX = { background: '#111118', border: '1px solid #1f2937', borderRadius: 10, padding: '12px 14px' }
 const INPUT = { background: '#0d0d14', border: '1px solid #2d2d3f', borderRadius: 8, padding: '8px 10px', color: '#f9fafb', fontSize: 12, outline: 'none' }
@@ -58,6 +58,7 @@ export default function AdminCatalogManager() {
     setRarities(json.rarities || [])
     setPaymentMethods(json.paymentMethods || [])
     clearMarketConfigCache()
+    bumpMarketConfigVersion()
   }
 
   const load = async () => {

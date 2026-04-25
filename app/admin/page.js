@@ -219,7 +219,6 @@ export default function AdminPage() {
   const [userSearch, setUserSearch] = useState('')
   const [usersPage, setUsersPage] = useState(1)
   const [usersTotal, setUsersTotal] = useState(0)
-  const [showEmails, setShowEmails] = useState(false)
   const [userEmails, setUserEmails] = useState({}) // { userId: email }
   const [emailsLoading, setEmailsLoading] = useState(false)
   const [reviews, setReviews] = useState([])
@@ -406,8 +405,8 @@ export default function AdminPage() {
       setUsersTotal(count || 0)
       setUsersPage(page)
       setUsers(data || [])
-      // Clear cached emails when user list refreshes
-      if (!showEmails) setUserEmails({})
+      const ids = (data || []).map(u => u.id).filter(Boolean)
+      if (ids.length > 0) loadEmailsByIds(ids)
     } catch (err) {
       showToast('Error loading users: ' + err.message, 'error')
     } finally {
@@ -416,21 +415,23 @@ export default function AdminPage() {
   }
 
   // Loads email addresses via SECURITY DEFINER RPC (Owner only)
-  async function loadEmails(search) {
+  async function loadEmailsByIds(userIds = []) {
     setEmailsLoading(true)
     try {
-      const { data, error } = await supabase.rpc('admin_get_users_with_email', {
-        search_term: search || null
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/admin/user-emails', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: session?.access_token ? `Bearer ${session.access_token}` : '',
+        },
+        body: JSON.stringify({ userIds }),
       })
-      if (error) throw error
-      const map = {}
-      for (const row of data || []) {
-        map[row.id] = { email: row.email, lastSignIn: row.last_sign_in_at, confirmed: row.confirmed_at }
-      }
-      setUserEmails(map)
-      setShowEmails(true)
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || 'Failed to load emails')
+      setUserEmails(prev => ({ ...prev, ...(json.emails || {}) }))
     } catch (err) {
-      showToast('Failed to load emails: ' + err.message + ' — Run SQL migration #4 in SUPABASE_SQL.md', 'error')
+      showToast('Failed to load emails: ' + err.message, 'error')
     } finally {
       setEmailsLoading(false)
     }
@@ -1304,18 +1305,9 @@ export default function AdminPage() {
                 color: '#4ade80', fontSize: 12, fontWeight: 700, cursor: 'pointer',
               }}>Search</button>
 
-              {/* Email toggle */}
-              <button
-                onClick={() => showEmails ? setShowEmails(false) : loadEmails(userSearch)}
-                disabled={emailsLoading}
-                style={{
-                  padding: '10px 16px', borderRadius: 8, border: 'none',
-                  background: showEmails ? 'rgba(96,165,250,0.2)' : 'rgba(96,165,250,0.1)',
-                  color: '#60a5fa', fontSize: 12, fontWeight: 700, cursor: emailsLoading ? 'default' : 'pointer',
-                  boxShadow: showEmails ? '0 0 0 1px rgba(96,165,250,0.4)' : 'none',
-                }}>
-                {emailsLoading ? '...' : showEmails ? '🔒 Hide Emails' : '📧 Show Emails'}
-              </button>
+              <span style={{ fontSize: 11, color: emailsLoading ? '#60a5fa' : '#4b5563' }}>
+                {emailsLoading ? 'Loading emails...' : 'Emails auto-loaded'}
+              </span>
 
               <span style={{ fontSize: 11, color: '#4b5563', marginLeft: 'auto' }}>{usersTotal} users</span>
             </div>
@@ -1327,7 +1319,7 @@ export default function AdminPage() {
               : <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {users.map(u => (
                     <UserRow key={u.id} user={u}
-                      emailData={showEmails ? userEmails[u.id] : null}
+                      emailData={userEmails[u.id] || null}
                       onUpdateBadge={updateBadge}
                       onToggleBan={toggleBan}
                       onDelete={confirmDeleteUser}
@@ -2243,6 +2235,10 @@ function EmptyState({ icon, message }) {
     </div>
   )
 }
+
+
+
+
 
 
 
